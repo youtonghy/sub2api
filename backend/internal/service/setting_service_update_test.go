@@ -331,7 +331,8 @@ func TestSettingService_UpdateSettings_DefaultSubscriptions_RejectsDuplicateGrou
 
 func TestSettingService_UpdateSettings_DefaultSubscriptions_RejectsDuplicateGroupWithoutGroupReader(t *testing.T) {
 	repo := &settingUpdateRepoStub{}
-	svc := NewSettingService(repo, &config.Config{})
+	cfg := &config.Config{}
+	svc := NewSettingService(repo, cfg)
 
 	err := svc.UpdateSettings(context.Background(), &SystemSettings{
 		DefaultSubscriptions: []DefaultSubscriptionSetting{
@@ -402,7 +403,8 @@ func TestSettingService_UpdateSettings_PaymentVisibleMethodsAndAdvancedScheduler
 	defer resetOpenAIAdvancedSchedulerSettingCacheForTest()
 
 	repo := &settingUpdateRepoStub{}
-	svc := NewSettingService(repo, &config.Config{})
+	cfg := &config.Config{}
+	svc := NewSettingService(repo, cfg)
 
 	err := svc.UpdateSettings(context.Background(), &SystemSettings{
 		PaymentVisibleMethodAlipaySource:                   "alipay",
@@ -425,6 +427,7 @@ func TestSettingService_UpdateSettings_PaymentVisibleMethodsAndAdvancedScheduler
 		OpenAIAdvancedSchedulerWeightUpstreamCost:          "1.5",
 		OpenAIAdvancedSchedulerWeightPreviousResponse:      "8",
 		OpenAIAdvancedSchedulerWeightSessionSticky:         "4",
+		StrictPriorityFallback:                             true,
 	})
 	require.NoError(t, err)
 	require.Equal(t, VisibleMethodSourceOfficialAlipay, repo.updates[SettingPaymentVisibleMethodAlipaySource])
@@ -434,6 +437,8 @@ func TestSettingService_UpdateSettings_PaymentVisibleMethodsAndAdvancedScheduler
 	require.Equal(t, "true", repo.updates[SettingKeyOpenAILowUpstreamRatePriorityEnabled])
 	require.Equal(t, "0.05", repo.updates[SettingKeyOpenAIOAuthSchedulingRateMultiplier])
 	require.Equal(t, "true", repo.updates[openAIAdvancedSchedulerSettingKey])
+	require.Equal(t, "true", repo.updates[SettingKeyStrictPriorityFallback])
+	require.True(t, cfg.Gateway.Scheduling.StrictPriorityFallback)
 	require.Equal(t, "true", repo.updates[SettingKeyOpenAIAdvancedSchedulerStickyWeightedEnabled])
 	require.Equal(t, "true", repo.updates[SettingKeyOpenAIAdvancedSchedulerSubscriptionPriorityEnabled])
 	require.Equal(t, "3", repo.updates[SettingKeyOpenAIAdvancedSchedulerLBTopK])
@@ -517,6 +522,15 @@ func TestSettingService_ParseSettingsDefaultsOpenAIOAuthSchedulingRateMultiplier
 
 	require.Equal(t, 1.0, svc.parseSettings(map[string]string{}).OpenAIOAuthSchedulingRateMultiplier)
 	require.Equal(t, 0.05, svc.parseSettings(map[string]string{SettingKeyOpenAIOAuthSchedulingRateMultiplier: "0.05"}).OpenAIOAuthSchedulingRateMultiplier)
+}
+
+func TestSettingService_ParseSettingsStrictPriorityFallbackFollowsConfigWhenUnset(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Gateway.Scheduling.StrictPriorityFallback = true
+	svc := NewSettingService(&settingUpdateRepoStub{}, cfg)
+
+	require.True(t, svc.parseSettings(map[string]string{}).StrictPriorityFallback)
+	require.False(t, svc.parseSettings(map[string]string{SettingKeyStrictPriorityFallback: "false"}).StrictPriorityFallback)
 }
 
 func TestSettingService_GetAllSettings_OpenAIAdvancedSchedulerEffectiveValuesUseConfig(t *testing.T) {

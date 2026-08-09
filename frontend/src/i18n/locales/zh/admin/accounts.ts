@@ -2,6 +2,21 @@ export default {
     accounts: {
       title: '账号管理',
       description: '管理 AI 平台账号和 Cookie',
+      accountList: '账号列表',
+      failureLog: '故障日志',
+      viewMode: '账号视图',
+      failureHeatmap: {
+        title: '今日账号故障率',
+        today: '今天',
+        noCalls: '无调用',
+        requests: '调用',
+        failures: '故障',
+        failureRate: '故障率',
+        todayRate: '今日',
+        loadFailed: '加载账号故障率失败',
+        legendLow: '低',
+        legendHigh: '高'
+      },
       createAccount: '添加账号',
       autoRefresh: '自动刷新',
       enableAutoRefresh: '启用自动刷新',

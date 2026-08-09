@@ -2,6 +2,21 @@ export default {
     accounts: {
       title: 'Account Management',
       description: 'Manage AI platform accounts and credentials',
+      accountList: 'Account List',
+      failureLog: 'Failure Log',
+      viewMode: 'Account view',
+      failureHeatmap: {
+        title: "Today's account failure rate",
+        today: 'Today',
+        noCalls: 'No calls',
+        requests: 'Calls',
+        failures: 'Failures',
+        failureRate: 'Failure rate',
+        todayRate: 'Today',
+        loadFailed: 'Failed to load account failure rates',
+        legendLow: 'Low',
+        legendHigh: 'High'
+      },
       createAccount: 'Create Account',
       autoRefresh: 'Auto Refresh',
       enableAutoRefresh: 'Enable auto refresh',

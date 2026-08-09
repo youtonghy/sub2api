@@ -428,6 +428,15 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.AllowUngroupedKeyScheduling != after.AllowUngroupedKeyScheduling {
 		changed = append(changed, "allow_ungrouped_key_scheduling")
 	}
+	if before.StrictPriorityFallback != after.StrictPriorityFallback {
+		changed = append(changed, "strict_priority_fallback")
+	}
+	if before.StrictPriorityRetryCount != after.StrictPriorityRetryCount {
+		changed = append(changed, "strict_priority_retry_count")
+	}
+	if before.StrictPriorityCooldownMinutes != after.StrictPriorityCooldownMinutes {
+		changed = append(changed, "strict_priority_cooldown_minutes")
+	}
 	if before.BackendModeEnabled != after.BackendModeEnabled {
 		changed = append(changed, "backend_mode_enabled")
 	}

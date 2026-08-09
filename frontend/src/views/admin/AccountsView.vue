@@ -17,6 +17,25 @@
             @create="showCreate = true"
           >
             <template #after>
+              <div class="inline-flex h-9 items-center border border-gray-200 bg-gray-50 p-0.5 dark:border-dark-700 dark:bg-dark-800" role="group" :aria-label="t('admin.accounts.viewMode')">
+                <button
+                  type="button"
+                  class="h-7 px-2.5 text-sm transition-colors"
+                  :class="accountView === 'list' ? 'bg-white font-medium text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'"
+                  @click="setAccountView('list')"
+                >
+                  {{ t('admin.accounts.accountList') }}
+                </button>
+                <button
+                  type="button"
+                  class="h-7 px-2.5 text-sm transition-colors"
+                  :class="accountView === 'failures' ? 'bg-white font-medium text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'"
+                  @click="setAccountView('failures')"
+                >
+                  {{ t('admin.accounts.failureLog') }}
+                </button>
+              </div>
+
               <!-- Auto Refresh Dropdown -->
               <div class="relative" ref="autoRefreshDropdownRef">
                 <button
@@ -176,6 +195,7 @@
       </template>
       <template #table>
         <AccountBulkActionsBar
+          v-if="accountView === 'list'"
           :selected-ids="selIds"
           :total-results="pagination.total"
           :selecting-all="selectingAllResults"
@@ -193,6 +213,7 @@
         />
         <div ref="accountTableRef" class="flex min-h-0 flex-1 flex-col overflow-hidden">
         <DataTable
+          v-if="accountView === 'list'"
           ref="dataTableRef"
           :columns="cols"
           :data="accounts"
@@ -446,6 +467,15 @@
             </div>
           </template>
         </DataTable>
+        <AccountFailureHeatmap
+          v-else
+          :accounts="accounts"
+          :by-account="hourlyFailureData.by_account"
+          :date="hourlyFailureData.date"
+          :timezone="hourlyFailureData.timezone"
+          :loading="loading || hourlyFailureLoading"
+          :error="hourlyFailureError"
+        />
         </div>
       </template>
       <template #pagination><Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" /></template>
@@ -503,7 +533,7 @@ import DataTable from '@/components/common/DataTable.vue'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-import { CreateAccountModal, EditAccountModal, BulkEditAccountModal, SyncFromCrsModal, TempUnschedStatusModal } from '@/components/account'
+import { CreateAccountModal, EditAccountModal, BulkEditAccountModal, SyncFromCrsModal, TempUnschedStatusModal, AccountFailureHeatmap } from '@/components/account'
 import AccountTableActions from '@/components/admin/account/AccountTableActions.vue'
 import AccountTableFilters from '@/components/admin/account/AccountTableFilters.vue'
 import AccountBulkActionsBar from '@/components/admin/account/AccountBulkActionsBar.vue'
@@ -533,6 +563,7 @@ import { sanitizeUrl } from '@/utils/url'
 import { getFloatingPanelPosition } from '@/utils/floatingPanel'
 import { formatMultiplier } from '@/utils/formatters'
 import type { Account, AccountPlatform, AccountSchedulerGroupScore, AccountType, AccountUsageInfo, Proxy as AccountProxy, AdminGroup, WindowStats, ClaudeModel, UpstreamBillingProbeSnapshot } from '@/types'
+import type { AccountHourlyFailureResponse } from '@/api/admin/ops'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -696,6 +727,38 @@ const todayStatsError = ref<string | null>(null)
 const todayStatsReqSeq = ref(0)
 const pendingTodayStatsRefresh = ref(false)
 const usageManualRefreshToken = ref(0)
+const accountView = ref<'list' | 'failures'>('list')
+const hourlyFailureLoading = ref(false)
+const hourlyFailureError = ref<string | null>(null)
+const hourlyFailureReqSeq = ref(0)
+const hourlyFailureData = ref<AccountHourlyFailureResponse>({ date: '', timezone: '', by_account: {} })
+
+const refreshHourlyFailures = async () => {
+  if (accountView.value !== 'failures') return
+  const accountIDs = accounts.value.map(account => account.id)
+  const reqSeq = ++hourlyFailureReqSeq.value
+  if (accountIDs.length === 0) {
+    hourlyFailureData.value = { date: '', timezone: '', by_account: {} }
+    hourlyFailureError.value = null
+    hourlyFailureLoading.value = false
+    return
+  }
+  hourlyFailureLoading.value = true
+  hourlyFailureError.value = null
+  try {
+    const result = await adminAPI.ops.getAccountHourlyFailures(accountIDs)
+    if (reqSeq === hourlyFailureReqSeq.value) hourlyFailureData.value = result
+  } catch (error) {
+    if (reqSeq === hourlyFailureReqSeq.value) hourlyFailureError.value = extractApiErrorMessage(error)
+  } finally {
+    if (reqSeq === hourlyFailureReqSeq.value) hourlyFailureLoading.value = false
+  }
+}
+
+const setAccountView = (view: 'list' | 'failures') => {
+  accountView.value = view
+  if (view === 'failures') void refreshHourlyFailures()
+}
 
 const desktopViewportQuery = '(min-width: 768px)'
 const isDesktopViewport = ref(
@@ -1162,7 +1225,7 @@ const load = async () => {
     isFirstLoad.value = false
     delete requestParams.lite
   }
-  await refreshTodayStatsBatch()
+  await Promise.all([refreshTodayStatsBatch(), refreshHourlyFailures()])
 }
 
 const reload = async () => {
@@ -1172,7 +1235,7 @@ const reload = async () => {
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = false
   await baseReload()
-  await refreshTodayStatsBatch()
+  await Promise.all([refreshTodayStatsBatch(), refreshHourlyFailures()])
 }
 
 const refreshUpstreamBillingSortedList = async (force = false) => {
@@ -1235,6 +1298,9 @@ watch(loading, (isLoading, wasLoading) => {
     pendingTodayStatsRefresh.value = false
     refreshTodayStatsBatch().catch((error) => {
       console.error('Failed to refresh account today stats after table load:', error)
+    })
+    refreshHourlyFailures().catch((error) => {
+      console.error('Failed to refresh account failure heatmap after table load:', error)
     })
   }
 })
@@ -1376,7 +1442,7 @@ const refreshAccountsIncrementally = async () => {
     }
     upstreamBillingNow.value = Date.now()
 
-    await refreshTodayStatsBatch()
+    await Promise.all([refreshTodayStatsBatch(), refreshHourlyFailures()])
   } catch (error) {
     console.error('Auto refresh failed:', error)
   } finally {

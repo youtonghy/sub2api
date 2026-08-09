@@ -13,6 +13,20 @@ export interface OpsRequestOptions {
   signal?: AbortSignal
 }
 
+export interface AccountHourlyFailureBucket {
+  account_id: number
+  hour: number
+  request_count: number
+  failure_count: number
+  failure_rate: number
+}
+
+export interface AccountHourlyFailureResponse {
+  date: string
+  timezone: string
+  by_account: Record<string, AccountHourlyFailureBucket[]>
+}
+
 export type OpsUpstreamErrorEvent = {
   at_unix_ms?: number
   platform?: string
@@ -390,6 +404,9 @@ export interface AccountAvailability {
   overload_remaining_sec?: number
   has_error: boolean
   error_message?: string
+  temp_unschedulable_until?: string
+  temp_unschedulable_reason?: string
+  cooldown_remaining_sec?: number
 }
 
 export interface OpsAccountAvailabilityStatsResponse {
@@ -1305,6 +1322,13 @@ async function updateMetricThresholds(thresholds: OpsMetricThresholds): Promise<
   await apiClient.put('/admin/ops/settings/metric-thresholds', thresholds)
 }
 
+export async function getAccountHourlyFailures(accountIds: number[]): Promise<AccountHourlyFailureResponse> {
+  const { data } = await apiClient.post<AccountHourlyFailureResponse>('/admin/ops/account-hourly-failures', {
+    account_ids: accountIds
+  })
+  return data
+}
+
 export const opsAPI = {
   getDashboardSnapshotV2,
   getDashboardOverview,
@@ -1316,6 +1340,7 @@ export const opsAPI = {
   getConcurrencyStats,
   getUserConcurrencyStats,
   getAccountAvailabilityStats,
+  getAccountHourlyFailures,
   getRealtimeTrafficSummary,
   subscribeQPS,
 

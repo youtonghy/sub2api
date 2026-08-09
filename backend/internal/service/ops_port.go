@@ -13,6 +13,7 @@ type OpsRepository interface {
 	ListRequestDetails(ctx context.Context, filter *OpsRequestDetailFilter) ([]*OpsRequestDetail, int64, error)
 	BatchInsertSystemLogs(ctx context.Context, inputs []*OpsInsertSystemLogInput) (int64, error)
 	ListSystemLogs(ctx context.Context, filter *OpsSystemLogFilter) (*OpsSystemLogList, error)
+	GetAccountHourlyFailureBuckets(ctx context.Context, accountIDs []int64, startTime, endTime time.Time, timezoneName string) ([]*OpsAccountHourlyFailureBucket, error)
 	DeleteSystemLogs(ctx context.Context, filter *OpsSystemLogCleanupFilter) (int64, error)
 	InsertSystemLogCleanupAudit(ctx context.Context, input *OpsSystemLogCleanupAudit) error
 
@@ -239,6 +240,23 @@ type OpsSystemLogList struct {
 	Total    int             `json:"total"`
 	Page     int             `json:"page"`
 	PageSize int             `json:"page_size"`
+}
+
+// OpsAccountHourlyFailureBucket combines completed successful requests with
+// every recorded upstream failure attempt, including failures hidden by a
+// successful retry or account fallback.
+type OpsAccountHourlyFailureBucket struct {
+	AccountID    int64   `json:"account_id"`
+	Hour         int     `json:"hour"`
+	RequestCount int64   `json:"request_count"`
+	FailureCount int64   `json:"failure_count"`
+	FailureRate  float64 `json:"failure_rate"`
+}
+
+type OpsAccountHourlyFailureResponse struct {
+	Date      string                                      `json:"date"`
+	Timezone  string                                      `json:"timezone"`
+	ByAccount map[string][]*OpsAccountHourlyFailureBucket `json:"by_account"`
 }
 
 type OpsSystemLogCleanupAudit struct {

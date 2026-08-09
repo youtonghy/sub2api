@@ -1365,6 +1365,10 @@ type TLSProfileConfig struct {
 
 // GatewaySchedulingConfig accounts scheduling configuration.
 type GatewaySchedulingConfig struct {
+	// StrictPriorityRetryCount retries a failed pool-mode account before switching.
+	StrictPriorityRetryCount int `mapstructure:"strict_priority_retry_count"`
+	// StrictPriorityCooldownMinutes temporarily removes a failed account after switching.
+	StrictPriorityCooldownMinutes int `mapstructure:"strict_priority_cooldown_minutes"`
 	// 粘性会话排队配置
 	StickySessionMaxWaiting  int           `mapstructure:"sticky_session_max_waiting"`
 	StickySessionWaitTimeout time.Duration `mapstructure:"sticky_session_wait_timeout"`
@@ -2392,6 +2396,8 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.fallback_max_waiting", 100)
 	viper.SetDefault("gateway.scheduling.fallback_selection_mode", "last_used")
 	viper.SetDefault("gateway.scheduling.strict_priority_fallback", false)
+	viper.SetDefault("gateway.scheduling.strict_priority_retry_count", 0)
+	viper.SetDefault("gateway.scheduling.strict_priority_cooldown_minutes", 0)
 	viper.SetDefault("gateway.scheduling.prefer_soonest_reset", false)
 	viper.SetDefault("gateway.scheduling.load_batch_enabled", true)
 	viper.SetDefault("gateway.scheduling.load_batch_cache_ttl_ms", 200)

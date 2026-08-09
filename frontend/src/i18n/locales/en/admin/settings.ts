@@ -420,6 +420,12 @@ export default {
       scheduling: {
         title: 'Gateway Scheduling Settings',
         description: 'Control API Key scheduling behavior',
+        strictPriorityFallback: 'Strict Priority Auto-Failover',
+        strictPriorityFallbackHint: 'When an upstream account returns a recoverable error, immediately try the next available provider by priority. No manual error-code list is required.',
+        strictPriorityRetryCount: 'Pool-mode retry count',
+        strictPriorityRetryCountHint: 'Retries pool-mode providers before switching; 0 disables retries.',
+        strictPriorityCooldownMinutes: 'Failed provider cooldown (minutes)',
+        strictPriorityCooldownMinutesHint: 'Temporarily removes the failed provider after switching; 0 disables cooldown.',
         allowUngroupedKey: 'Allow Ungrouped Key Scheduling',
         allowUngroupedKeyHint: 'When disabled, API Keys not assigned to any group cannot make requests (403 Forbidden). Keep disabled to ensure all Keys belong to a specific group.',
         accountSchedulingThresholdsTitle: 'Platform Account Auto-Pause Thresholds',

@@ -528,6 +528,9 @@ const (
 
 	// SettingKeyAllowUngroupedKeyScheduling 允许未分组 API Key 调度（默认 false：未分组 Key 返回 403）
 	SettingKeyAllowUngroupedKeyScheduling = "allow_ungrouped_key_scheduling"
+	SettingKeyStrictPriorityFallback = "strict_priority_fallback"
+	SettingKeyStrictPriorityRetryCount = "strict_priority_retry_count"
+	SettingKeyStrictPriorityCooldownMinutes = "strict_priority_cooldown_minutes"
 	// SettingKeyOpenAILowUpstreamRatePriorityEnabled 旧调度是否按上游 token 倍率优先。
 	SettingKeyOpenAILowUpstreamRatePriorityEnabled = "openai_low_upstream_rate_priority_enabled"
 	// SettingKeyOpenAIOAuthSchedulingRateMultiplier OAuth 账号参与成本调度时使用的参考倍率。

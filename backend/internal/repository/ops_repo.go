@@ -840,6 +840,106 @@ LIMIT $` + itoa(len(args)+1) + ` OFFSET $` + itoa(len(args)+2)
 	}, nil
 }
 
+func (r *opsRepository) GetAccountHourlyFailureBuckets(
+	ctx context.Context,
+	accountIDs []int64,
+	startTime, endTime time.Time,
+	timezoneName string,
+) ([]*service.OpsAccountHourlyFailureBucket, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("nil ops repository")
+	}
+	if len(accountIDs) == 0 {
+		return []*service.OpsAccountHourlyFailureBucket{}, nil
+	}
+
+	// Successful requests are persisted in usage_logs. Failed attempts come
+	// from upstream_errors, which is also written when retry/fallback makes the
+	// final client response successful. This preserves the reliability signal
+	// for the account that actually failed.
+	query := `
+WITH successful AS (
+  SELECT
+    account_id,
+    EXTRACT(HOUR FROM created_at AT TIME ZONE $4)::int AS hour,
+    COUNT(*)::bigint AS success_count
+  FROM usage_logs
+  WHERE account_id = ANY($1)
+    AND created_at >= $2
+    AND created_at < $3
+  GROUP BY account_id, hour
+), failed_events AS (
+  SELECT
+    (event->>'account_id')::bigint AS account_id,
+    EXTRACT(HOUR FROM e.created_at AT TIME ZONE $4)::int AS hour,
+    COUNT(*)::bigint AS failure_count
+  FROM ops_error_logs e
+  CROSS JOIN LATERAL jsonb_array_elements(
+    CASE
+      WHEN jsonb_typeof(e.upstream_errors) = 'array' THEN e.upstream_errors
+      ELSE '[]'::jsonb
+    END
+  ) AS event
+  WHERE e.created_at >= $2
+    AND e.created_at < $3
+    AND COALESCE(event->>'account_id', '') ~ '^[1-9][0-9]*$'
+    AND (event->>'account_id')::bigint = ANY($1)
+  GROUP BY (event->>'account_id')::bigint, hour
+), direct_failed AS (
+  SELECT
+    e.account_id,
+    EXTRACT(HOUR FROM e.created_at AT TIME ZONE $4)::int AS hour,
+    COUNT(*)::bigint AS failure_count
+  FROM ops_error_logs e
+  WHERE e.account_id = ANY($1)
+    AND e.created_at >= $2
+    AND e.created_at < $3
+    AND jsonb_array_length(
+      CASE WHEN jsonb_typeof(e.upstream_errors) = 'array' THEN e.upstream_errors ELSE '[]'::jsonb END
+    ) = 0
+    AND (e.upstream_status_code IS NOT NULL OR e.error_phase = 'upstream' OR e.error_source = 'upstream')
+  GROUP BY e.account_id, hour
+), failed AS (
+  SELECT account_id, hour, failure_count FROM failed_events
+  UNION ALL
+  SELECT account_id, hour, failure_count FROM direct_failed
+), combined AS (
+  SELECT account_id, hour, success_count, 0::bigint AS failure_count FROM successful
+  UNION ALL
+  SELECT account_id, hour, 0::bigint AS success_count, failure_count FROM failed
+)
+SELECT
+  account_id,
+  hour,
+  SUM(success_count)::bigint + SUM(failure_count)::bigint AS request_count,
+  SUM(failure_count)::bigint AS failure_count
+FROM combined
+GROUP BY account_id, hour
+ORDER BY account_id, hour`
+
+	rows, err := r.db.QueryContext(ctx, query, pq.Array(accountIDs), startTime, endTime, timezoneName)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	buckets := make([]*service.OpsAccountHourlyFailureBucket, 0)
+	for rows.Next() {
+		bucket := &service.OpsAccountHourlyFailureBucket{}
+		if err := rows.Scan(&bucket.AccountID, &bucket.Hour, &bucket.RequestCount, &bucket.FailureCount); err != nil {
+			return nil, err
+		}
+		if bucket.RequestCount > 0 {
+			bucket.FailureRate = float64(bucket.FailureCount) / float64(bucket.RequestCount)
+		}
+		buckets = append(buckets, bucket)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return buckets, nil
+}
+
 func (r *opsRepository) DeleteSystemLogs(ctx context.Context, filter *service.OpsSystemLogCleanupFilter) (int64, error) {
 	if r == nil || r.db == nil {
 		return 0, fmt.Errorf("nil ops repository")

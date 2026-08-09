@@ -413,6 +413,12 @@ export default {
       scheduling: {
         title: '网关调度设置',
         description: '控制 API Key 的调度行为',
+        strictPriorityFallback: '严格优先级自动回退',
+        strictPriorityFallbackHint: '上游账号发生可恢复错误时立即跳过当前账号，按优先级尝试下一个可用 provider；不需要手动维护错误码列表。',
+        strictPriorityRetryCount: '池模式重试次数',
+        strictPriorityRetryCountHint: '仅对启用池模式的 provider 生效，0 表示不重试。',
+        strictPriorityCooldownMinutes: '失败 provider 冷却（分钟）',
+        strictPriorityCooldownMinutesHint: '切换 away 后暂时移出调度池，0 表示不冷却。',
         allowUngroupedKey: '允许未分组 Key 调度',
         allowUngroupedKeyHint: '关闭后，未分配到任何分组的 API Key 将无法发起请求（返回 403）。建议保持关闭以确保所有 Key 都归属明确的分组。',
         accountSchedulingThresholdsTitle: '平台账号自动停调阈值',

@@ -4875,6 +4875,42 @@
             </div>
             <div class="space-y-5 p-6">
               <div class="flex items-center justify-between">
+                <div class="min-w-0 pr-6">
+                  <label
+                    class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                    for="strict-priority-fallback-toggle"
+                  >
+                    {{ t("admin.settings.scheduling.strictPriorityFallback") }}
+                  </label>
+                  <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.scheduling.strictPriorityFallbackHint") }}
+                  </p>
+                </div>
+                <Toggle
+                  id="strict-priority-fallback-toggle"
+                  v-model="form.strict_priority_fallback"
+                  data-testid="strict-priority-fallback-toggle"
+                />
+              </div>
+
+              <div class="grid gap-4 border-t border-gray-100 pt-4 sm:grid-cols-2 dark:border-dark-700">
+                <div>
+                  <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300" for="strict-priority-retry-count">
+                    {{ t("admin.settings.scheduling.strictPriorityRetryCount") }}
+                  </label>
+                  <input id="strict-priority-retry-count" v-model.number="form.strict_priority_retry_count" type="number" min="0" max="10" step="1" class="input w-full sm:w-32" :disabled="!form.strict_priority_fallback" data-testid="strict-priority-retry-count" />
+                  <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.settings.scheduling.strictPriorityRetryCountHint") }}</p>
+                </div>
+                <div>
+                  <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300" for="strict-priority-cooldown-minutes">
+                    {{ t("admin.settings.scheduling.strictPriorityCooldownMinutes") }}
+                  </label>
+                  <input id="strict-priority-cooldown-minutes" v-model.number="form.strict_priority_cooldown_minutes" type="number" min="0" max="1440" step="1" class="input w-full sm:w-32" :disabled="!form.strict_priority_fallback" data-testid="strict-priority-cooldown-minutes" />
+                  <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.settings.scheduling.strictPriorityCooldownMinutesHint") }}</p>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between">
                 <div>
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -9633,6 +9669,9 @@ const form = reactive<SettingsForm>({
   max_claude_code_version: "",
   // 分组隔离
   allow_ungrouped_key_scheduling: false,
+  strict_priority_fallback: false,
+  strict_priority_retry_count: 0,
+  strict_priority_cooldown_minutes: 0,
   openai_low_upstream_rate_priority_enabled: false,
   openai_oauth_scheduling_rate_multiplier: 1,
   openai_advanced_scheduler_enabled: false,
@@ -11217,6 +11256,9 @@ async function saveSettings() {
       min_claude_code_version: form.min_claude_code_version,
       max_claude_code_version: form.max_claude_code_version,
       allow_ungrouped_key_scheduling: form.allow_ungrouped_key_scheduling,
+      strict_priority_fallback: form.strict_priority_fallback,
+      strict_priority_retry_count: form.strict_priority_retry_count,
+      strict_priority_cooldown_minutes: form.strict_priority_cooldown_minutes,
       enable_fingerprint_unification: form.enable_fingerprint_unification,
       enable_metadata_passthrough: form.enable_metadata_passthrough,
       enable_cch_signing: form.enable_cch_signing,

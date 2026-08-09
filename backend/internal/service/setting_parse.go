@@ -229,6 +229,9 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 
 		// 分组隔离（默认不允许未分组 Key 调度）
 		SettingKeyAllowUngroupedKeyScheduling:                        "false",
+		SettingKeyStrictPriorityFallback:                             strconv.FormatBool(s != nil && s.cfg != nil && s.cfg.Gateway.Scheduling.StrictPriorityFallback),
+		SettingKeyStrictPriorityRetryCount:                           strconv.Itoa(strictPriorityRetryCountFromConfig(s)),
+		SettingKeyStrictPriorityCooldownMinutes:                      strconv.Itoa(strictPriorityCooldownMinutesFromConfig(s)),
 		SettingKeyOpenAILowUpstreamRatePriorityEnabled:               "false",
 		SettingKeyOpenAIOAuthSchedulingRateMultiplier:                "1",
 		SettingKeyEnableAnthropicCacheTTL1hInjection:                 "false",
@@ -837,6 +840,19 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 
 	// 分组隔离
 	result.AllowUngroupedKeyScheduling = settings[SettingKeyAllowUngroupedKeyScheduling] == "true"
+	if raw, ok := settings[SettingKeyStrictPriorityFallback]; ok && strings.TrimSpace(raw) != "" {
+		result.StrictPriorityFallback = strings.EqualFold(strings.TrimSpace(raw), "true")
+	} else {
+		// Existing installations may predate this DB setting. Preserve the deployment
+		// config/env value until an administrator explicitly saves the switch.
+		result.StrictPriorityFallback = s != nil && s.cfg != nil && s.cfg.Gateway.Scheduling.StrictPriorityFallback
+	}
+	result.StrictPriorityRetryCount = parseBoundedNonNegativeSetting(
+		settings[SettingKeyStrictPriorityRetryCount], strictPriorityRetryCountFromConfig(s), 10,
+	)
+	result.StrictPriorityCooldownMinutes = parseBoundedNonNegativeSetting(
+		settings[SettingKeyStrictPriorityCooldownMinutes], strictPriorityCooldownMinutesFromConfig(s), 1440,
+	)
 
 	// Gateway forwarding behavior (defaults: fingerprint=true, metadata_passthrough=false,
 	// cch_signing=false, claude_oauth_system_prompt_injection=true)
@@ -1302,4 +1318,32 @@ func normalizeTablePreferences(defaultPageSize int, options []int) (int, []int) 
 	}
 
 	return defaultPageSize, normalizedOptions
+}
+
+func strictPriorityRetryCountFromConfig(s *SettingService) int {
+	if s == nil || s.cfg == nil {
+		return 0
+	}
+	return parseBoundedNonNegativeSetting(strconv.Itoa(s.cfg.Gateway.Scheduling.StrictPriorityRetryCount), 0, 10)
+}
+
+func strictPriorityCooldownMinutesFromConfig(s *SettingService) int {
+	if s == nil || s.cfg == nil {
+		return 0
+	}
+	return parseBoundedNonNegativeSetting(strconv.Itoa(s.cfg.Gateway.Scheduling.StrictPriorityCooldownMinutes), 0, 1440)
+}
+
+func parseBoundedNonNegativeSetting(raw string, fallback, max int) int {
+	v, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil {
+		return fallback
+	}
+	if v < 0 {
+		return 0
+	}
+	if v > max {
+		return max
+	}
+	return v
 }

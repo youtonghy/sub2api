@@ -237,7 +237,10 @@ type UpdateSettingsRequest struct {
 	MaxClaudeCodeVersion string `json:"max_claude_code_version"`
 
 	// 分组隔离
-	AllowUngroupedKeyScheduling bool `json:"allow_ungrouped_key_scheduling"`
+	AllowUngroupedKeyScheduling   bool `json:"allow_ungrouped_key_scheduling"`
+	StrictPriorityFallback        bool `json:"strict_priority_fallback"`
+	StrictPriorityRetryCount      int  `json:"strict_priority_retry_count"`
+	StrictPriorityCooldownMinutes int  `json:"strict_priority_cooldown_minutes"`
 
 	// Backend Mode
 	BackendModeEnabled bool `json:"backend_mode_enabled"`
@@ -1488,6 +1491,14 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		response.BadRequest(c, "cyber_session_block_ttl_seconds must be > 0")
 		return
 	}
+	if req.StrictPriorityRetryCount < 0 || req.StrictPriorityRetryCount > 10 {
+		response.BadRequest(c, "strict_priority_retry_count must be between 0 and 10")
+		return
+	}
+	if req.StrictPriorityCooldownMinutes < 0 || req.StrictPriorityCooldownMinutes > 1440 {
+		response.BadRequest(c, "strict_priority_cooldown_minutes must be between 0 and 1440")
+		return
+	}
 
 	settings := &service.SystemSettings{
 		// 系统全局 platform quota 默认值（整体替换语义）
@@ -1642,6 +1653,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		MinClaudeCodeVersion:                   req.MinClaudeCodeVersion,
 		MaxClaudeCodeVersion:                   req.MaxClaudeCodeVersion,
 		AllowUngroupedKeyScheduling:            req.AllowUngroupedKeyScheduling,
+		StrictPriorityFallback:                 req.StrictPriorityFallback,
+		StrictPriorityRetryCount:               req.StrictPriorityRetryCount,
+		StrictPriorityCooldownMinutes:          req.StrictPriorityCooldownMinutes,
 		BackendModeEnabled:                     req.BackendModeEnabled,
 		AllowUserViewErrorRequests: func() bool {
 			if req.AllowUserViewErrorRequests != nil {
@@ -2256,6 +2270,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		MinClaudeCodeVersion:                                   updatedSettings.MinClaudeCodeVersion,
 		MaxClaudeCodeVersion:                                   updatedSettings.MaxClaudeCodeVersion,
 		AllowUngroupedKeyScheduling:                            updatedSettings.AllowUngroupedKeyScheduling,
+		StrictPriorityFallback:                                 updatedSettings.StrictPriorityFallback,
+		StrictPriorityRetryCount:                               updatedSettings.StrictPriorityRetryCount,
+		StrictPriorityCooldownMinutes:                          updatedSettings.StrictPriorityCooldownMinutes,
 		BackendModeEnabled:                                     updatedSettings.BackendModeEnabled,
 		EnableFingerprintUnification:                           updatedSettings.EnableFingerprintUnification,
 		EnableMetadataPassthrough:                              updatedSettings.EnableMetadataPassthrough,

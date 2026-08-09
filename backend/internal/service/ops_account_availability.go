@@ -149,6 +149,11 @@ func (s *OpsService) GetAccountAvailabilityStats(ctx context.Context, platformFi
 		}
 		if isTempUnsched && acc.TempUnschedulableUntil != nil {
 			item.TempUnschedulableUntil = acc.TempUnschedulableUntil
+			item.TempUnschedulableReason = acc.TempUnschedulableReason
+			remainingSec := int64(time.Until(*acc.TempUnschedulableUntil).Seconds())
+			if remainingSec > 0 {
+				item.CooldownRemainingSec = &remainingSec
+			}
 		}
 
 		account[acc.ID] = item

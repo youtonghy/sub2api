@@ -7,12 +7,13 @@ import (
 
 // opsRepoMock is a test-only OpsRepository implementation with optional function hooks.
 type opsRepoMock struct {
-	InsertErrorLogFn              func(ctx context.Context, input *OpsInsertErrorLogInput) (int64, error)
-	BatchInsertErrorLogsFn        func(ctx context.Context, inputs []*OpsInsertErrorLogInput) (int64, error)
-	BatchInsertSystemLogsFn       func(ctx context.Context, inputs []*OpsInsertSystemLogInput) (int64, error)
-	ListSystemLogsFn              func(ctx context.Context, filter *OpsSystemLogFilter) (*OpsSystemLogList, error)
-	DeleteSystemLogsFn            func(ctx context.Context, filter *OpsSystemLogCleanupFilter) (int64, error)
-	InsertSystemLogCleanupAuditFn func(ctx context.Context, input *OpsSystemLogCleanupAudit) error
+	InsertErrorLogFn                 func(ctx context.Context, input *OpsInsertErrorLogInput) (int64, error)
+	BatchInsertErrorLogsFn           func(ctx context.Context, inputs []*OpsInsertErrorLogInput) (int64, error)
+	BatchInsertSystemLogsFn          func(ctx context.Context, inputs []*OpsInsertSystemLogInput) (int64, error)
+	ListSystemLogsFn                 func(ctx context.Context, filter *OpsSystemLogFilter) (*OpsSystemLogList, error)
+	GetAccountHourlyFailureBucketsFn func(ctx context.Context, accountIDs []int64, startTime, endTime time.Time, timezoneName string) ([]*OpsAccountHourlyFailureBucket, error)
+	DeleteSystemLogsFn               func(ctx context.Context, filter *OpsSystemLogCleanupFilter) (int64, error)
+	InsertSystemLogCleanupAuditFn    func(ctx context.Context, input *OpsSystemLogCleanupAudit) error
 }
 
 func (m *opsRepoMock) InsertErrorLog(ctx context.Context, input *OpsInsertErrorLogInput) (int64, error) {
@@ -53,6 +54,13 @@ func (m *opsRepoMock) ListSystemLogs(ctx context.Context, filter *OpsSystemLogFi
 		return m.ListSystemLogsFn(ctx, filter)
 	}
 	return &OpsSystemLogList{Logs: []*OpsSystemLog{}, Total: 0, Page: 1, PageSize: 50}, nil
+}
+
+func (m *opsRepoMock) GetAccountHourlyFailureBuckets(ctx context.Context, accountIDs []int64, startTime, endTime time.Time, timezoneName string) ([]*OpsAccountHourlyFailureBucket, error) {
+	if m.GetAccountHourlyFailureBucketsFn != nil {
+		return m.GetAccountHourlyFailureBucketsFn(ctx, accountIDs, startTime, endTime, timezoneName)
+	}
+	return []*OpsAccountHourlyFailureBucket{}, nil
 }
 
 func (m *opsRepoMock) DeleteSystemLogs(ctx context.Context, filter *OpsSystemLogCleanupFilter) (int64, error) {
