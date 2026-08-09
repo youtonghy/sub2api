@@ -690,6 +690,7 @@ func resolveOpenAIAccountUpstreamModelForRequest(account *Account, requestedMode
 
 func (s *OpenAIGatewayService) selectAccountForModelWithExclusions(ctx context.Context, groupID *int64, platform string, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, stickyAccountID int64, requiredCapability OpenAIEndpointCapability, preferLowUpstreamRate bool) (*Account, error) {
 	platform = normalizeOpenAICompatiblePlatform(platform)
+	strictPriorityFallback := s.strictPriorityFallback()
 	if s.checkChannelPricingRestriction(ctx, groupID, requestedModel) {
 		slog.Warn("channel pricing restriction blocked request",
 			"group_id", derefGroupID(groupID),
@@ -699,8 +700,10 @@ func (s *OpenAIGatewayService) selectAccountForModelWithExclusions(ctx context.C
 
 	// 1. 尝试粘性会话命中
 	// Try sticky session hit
-	if account := s.tryStickySessionHit(ctx, groupID, platform, sessionHash, requestedModel, excludedIDs, requireCompact, stickyAccountID, requiredCapability); account != nil {
-		return account, nil
+	if !strictPriorityFallback {
+		if account := s.tryStickySessionHit(ctx, groupID, platform, sessionHash, requestedModel, excludedIDs, requireCompact, stickyAccountID, requiredCapability); account != nil {
+			return account, nil
+		}
 	}
 
 	// 2. 获取可调度的 OpenAI 账号
@@ -726,7 +729,7 @@ func (s *OpenAIGatewayService) selectAccountForModelWithExclusions(ctx context.C
 	// 4. 设置粘性会话绑定（利润门下推迟到 handler 终检通过后再绑定，
 	// 终检否决的账号不得成为新的粘性目标；无门保持既有 eager 绑定与 TTL）
 	// Set sticky session binding (deferred until terminal admission under a profit gate)
-	if sessionHash != "" && !gatewayProfitControlGateActive(ctx) {
+	if !strictPriorityFallback && sessionHash != "" && !gatewayProfitControlGateActive(ctx) {
 		_ = s.setStickySessionAccountID(ctx, groupID, sessionHash, selected.ID, openaiStickySessionTTL)
 	}
 
@@ -905,10 +908,10 @@ func (s *OpenAIGatewayService) SelectAccountWithLoadAwareness(ctx context.Contex
 	// 分组利润控制：legacy 公共入口同样装门，保证不经
 	// selectAccountWithScheduler 的调用方也无法绕过利润准入。
 	ctx = s.withOpenAIProfitControlGate(ctx, groupID)
-	return s.selectAccountWithLoadAwareness(ctx, groupID, PlatformOpenAI, sessionHash, requestedModel, excludedIDs, false, "", true)
+	return s.selectAccountWithLoadAwareness(ctx, groupID, PlatformOpenAI, sessionHash, requestedModel, excludedIDs, false, "", true, 0)
 }
 
-func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Context, groupID *int64, platform string, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, useUpstreamTokenCost bool) (*AccountSelectionResult, error) {
+func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Context, groupID *int64, platform string, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, useUpstreamTokenCost bool, preferAccountID int64) (*AccountSelectionResult, error) {
 	platform = normalizeOpenAICompatiblePlatform(platform)
 	if s.checkChannelPricingRestriction(ctx, groupID, requestedModel) {
 		slog.Warn("channel pricing restriction blocked request",
@@ -918,10 +921,11 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 	}
 
 	cfg := s.schedulingConfig()
+	strictPriorityFallback := s.strictPriorityFallback()
 	preferLowUpstreamRate := useUpstreamTokenCost && s.isOpenAILowUpstreamRatePriorityEnabled(ctx)
 	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
 	var stickyAccountID int64
-	if sessionHash != "" && s.cache != nil {
+	if !strictPriorityFallback && sessionHash != "" && s.cache != nil {
 		if accountID, err := s.getStickySessionAccountID(ctx, groupID, sessionHash); err == nil {
 			stickyAccountID = accountID
 		}
@@ -968,6 +972,11 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		}
 		_, excluded := excludedIDs[accountID]
 		return excluded
+	}
+
+	if strictPriorityFallback {
+		candidates, baseCandidateCount := s.buildOpenAICandidateAccounts(ctx, accounts, groupID, platform, requestedModel, excludedIDs, requireCompact, requiredCapability, needsUpstreamCheck)
+		return s.selectStrictPriorityAccount(ctx, groupID, platform, requestedModel, candidates, baseCandidateCount, requireCompact, requiredCapability, needsUpstreamCheck, cfg, preferAccountID)
 	}
 
 	// ============ Layer 1: Sticky session ============
@@ -1019,46 +1028,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 	}
 
 	// ============ Layer 2: Load-aware selection ============
-	// Per-pass parent-health cache to avoid repeated DB calls when multiple shadow
-	// accounts share the same parent.
-	parentCacheL2 := make(map[int64]*Account)
-	parentLookupL2 := func(id int64) *Account {
-		if a, ok := parentCacheL2[id]; ok {
-			return a
-		}
-		if s.accountRepo == nil {
-			return nil
-		}
-		a, _ := s.accountRepo.GetByID(ctx, id)
-		parentCacheL2[id] = a
-		return a
-	}
-	baseCandidateCount := 0
-	candidates := make([]*Account, 0, len(accounts))
-	for i := range accounts {
-		acc := &accounts[i]
-		if isExcluded(acc.ID) {
-			continue
-		}
-		// Scheduler snapshots can be temporarily stale (bucket rebuild is throttled);
-		// re-check schedulability here so recently rate-limited/overloaded accounts
-		// are not selected again before the bucket is rebuilt.
-		if !isOpenAICompatibleAccountEligibleForRequest(ctx, acc, platform, requestedModel, false, requiredCapability) {
-			continue
-		}
-		if !parentHealthyForShadow(acc, parentLookupL2) {
-			continue
-		}
-		if s.isOpenAIAccountRequestRuntimeBlocked(acc, requestedModel) {
-			continue
-		}
-		if needsUpstreamCheck && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, acc, requestedModel, requireCompact) {
-			continue
-		}
-		baseCandidateCount++
-		candidates = append(candidates, acc)
-	}
-
+	candidates, baseCandidateCount := s.buildOpenAICandidateAccounts(ctx, accounts, groupID, platform, requestedModel, excludedIDs, requireCompact, requiredCapability, needsUpstreamCheck)
 	if len(candidates) == 0 {
 		return nil, ErrNoAvailableAccounts
 	}
@@ -1228,6 +1198,146 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 	if requireCompact {
 		candidates = prioritizeOpenAICompactAccounts(candidates)
 	}
+	for _, acc := range candidates {
+		fresh := s.resolveFreshSchedulableOpenAIAccount(ctx, acc, platform, requestedModel, false, requiredCapability)
+		if fresh == nil {
+			continue
+		}
+		fresh = s.recheckSelectedOpenAIAccountFromDB(ctx, fresh, groupID, platform, requestedModel, requireCompact, requiredCapability)
+		if fresh == nil {
+			continue
+		}
+		if needsUpstreamCheck && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, fresh, requestedModel, requireCompact) {
+			continue
+		}
+		return s.newSelectionResult(ctx, fresh, false, nil, &AccountWaitPlan{
+			AccountID:      fresh.ID,
+			MaxConcurrency: fresh.Concurrency,
+			Timeout:        cfg.FallbackWaitTimeout,
+			MaxWaiting:     cfg.FallbackMaxWaiting,
+		})
+	}
+
+	if requireCompact && baseCandidateCount > 0 {
+		return nil, ErrNoAvailableCompactAccounts
+	}
+	return nil, ErrNoAvailableAccounts
+}
+
+// buildOpenAICandidateAccounts applies the same initial eligibility filters as
+// the legacy load-aware loop so strict and non-strict scheduling share one
+// definition of which snapshot accounts are worth trying.
+func (s *OpenAIGatewayService) buildOpenAICandidateAccounts(ctx context.Context, accounts []Account, groupID *int64, platform string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, needsUpstreamCheck bool) ([]*Account, int) {
+	// Per-pass parent-health cache to avoid repeated DB calls when multiple shadow
+	// accounts share the same parent.
+	parentCacheL2 := make(map[int64]*Account)
+	parentLookupL2 := func(id int64) *Account {
+		if a, ok := parentCacheL2[id]; ok {
+			return a
+		}
+		if s.accountRepo == nil {
+			return nil
+		}
+		a, _ := s.accountRepo.GetByID(ctx, id)
+		parentCacheL2[id] = a
+		return a
+	}
+
+	candidates := make([]*Account, 0, len(accounts))
+	baseCandidateCount := 0
+	for i := range accounts {
+		acc := &accounts[i]
+		if _, excluded := excludedIDs[acc.ID]; excluded {
+			continue
+		}
+		// Scheduler snapshots can be temporarily stale (bucket rebuild is throttled);
+		// re-check schedulability here so recently rate-limited/overloaded accounts
+		// are not selected again before the bucket is rebuilt.
+		if !isOpenAICompatibleAccountEligibleForRequest(ctx, acc, platform, requestedModel, false, requiredCapability) {
+			continue
+		}
+		if !parentHealthyForShadow(acc, parentLookupL2) {
+			continue
+		}
+		if s.isOpenAIAccountRequestRuntimeBlocked(acc, requestedModel) {
+			continue
+		}
+		if needsUpstreamCheck && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, acc, requestedModel, requireCompact) {
+			continue
+		}
+		baseCandidateCount++
+		candidates = append(candidates, acc)
+	}
+	return candidates, baseCandidateCount
+}
+
+// selectStrictPriorityAccount performs strict priority selection from an already
+// filtered candidate list. It acquires a concurrency slot before doing the DB
+// recheck, releasing the slot if the fresh account is no longer schedulable.
+// preferAccountID is used for previous_response_id continuity and is honored
+// only when that account is at the current minimum priority tier.
+func (s *OpenAIGatewayService) selectStrictPriorityAccount(ctx context.Context, groupID *int64, platform string, requestedModel string, candidates []*Account, baseCandidateCount int, requireCompact bool, requiredCapability OpenAIEndpointCapability, needsUpstreamCheck bool, cfg config.GatewaySchedulingConfig, preferAccountID int64) (*AccountSelectionResult, error) {
+	if len(candidates) == 0 {
+		if requireCompact && baseCandidateCount > 0 {
+			return nil, ErrNoAvailableCompactAccounts
+		}
+		return nil, ErrNoAvailableAccounts
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].Priority != candidates[j].Priority {
+			return candidates[i].Priority < candidates[j].Priority
+		}
+		return candidates[i].ID < candidates[j].ID
+	})
+	if preferAccountID > 0 {
+		minPriority := candidates[0].Priority
+		for i := range candidates {
+			if candidates[i].ID == preferAccountID && candidates[i].Priority == minPriority {
+				if i != 0 {
+					preferred := candidates[i]
+					copy(candidates[1:i+1], candidates[0:i])
+					candidates[0] = preferred
+				}
+				break
+			}
+		}
+	}
+
+	tryCandidate := func(acc *Account) (*AccountSelectionResult, error) {
+		fresh := s.resolveFreshSchedulableOpenAIAccount(ctx, acc, platform, requestedModel, false, requiredCapability)
+		if fresh == nil {
+			return nil, nil
+		}
+		result, err := s.tryAcquireAccountSlot(ctx, fresh.ID, fresh.Concurrency)
+		if err != nil || result == nil || !result.Acquired {
+			return nil, nil
+		}
+		fresh = s.recheckSelectedOpenAIAccountFromDB(ctx, fresh, groupID, platform, requestedModel, requireCompact, requiredCapability)
+		if fresh == nil {
+			result.ReleaseFunc()
+			return nil, nil
+		}
+		if needsUpstreamCheck && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, fresh, requestedModel, requireCompact) {
+			result.ReleaseFunc()
+			return nil, nil
+		}
+		selection, selectErr := s.newAcquiredSelectionResult(ctx, fresh, result.ReleaseFunc)
+		if selectErr != nil {
+			return nil, selectErr
+		}
+		return selection, nil
+	}
+
+	for _, acc := range candidates {
+		selection, err := tryCandidate(acc)
+		if err != nil {
+			return nil, err
+		}
+		if selection != nil {
+			return selection, nil
+		}
+	}
+
 	for _, acc := range candidates {
 		fresh := s.resolveFreshSchedulableOpenAIAccount(ctx, acc, platform, requestedModel, false, requiredCapability)
 		if fresh == nil {
@@ -1482,6 +1592,10 @@ func (s *OpenAIGatewayService) newAcquiredSelectionResult(ctx context.Context, a
 		release()
 	}
 	return selection, err
+}
+
+func (s *OpenAIGatewayService) strictPriorityFallback() bool {
+	return s != nil && s.cfg != nil && s.cfg.Gateway.Scheduling.StrictPriorityFallback
 }
 
 func (s *OpenAIGatewayService) schedulingConfig() config.GatewaySchedulingConfig {

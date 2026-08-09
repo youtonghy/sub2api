@@ -231,6 +231,10 @@ func NewOpenAIGatewayHandler(
 	}
 }
 
+func (h *OpenAIGatewayHandler) strictPriorityFallback() bool {
+	return h != nil && h.cfg != nil && h.cfg.Gateway.Scheduling.StrictPriorityFallback
+}
+
 // Responses handles OpenAI Responses API endpoint
 // POST /openai/v1/responses
 func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
@@ -606,7 +610,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 						return
 					}
 					// 池模式：同账号重试
-					if failoverErr.RetryableOnSameAccount {
+					if !h.strictPriorityFallback() && failoverErr.RetryableOnSameAccount {
 						retryLimit := account.GetPoolModeRetryCount()
 						if sameAccountRetryCount[account.ID] < retryLimit {
 							sameAccountRetryCount[account.ID]++
@@ -1154,7 +1158,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 						return
 					}
 					// 池模式：同账号重试
-					if failoverErr.RetryableOnSameAccount {
+					if !h.strictPriorityFallback() && failoverErr.RetryableOnSameAccount {
 						retryLimit := account.GetPoolModeRetryCount()
 						if sameAccountRetryCount[account.ID] < retryLimit {
 							sameAccountRetryCount[account.ID]++

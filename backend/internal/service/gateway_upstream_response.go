@@ -1015,8 +1015,18 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 					return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, nil
 				}
 				// 检测 context 取消（客户端断开会导致 context 取消，进而影响上游读取）
-				if errors.Is(ev.err, context.Canceled) || errors.Is(ev.err, context.DeadlineExceeded) {
+				if errors.Is(ev.err, context.Canceled) {
 					return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: true}, fmt.Errorf("stream usage incomplete: %w", ev.err)
+				}
+				// DeadlineExceeded 来自上游转发超时而非客户端断开：
+				// - 尚未写字节时，落到下方 !c.Writer.Written() 分支返回 UpstreamFailoverError。
+				// - 已写字节时，保留部分结果并标记为客户端断开（防止 handler 继续 failover
+				//   已写入数据的流）。
+				if errors.Is(ev.err, context.DeadlineExceeded) {
+					if c.Writer.Written() {
+						return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: true}, fmt.Errorf("stream usage incomplete (deadline): %w", ev.err)
+					}
+					// Fall through to the !c.Writer.Written() branch below which returns UpstreamFailoverError.
 				}
 				// 客户端已通过写入失败检测到断开，上游也出错了，返回已收集的 usage
 				if clientDisconnected {

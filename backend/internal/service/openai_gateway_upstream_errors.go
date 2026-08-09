@@ -241,6 +241,16 @@ func isOpenAIRequestBodyTooLargeError(statusCode int, upstreamMsg string, upstre
 	return statusCode == http.StatusRequestEntityTooLarge && !isOpenAIContextWindowError(upstreamMsg, upstreamBody)
 }
 
+func (s *OpenAIGatewayService) openAIUpstreamRetryableOnSameAccount(account *Account, statusCode int, upstreamMsg string, responseBody []byte, shouldDisable bool, includeTransient bool) bool {
+	if s.strictPriorityFallback() || shouldDisable || account == nil || !account.IsPoolMode() {
+		return false
+	}
+	if account.IsPoolModeRetryableStatus(statusCode) {
+		return true
+	}
+	return includeTransient && isOpenAITransientProcessingError(statusCode, upstreamMsg, responseBody)
+}
+
 func newOpenAIUpstreamFailoverError(
 	statusCode int,
 	responseHeaders http.Header,

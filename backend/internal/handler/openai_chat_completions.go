@@ -284,7 +284,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 						return
 					}
 					// Pool mode: retry on the same account
-					if failoverErr.RetryableOnSameAccount {
+					if !h.strictPriorityFallback() && failoverErr.RetryableOnSameAccount {
 						retryLimit := account.GetPoolModeRetryCount()
 						if sameAccountRetryCount[account.ID] < retryLimit {
 							sameAccountRetryCount[account.ID]++

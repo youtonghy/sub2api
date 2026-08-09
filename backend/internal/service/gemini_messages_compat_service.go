@@ -37,6 +37,8 @@ const (
 	geminiMaxRetries     = 5
 	geminiRetryBaseDelay = 1 * time.Second
 	geminiRetryMaxDelay  = 16 * time.Second
+
+	geminiTransportFailoverBody = `{"error":{"code":502,"message":"Upstream request failed","status":"UNAVAILABLE"}}`
 )
 
 // Gemini tool calling now requires `thoughtSignature` in parts that include `functionCall`.
@@ -1343,8 +1345,16 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 					FirstTokenMs:  nil,
 				}, nil
 			}
+			// Client disconnect: do NOT fail over to another account.
+			if errors.Is(err, context.Canceled) {
+				return nil, err
+			}
 			setOpsUpstreamError(c, 0, safeErr, "")
-			return nil, s.writeGoogleError(c, http.StatusBadGateway, "Upstream request failed after retries: "+safeErr)
+			return nil, &UpstreamFailoverError{
+				StatusCode:             http.StatusBadGateway,
+				ResponseBody:           []byte(geminiTransportFailoverBody),
+				RetryableOnSameAccount: false,
+			}
 		}
 
 		// 错误策略优先：匹配则跳过重试直接处理。

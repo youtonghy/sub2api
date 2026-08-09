@@ -165,7 +165,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 	sessionHash := h.gatewayService.GenerateSessionHash(parsedReq)
 
 	// 3. Account selection + failover loop
-	fs := NewFailoverState(h.maxAccountSwitches, false)
+	fs := h.newFailoverState(h.maxAccountSwitches, false)
 
 	for {
 		if requestCtx.Err() != nil {
@@ -173,7 +173,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		}
 		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(requestCtx, apiKey.GroupID, sessionHash, reqModel, fs.FailedAccountIDs, "", int64(0))
 		if err != nil {
-			if len(fs.FailedAccountIDs) == 0 {
+			if fs.LastFailoverErr == nil {
 				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, effectiveAPIKeyPlatform(c, apiKey))
 				if !cls.ModelNotFound {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)

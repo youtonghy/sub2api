@@ -30,9 +30,51 @@ const (
 	// 最大重试耗时（包含请求本身耗时 + 退避等待时间）。
 	// 用于防止极端情况下 goroutine 长时间堆积导致资源耗尽。
 	maxRetryElapsed = 10 * time.Second
+
+	// anthropicTransportFailoverBody matches the legacy inline 502 error so the
+	// client-visible payload is unchanged if failover is ultimately exhausted.
+	anthropicTransportFailoverBody = `{"type":"error","error":{"type":"upstream_error","message":"Upstream request failed"}}`
 )
 
+// handleGatewayUpstreamTransportError records ops/log side effects for a
+// transport-level upstream failure (the HTTP round-trip never completed) and
+// returns an UpstreamFailoverError so the handler can move to the next account.
+// It never writes a terminal response. Client cancellation is preserved as a
+// plain error and is not treated as an upstream failure.
+func (s *GatewayService) handleGatewayUpstreamTransportError(ctx context.Context, c *gin.Context, account *Account, upstreamURL string, err error, countOllamaActivity bool) error {
+	safeErr := sanitizeUpstreamErrorMessage(err.Error())
+	setOpsUpstreamError(c, 0, safeErr, "")
+	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+		Platform:           account.Platform,
+		AccountID:          account.ID,
+		AccountName:        account.Name,
+		UpstreamStatusCode: 0,
+		UpstreamURL:        safeUpstreamURL(upstreamURL),
+		Kind:               "request_error",
+		Message:            safeErr,
+	})
+
+	if errors.Is(err, context.Canceled) {
+		return err
+	}
+
+	if countOllamaActivity {
+		scheduleOllamaCloudUsageActivity(s.deferredService, account)
+	}
+
+	return &UpstreamFailoverError{
+		StatusCode:             http.StatusBadGateway,
+		ResponseBody:           []byte(anthropicTransportFailoverBody),
+		RetryableOnSameAccount: false,
+	}
+}
+
 func (s *GatewayService) shouldRetryUpstreamError(account *Account, statusCode int) bool {
+	// 严格优先级回退不重试当前账号，失败后直接交给 handler 切到下一个优先级账号。
+	if s.strictPriorityFallback() {
+		return false
+	}
+
 	// OAuth/Setup Token 账号：仅 403 重试
 	if account.IsOAuth() {
 		return statusCode == 403
@@ -40,6 +82,12 @@ func (s *GatewayService) shouldRetryUpstreamError(account *Account, statusCode i
 
 	// API Key 账号：未配置的错误码重试
 	return !account.ShouldHandleErrorCode(statusCode)
+}
+
+// retryableOnSameAccount reports whether pool-mode retry should be attempted on
+// the same account. Strict priority fallback disables it so failover moves on.
+func (s *GatewayService) retryableOnSameAccount(account *Account, statusCode int) bool {
+	return !s.strictPriorityFallback() && account.IsPoolMode() && account.IsPoolModeRetryableStatus(statusCode)
 }
 
 // shouldFailoverUpstreamError determines whether an upstream error should trigger account failover.
@@ -364,9 +412,23 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	var resp *http.Response
 	lastWireBody := body
 	retryStart := time.Now()
+
+	// Per-attempt forward timeout: wrap the upstream context so a single
+	// attempt that accepts the connection but never responds triggers a
+	// transport-class failover (504) instead of hanging indefinitely.
+	responseTimeout := time.Duration(0)
+	if s.cfg != nil && s.cfg.Gateway.ResponseTimeout > 0 {
+		responseTimeout = time.Duration(s.cfg.Gateway.ResponseTimeout) * time.Second
+	}
+
 	for attempt := 1; attempt <= maxRetryAttempts; attempt++ {
 		// 构建上游请求（每次重试需要重新构建，因为请求体需要重新读取）
 		upstreamCtx, releaseUpstreamCtx := detachStreamUpstreamContext(ctx, reqStream)
+		if responseTimeout > 0 {
+			var attemptCancel context.CancelFunc
+			upstreamCtx, attemptCancel = context.WithTimeout(upstreamCtx, responseTimeout)
+			defer attemptCancel()
+		}
 		upstreamReq, wireBody, err := s.buildUpstreamRequest(upstreamCtx, c, account, body, token, tokenType, reqModel, reqStream, shouldMimicClaudeCode)
 		releaseUpstreamCtx()
 		if err != nil {
@@ -381,30 +443,27 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			if resp != nil && resp.Body != nil {
 				_ = resp.Body.Close()
 			}
-			// Transport attempt left local validation; count Ollama Cloud activity.
-			if !errors.Is(err, context.Canceled) {
-				scheduleOllamaCloudUsageActivity(s.deferredService, account)
+			// Per-attempt timeout: treat as a transport-class failover with 504.
+			if errors.Is(err, context.DeadlineExceeded) && responseTimeout > 0 {
+				safeErr := sanitizeUpstreamErrorMessage(err.Error())
+				setOpsUpstreamError(c, 0, safeErr, "")
+				appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+					Platform:           account.Platform,
+					AccountID:          account.ID,
+					AccountName:        account.Name,
+					UpstreamStatusCode: 0,
+					UpstreamURL:        safeUpstreamURL(upstreamReq.URL.String()),
+					Kind:               "request_error",
+					Message:            safeErr,
+				})
+				return nil, &UpstreamFailoverError{
+					StatusCode:             http.StatusGatewayTimeout,
+					ResponseBody:           []byte(anthropicTransportFailoverBody),
+					RetryableOnSameAccount: false,
+				}
 			}
-			// Ensure the client receives an error response (handlers assume Forward writes on non-failover errors).
-			safeErr := sanitizeUpstreamErrorMessage(err.Error())
-			setOpsUpstreamError(c, 0, safeErr, "")
-			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
-				Platform:           account.Platform,
-				AccountID:          account.ID,
-				AccountName:        account.Name,
-				UpstreamStatusCode: 0,
-				UpstreamURL:        safeUpstreamURL(upstreamReq.URL.String()),
-				Kind:               "request_error",
-				Message:            safeErr,
-			})
-			c.JSON(http.StatusBadGateway, gin.H{
-				"type": "error",
-				"error": gin.H{
-					"type":    "upstream_error",
-					"message": "Upstream request failed",
-				},
-			})
-			return nil, fmt.Errorf("upstream request failed: %s", safeErr)
+			// Transport attempt left local validation; count Ollama Cloud activity.
+			return nil, s.handleGatewayUpstreamTransportError(ctx, c, account, upstreamReq.URL.String(), err, true)
 		}
 
 		// 优先检测thinking block签名错误（400）并重试一次
@@ -696,7 +755,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			return nil, &UpstreamFailoverError{
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
-				RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
+				RetryableOnSameAccount: s.retryableOnSameAccount(account, resp.StatusCode),
 			}
 		}
 		return s.handleRetryExhaustedError(ctx, resp, c, account)
@@ -730,7 +789,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		return nil, &UpstreamFailoverError{
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           respBody,
-			RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
+			RetryableOnSameAccount: s.retryableOnSameAccount(account, resp.StatusCode),
 		}
 	}
 	if resp.StatusCode >= 400 {

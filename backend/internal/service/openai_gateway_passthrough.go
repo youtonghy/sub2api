@@ -637,7 +637,7 @@ func (s *OpenAIGatewayService) handleFailoverErrorResponsePassthrough(
 		resp.Header,
 		body,
 		upstreamMsg,
-		!shouldDisable && account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
+		s.openAIUpstreamRetryableOnSameAccount(account, resp.StatusCode, upstreamMsg, body, shouldDisable, false),
 	)
 }
 

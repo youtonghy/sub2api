@@ -2134,6 +2134,107 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 	return s.selectAccountWithSchedulerOnce(withOpenAIProxyStreamQuarantineBypass(ctx), groupID, previousResponseID, sessionHash, requestedModel, excludedIDs, requiredTransport, requiredCapability, requiredImageCapability, requireCompact, platform, previousResponseCanMove, useUpstreamTokenCost)
 }
 
+func (s *OpenAIGatewayService) selectAccountWithLoadAwarenessWithChecks(
+	ctx context.Context,
+	groupID *int64,
+	platform string,
+	sessionHash string,
+	requestedModel string,
+	excludedIDs map[int64]struct{},
+	requiredTransport OpenAIUpstreamTransport,
+	requiredCapability OpenAIEndpointCapability,
+	requiredImageCapability OpenAIImagesCapability,
+	requireCompact bool,
+	useUpstreamTokenCost bool,
+) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
+	return s.selectAccountWithLoadAwarenessWithChecksAndPreviousResponse(ctx, groupID, platform, sessionHash, requestedModel, excludedIDs, requiredTransport, requiredCapability, requiredImageCapability, requireCompact, useUpstreamTokenCost, "", false)
+}
+
+// selectAccountWithLoadAwarenessWithChecksAndPreviousResponse is the internal
+// scheduler path used by selectAccountWithSchedulerOnce. In strict mode it
+// preserves previous_response_id continuity before falling back to strict
+// priority selection.
+func (s *OpenAIGatewayService) selectAccountWithLoadAwarenessWithChecksAndPreviousResponse(
+	ctx context.Context,
+	groupID *int64,
+	platform string,
+	sessionHash string,
+	requestedModel string,
+	excludedIDs map[int64]struct{},
+	requiredTransport OpenAIUpstreamTransport,
+	requiredCapability OpenAIEndpointCapability,
+	requiredImageCapability OpenAIImagesCapability,
+	requireCompact bool,
+	useUpstreamTokenCost bool,
+	previousResponseID string,
+	previousResponseCanMove bool,
+) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
+	decision := OpenAIAccountScheduleDecision{Layer: openAIAccountScheduleLayerLoadBalance}
+	preferAccountID := int64(0)
+	ownerResolved := int64(0)
+	if s.strictPriorityFallback() && !previousResponseCanMove && strings.TrimSpace(previousResponseID) != "" && normalizeOpenAICompatiblePlatform(platform) == PlatformOpenAI {
+		ownerResolved = s.ResolveAccountIDByPreviousResponseIDForScheduler(ctx, groupID, previousResponseID, requestedModel, excludedIDs, requiredCapability, false)
+		if ownerResolved > 0 {
+			accounts, listErr := s.listSchedulableAccounts(ctx, groupID, platform)
+			if listErr == nil {
+				needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
+				candidates, _ := s.buildOpenAICandidateAccounts(ctx, accounts, groupID, platform, requestedModel, excludedIDs, requireCompact, requiredCapability, needsUpstreamCheck)
+				minPriority := 0
+				ownerInCandidates := false
+				for _, acc := range candidates {
+					if minPriority == 0 || acc.Priority < minPriority {
+						minPriority = acc.Priority
+					}
+					if acc.ID == ownerResolved {
+						ownerInCandidates = true
+					}
+				}
+				if ownerInCandidates {
+					ownerAccount, ownerErr := s.getSchedulableAccount(ctx, ownerResolved)
+					if ownerErr == nil && ownerAccount != nil && ownerAccount.Priority == minPriority {
+						preferAccountID = ownerResolved
+					} else {
+						slog.Warn("openai_strict_previous_response_continuity_broken",
+							"account_id", ownerResolved,
+							"previous_response_id", previousResponseID,
+							"group_id", derefGroupID(groupID),
+							"reason", "previous response owner is unavailable or lower priority than current minimum",
+						)
+					}
+				}
+			}
+		}
+	}
+
+	effectiveExcludedIDs := cloneExcludedAccountIDs(excludedIDs)
+	for {
+		selection, err := s.selectAccountWithLoadAwareness(ctx, groupID, platform, sessionHash, requestedModel, effectiveExcludedIDs, requireCompact, requiredCapability, useUpstreamTokenCost, preferAccountID)
+		if err != nil {
+			return nil, decision, err
+		}
+		if selection == nil || selection.Account == nil {
+			return selection, decision, nil
+		}
+		if s.isOpenAIAccountTransportCompatible(selection.Account, requiredTransport) &&
+			accountSupportsOpenAICapabilities(selection.Account, requiredCapability, requiredImageCapability) {
+			if ownerResolved > 0 && selection.Account.ID == ownerResolved {
+				decision.StickyPreviousHit = true
+			}
+			return selection, decision, nil
+		}
+		if selection.ReleaseFunc != nil {
+			selection.ReleaseFunc()
+		}
+		if effectiveExcludedIDs == nil {
+			effectiveExcludedIDs = make(map[int64]struct{})
+		}
+		if _, exists := effectiveExcludedIDs[selection.Account.ID]; exists {
+			return nil, decision, ErrNoAvailableAccounts
+		}
+		effectiveExcludedIDs[selection.Account.ID] = struct{}{}
+	}
+}
+
 func (s *OpenAIGatewayService) selectAccountWithSchedulerOnce(
 	ctx context.Context,
 	groupID *int64,
@@ -2164,58 +2265,16 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerOnce(
 	platform = normalizeOpenAICompatiblePlatform(platform)
 	decision := OpenAIAccountScheduleDecision{}
 	scheduler := s.getOpenAIAccountScheduler(ctx)
-	if scheduler == nil {
-		decision.Layer = openAIAccountScheduleLayerLoadBalance
-		if requiredTransport == OpenAIUpstreamTransportAny || requiredTransport == OpenAIUpstreamTransportHTTPSSE {
-			effectiveExcludedIDs := cloneExcludedAccountIDs(excludedIDs)
-			for {
-				selection, err := s.selectAccountWithLoadAwareness(ctx, groupID, platform, sessionHash, requestedModel, effectiveExcludedIDs, requireCompact, requiredCapability, useUpstreamTokenCost)
-				if err != nil {
-					return nil, decision, err
-				}
-				if selection == nil || selection.Account == nil {
-					return selection, decision, nil
-				}
-				if accountSupportsOpenAICapabilities(selection.Account, requiredCapability, requiredImageCapability) {
-					return selection, decision, nil
-				}
-				if selection.ReleaseFunc != nil {
-					selection.ReleaseFunc()
-				}
-				if effectiveExcludedIDs == nil {
-					effectiveExcludedIDs = make(map[int64]struct{})
-				}
-				if _, exists := effectiveExcludedIDs[selection.Account.ID]; exists {
-					return nil, decision, ErrNoAvailableAccounts
-				}
-				effectiveExcludedIDs[selection.Account.ID] = struct{}{}
-			}
+	if scheduler == nil || s.strictPriorityFallback() {
+		if s.strictPriorityFallback() {
+			slog.Info("openai_strict_scheduler_bypass",
+				"group_id", derefGroupID(groupID),
+				"model", requestedModel,
+				"has_session_hash", strings.TrimSpace(sessionHash) != "",
+				"has_previous_response_id", strings.TrimSpace(previousResponseID) != "",
+			)
 		}
-
-		effectiveExcludedIDs := cloneExcludedAccountIDs(excludedIDs)
-		for {
-			selection, err := s.selectAccountWithLoadAwareness(ctx, groupID, platform, sessionHash, requestedModel, effectiveExcludedIDs, requireCompact, requiredCapability, useUpstreamTokenCost)
-			if err != nil {
-				return nil, decision, err
-			}
-			if selection == nil || selection.Account == nil {
-				return selection, decision, nil
-			}
-			if s.isOpenAIAccountTransportCompatible(selection.Account, requiredTransport) &&
-				accountSupportsOpenAICapabilities(selection.Account, requiredCapability, requiredImageCapability) {
-				return selection, decision, nil
-			}
-			if selection.ReleaseFunc != nil {
-				selection.ReleaseFunc()
-			}
-			if effectiveExcludedIDs == nil {
-				effectiveExcludedIDs = make(map[int64]struct{})
-			}
-			if _, exists := effectiveExcludedIDs[selection.Account.ID]; exists {
-				return nil, decision, ErrNoAvailableAccounts
-			}
-			effectiveExcludedIDs[selection.Account.ID] = struct{}{}
-		}
+		return s.selectAccountWithLoadAwarenessWithChecksAndPreviousResponse(ctx, groupID, platform, sessionHash, requestedModel, excludedIDs, requiredTransport, requiredCapability, requiredImageCapability, requireCompact, useUpstreamTokenCost, previousResponseID, previousResponseCanMove)
 	}
 
 	if s.checkChannelPricingRestriction(ctx, groupID, requestedModel) {

@@ -139,8 +139,16 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 				sleepGeminiBackoff(attempt)
 				continue
 			}
+			// Client disconnect: do NOT fail over to another account.
+			if errors.Is(err, context.Canceled) {
+				return nil, err
+			}
 			setOpsUpstreamError(c, 0, safeErr, "")
-			return nil, s.writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed after retries: "+safeErr)
+			return nil, &UpstreamFailoverError{
+				StatusCode:             http.StatusBadGateway,
+				ResponseBody:           []byte(geminiTransportFailoverBody),
+				RetryableOnSameAccount: false,
+			}
 		}
 
 		if matched, rebuilt := s.checkErrorPolicyInLoop(ctx, account, resp, mappedModel); matched {

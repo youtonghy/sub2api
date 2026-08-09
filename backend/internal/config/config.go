@@ -892,6 +892,9 @@ type GatewayConfig struct {
 	// OpenAIHighEffortFirstOutputTimeoutSeconds: high/xhigh/max 推理的首个语义输出超时（秒）。
 	// 0 表示回退到 OpenAIFirstOutputTimeoutSeconds。
 	OpenAIHighEffortFirstOutputTimeoutSeconds int `mapstructure:"openai_high_effort_first_output_timeout_seconds"`
+	// ResponseTimeout 限制单次上游转发请求的完整超时（秒），超时后按 504 触发 failover。
+	// 0 表示不启用（默认），使用上游 HTTP 客户端的默认超时。
+	ResponseTimeout int `mapstructure:"response_timeout"`
 	// 请求体最大字节数，用于网关请求体大小限制
 	MaxBodySize int64 `mapstructure:"max_body_size"`
 	// TextMaxBodySize limits endpoints that cannot carry inline image/video payloads.
@@ -1372,6 +1375,10 @@ type GatewaySchedulingConfig struct {
 
 	// 兜底层账户选择策略: "last_used"(按最后使用时间排序，默认) 或 "random"(随机)
 	FallbackSelectionMode string `mapstructure:"fallback_selection_mode"`
+
+	// StrictPriorityFallback 开启后跳过粘性/加权选择，严格按 Priority 升序回退到下一个可用账号。
+	// 默认 false，保持原有粘性/负载/加权调度；需要时显式开启。
+	StrictPriorityFallback bool `mapstructure:"strict_priority_fallback"`
 
 	// PreferSoonestReset 开启后，负载感知选择会优先选用「会话窗口最早重置」的账号
 	// （use-it-or-lose-it：先用尽即将重置的账号，保留重置时间还很久的账号）。
@@ -2262,6 +2269,7 @@ func setDefaults() {
 	viper.SetDefault("gateway.openai_response_header_timeout", 0)
 	viper.SetDefault("gateway.openai_first_output_timeout_seconds", 0)
 	viper.SetDefault("gateway.openai_high_effort_first_output_timeout_seconds", 0)
+	viper.SetDefault("gateway.response_timeout", 0)
 	viper.SetDefault("gateway.log_upstream_error_body", true)
 	viper.SetDefault("gateway.log_upstream_error_body_max_bytes", 2048)
 	viper.SetDefault("gateway.inject_beta_for_apikey", false)
@@ -2383,6 +2391,7 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.fallback_wait_timeout", 30*time.Second)
 	viper.SetDefault("gateway.scheduling.fallback_max_waiting", 100)
 	viper.SetDefault("gateway.scheduling.fallback_selection_mode", "last_used")
+	viper.SetDefault("gateway.scheduling.strict_priority_fallback", false)
 	viper.SetDefault("gateway.scheduling.prefer_soonest_reset", false)
 	viper.SetDefault("gateway.scheduling.load_batch_enabled", true)
 	viper.SetDefault("gateway.scheduling.load_batch_cache_ttl_ms", 200)

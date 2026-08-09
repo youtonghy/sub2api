@@ -357,7 +357,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	hasBoundSession := sessionKey != "" && sessionBoundAccountID > 0
 	cleanedForUnknownBinding := false
 
-	fs := NewFailoverState(h.maxAccountSwitchesGemini, hasBoundSession)
+	fs := h.newFailoverState(h.maxAccountSwitchesGemini, hasBoundSession)
 
 	// 单账号分组提前设置 SingleAccountRetry 标记，让 Service 层首次 503 就不设模型限流标记。
 	// 避免单账号分组收到 503 (MODEL_CAPACITY_EXHAUSTED) 时设 29s 限流，导致后续请求连续快速失败。
@@ -369,7 +369,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	for {
 		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), apiKey.GroupID, sessionKey, modelName, fs.FailedAccountIDs, "", int64(0)) // Gemini 不使用会话限制
 		if err != nil {
-			if len(fs.FailedAccountIDs) == 0 {
+			if fs.LastFailoverErr == nil {
 				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, modelName, modelName, service.PlatformGemini)
 				if !cls.ModelNotFound {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
@@ -498,6 +498,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
 
 		// 5) forward (根据平台分流)
+		writerSizeBeforeForward := c.Writer.Size()
 		var result *service.ForwardResult
 		requestCtx := c.Request.Context()
 		if fs.SwitchCount > 0 {
@@ -525,6 +526,11 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		if err != nil {
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
+				// 流式内容已写入客户端，无法撤销，禁止 failover 以防止流拼接腐化
+				if c.Writer.Size() != writerSizeBeforeForward {
+					h.handleGeminiFailoverExhausted(c, failoverErr)
+					return
+				}
 				failoverAction := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, account.GetPoolModeRetryCount(), failoverErr)
 				switch failoverAction {
 				case FailoverContinue:

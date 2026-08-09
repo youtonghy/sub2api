@@ -110,6 +110,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		"excluded_ids", excludedIDsList)
 
 	cfg := s.schedulingConfig()
+	strictPriorityFallback := s.strictPriorityFallback()
 
 	// 检查 Claude Code 客户端限制（可能会替换 groupID 为降级分组）
 	group, groupID, err := s.checkClaudeCodeRestriction(ctx, groupID)
@@ -138,6 +139,10 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			stickyAccountID = accountID
 			stickySource = "cache"
 		}
+	}
+	if strictPriorityFallback {
+		stickyAccountID = 0
+		stickySource = "strict_priority"
 	}
 
 	// [DEBUG-STICKY] 调度器入口日志
@@ -264,6 +269,120 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 				logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] context group routing miss: group_id=%d model=%s patterns(sample)=%v", group.ID, requestedModel, keys)
 			}
 		}
+	}
+
+	buildCandidates := func() []*Account {
+		candidates := make([]*Account, 0, len(accounts))
+		for i := range accounts {
+			acc := &accounts[i]
+			if isExcluded(acc.ID) {
+				continue
+			}
+			// Scheduler snapshots can be temporarily stale (bucket rebuild is throttled);
+			// re-check schedulability here so recently rate-limited/overloaded accounts
+			// are not selected again before the bucket is rebuilt.
+			if !s.isAccountSchedulableForSelection(acc) {
+				continue
+			}
+			if !s.isGatewayAccountProfitEligible(ctx, acc) {
+				continue
+			}
+			if !s.isAccountAllowedForPlatform(acc, platform, useMixed) {
+				continue
+			}
+			if requestedModel != "" && !s.isModelSupportedByAccountWithContext(ctx, acc, requestedModel) {
+				continue
+			}
+			if !s.isAccountSchedulableForModelSelection(ctx, acc, requestedModel) {
+				continue
+			}
+			// 配额检查
+			if !s.isAccountSchedulableForQuota(acc) {
+				continue
+			}
+			// 窗口费用检查（非粘性会话路径）
+			if !s.isAccountSchedulableForWindowCost(ctx, acc, false) {
+				continue
+			}
+			// RPM 检查（非粘性会话路径）
+			if !s.isAccountSchedulableForRPM(ctx, acc, false) {
+				continue
+			}
+			candidates = append(candidates, acc)
+		}
+		return candidates
+	}
+
+	if strictPriorityFallback {
+		candidates := buildCandidates()
+		if len(candidates) == 0 {
+			return nil, ErrNoAvailableAccounts
+		}
+
+		selectCandidates := func(selectionCandidates []*Account) (*AccountSelectionResult, error) {
+			if len(selectionCandidates) == 0 {
+				return nil, nil
+			}
+			sort.SliceStable(selectionCandidates, func(i, j int) bool {
+				if selectionCandidates[i].Priority != selectionCandidates[j].Priority {
+					return selectionCandidates[i].Priority < selectionCandidates[j].Priority
+				}
+				return selectionCandidates[i].ID < selectionCandidates[j].ID
+			})
+			for _, acc := range selectionCandidates {
+				result, err := s.tryAcquireAccountSlot(ctx, acc.ID, acc.Concurrency)
+				if err == nil && result.Acquired {
+					if !s.checkAndRegisterSession(ctx, acc, sessionHash) {
+						result.ReleaseFunc()
+						continue
+					}
+					return s.newSelectionResult(ctx, acc, true, result.ReleaseFunc, nil)
+				}
+			}
+			for _, acc := range selectionCandidates {
+				if !s.checkAndRegisterSession(ctx, acc, sessionHash) {
+					continue
+				}
+				return s.newSelectionResult(ctx, acc, false, nil, &AccountWaitPlan{
+					AccountID:      acc.ID,
+					MaxConcurrency: acc.Concurrency,
+					Timeout:        cfg.FallbackWaitTimeout,
+					MaxWaiting:     cfg.FallbackMaxWaiting,
+				})
+			}
+			return nil, nil
+		}
+
+		if len(routingAccountIDs) > 0 {
+			routingSet := make(map[int64]struct{}, len(routingAccountIDs))
+			for _, id := range routingAccountIDs {
+				if id > 0 {
+					routingSet[id] = struct{}{}
+				}
+			}
+			routedCandidates := make([]*Account, 0, len(candidates))
+			for _, acc := range candidates {
+				if _, ok := routingSet[acc.ID]; ok {
+					routedCandidates = append(routedCandidates, acc)
+				}
+			}
+			if len(routedCandidates) > 0 {
+				if selection, err := selectCandidates(routedCandidates); err != nil {
+					return nil, err
+				} else if selection != nil {
+					return selection, nil
+				}
+			}
+			// 路由候选槽位不可用或会话注册被拒时，回退到完整严格优先级候选集。
+			logger.LegacyPrintf("service.gateway", "[ModelRouting] Strict routed candidates unavailable for model=%s, falling back to strict priority selection", requestedModel)
+		}
+
+		if selection, err := selectCandidates(candidates); err != nil {
+			return nil, err
+		} else if selection != nil {
+			return selection, nil
+		}
+		return nil, ErrNoAvailableAccounts
 	}
 
 	// ============ Layer 1: 模型路由优先选择（优先级高于粘性会话） ============
@@ -635,45 +754,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		"reason", "sticky_not_used_falling_back_to_load_balance",
 		"total_accounts", len(accounts),
 	)
-	candidates := make([]*Account, 0, len(accounts))
-	for i := range accounts {
-		acc := &accounts[i]
-		if isExcluded(acc.ID) {
-			continue
-		}
-		// Scheduler snapshots can be temporarily stale (bucket rebuild is throttled);
-		// re-check schedulability here so recently rate-limited/overloaded accounts
-		// are not selected again before the bucket is rebuilt.
-		if !s.isAccountSchedulableForSelection(acc) {
-			continue
-		}
-		if !s.isGatewayAccountProfitEligible(ctx, acc) {
-			continue
-		}
-		if !s.isAccountAllowedForPlatform(acc, platform, useMixed) {
-			continue
-		}
-		if requestedModel != "" && !s.isModelSupportedByAccountWithContext(ctx, acc, requestedModel) {
-			continue
-		}
-		if !s.isAccountSchedulableForModelSelection(ctx, acc, requestedModel) {
-			continue
-		}
-		// 配额检查
-		if !s.isAccountSchedulableForQuota(acc) {
-			continue
-		}
-		// 窗口费用检查（非粘性会话路径）
-		if !s.isAccountSchedulableForWindowCost(ctx, acc, false) {
-			continue
-		}
-		// RPM 检查（非粘性会话路径）
-		if !s.isAccountSchedulableForRPM(ctx, acc, false) {
-			continue
-		}
-		candidates = append(candidates, acc)
-	}
-
+	candidates := buildCandidates()
 	if len(candidates) == 0 {
 		return nil, ErrNoAvailableAccounts
 	}
@@ -790,6 +871,10 @@ func (s *GatewayService) tryAcquireByLegacyOrder(ctx context.Context, candidates
 	}
 
 	return nil, false, nil
+}
+
+func (s *GatewayService) strictPriorityFallback() bool {
+	return s != nil && s.cfg != nil && s.cfg.Gateway.Scheduling.StrictPriorityFallback
 }
 
 func (s *GatewayService) schedulingConfig() config.GatewaySchedulingConfig {
@@ -1815,6 +1900,7 @@ func shuffleWithinPriority(accounts []*Account) {
 // selectAccountForModelWithPlatform 选择单平台账户（完全隔离）
 func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, platform string) (*Account, error) {
 	preferOAuth := platform == PlatformGemini
+	strictPriorityFallback := s.strictPriorityFallback()
 	routingAccountIDs := s.routingAccountIDsForRequest(ctx, groupID, requestedModel, platform)
 
 	// require_privacy_set: 获取分组信息
@@ -1835,7 +1921,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 				derefGroupID(groupID), requestedModel, platform, shortSessionHash(sessionHash), routingAccountIDs)
 		}
 		// 1) Sticky session only applies if the bound account is within the routing set.
-		if sessionHash != "" && s.cache != nil {
+		if !strictPriorityFallback && sessionHash != "" && s.cache != nil {
 			accountID, err := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 			if err == nil && accountID > 0 && containsInt64(routingAccountIDs, accountID) {
 				if _, excluded := excludedIDs[accountID]; !excluded {
@@ -1943,7 +2029,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 		}
 
 		if selected != nil {
-			if sessionHash != "" && s.cache != nil {
+			if !strictPriorityFallback && sessionHash != "" && s.cache != nil {
 				if err := s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, selected.ID); err != nil {
 					logger.LegacyPrintf("service.gateway", "set session account failed: session=%s account_id=%d err=%v", sessionHash, selected.ID, err)
 				}
@@ -1957,7 +2043,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 	}
 
 	// 1. 查询粘性会话
-	if sessionHash != "" && s.cache != nil {
+	if !strictPriorityFallback && sessionHash != "" && s.cache != nil {
 		accountID, err := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 		if err == nil && accountID > 0 {
 			if _, excluded := excludedIDs[accountID]; !excluded {
@@ -2068,7 +2154,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 	}
 
 	// 4. 建立粘性绑定
-	if sessionHash != "" && s.cache != nil {
+	if !strictPriorityFallback && sessionHash != "" && s.cache != nil {
 		if err := s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, selected.ID); err != nil {
 			logger.LegacyPrintf("service.gateway", "set session account failed: session=%s account_id=%d err=%v", sessionHash, selected.ID, err)
 		}
@@ -2081,6 +2167,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 // 查询原生平台账户 + 启用 mixed_scheduling 的 antigravity 账户
 func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, nativePlatform string) (*Account, error) {
 	preferOAuth := nativePlatform == PlatformGemini
+	strictPriorityFallback := s.strictPriorityFallback()
 	routingAccountIDs := s.routingAccountIDsForRequest(ctx, groupID, requestedModel, nativePlatform)
 
 	// require_privacy_set: 获取分组信息
@@ -2099,7 +2186,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 				derefGroupID(groupID), requestedModel, nativePlatform, shortSessionHash(sessionHash), routingAccountIDs)
 		}
 		// 1) Sticky session only applies if the bound account is within the routing set.
-		if sessionHash != "" && s.cache != nil {
+		if !strictPriorityFallback && sessionHash != "" && s.cache != nil {
 			accountID, err := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 			if err == nil && accountID > 0 && containsInt64(routingAccountIDs, accountID) {
 				if _, excluded := excludedIDs[accountID]; !excluded {
@@ -2209,7 +2296,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 		}
 
 		if selected != nil {
-			if sessionHash != "" && s.cache != nil {
+			if !strictPriorityFallback && sessionHash != "" && s.cache != nil {
 				if err := s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, selected.ID); err != nil {
 					logger.LegacyPrintf("service.gateway", "set session account failed: session=%s account_id=%d err=%v", sessionHash, selected.ID, err)
 				}
@@ -2223,7 +2310,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 	}
 
 	// 1. 查询粘性会话
-	if sessionHash != "" && s.cache != nil {
+	if !strictPriorityFallback && sessionHash != "" && s.cache != nil {
 		accountID, err := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 		if err == nil && accountID > 0 {
 			if _, excluded := excludedIDs[accountID]; !excluded {
@@ -2335,7 +2422,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 	}
 
 	// 4. 建立粘性绑定
-	if sessionHash != "" && s.cache != nil {
+	if !strictPriorityFallback && sessionHash != "" && s.cache != nil {
 		if err := s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, selected.ID); err != nil {
 			logger.LegacyPrintf("service.gateway", "set session account failed: session=%s account_id=%d err=%v", sessionHash, selected.ID, err)
 		}

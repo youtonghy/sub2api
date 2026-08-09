@@ -485,6 +485,20 @@ func TestHandleFailoverError_SameAccountRetry(t *testing.T) {
 	})
 }
 
+func TestHandleFailoverError_StrictPrioritySkipsSameAccountRetry(t *testing.T) {
+	mock := &mockTempUnscheduler{}
+	fs := NewFailoverStateWithStrictPriority(3, false, true)
+	start := time.Now()
+	action := fs.HandleFailoverError(context.Background(), mock, 100, "openai", maxSameAccountRetries, newTestFailoverErr(400, true, false))
+
+	require.Equal(t, FailoverContinue, action)
+	require.Zero(t, fs.SameAccountRetryCount[100], "strict mode must not retry on the same account")
+	require.Equal(t, 1, fs.SwitchCount)
+	require.Contains(t, fs.FailedAccountIDs, int64(100))
+	require.Len(t, mock.calls, 1)
+	require.Less(t, time.Since(start), 400*time.Millisecond, "strict mode must not sleep for same-account retry")
+}
+
 // ---------------------------------------------------------------------------
 // HandleFailoverError — TempUnschedule 调用验证
 // ---------------------------------------------------------------------------
@@ -888,6 +902,22 @@ func TestHandleSelectionExhausted(t *testing.T) {
 		require.Equal(t, FailoverCanceled, action)
 	})
 
+	t.Run("严格模式下503不清理失败列表且不等待重试", func(t *testing.T) {
+		fs := NewFailoverStateWithStrictPriority(3, false, true)
+		fs.LastFailoverErr = newTestFailoverErr(503, false, false)
+		fs.FailedAccountIDs[100] = struct{}{}
+		fs.SwitchCount = 1
+
+		start := time.Now()
+		action := fs.HandleSelectionExhausted(context.Background())
+		elapsed := time.Since(start)
+
+		require.Equal(t, FailoverExhausted, action)
+		require.Less(t, elapsed, 100*time.Millisecond, "strict mode must not sleep for 503 backoff")
+		require.Contains(t, fs.FailedAccountIDs, int64(100), "strict mode must not clear failed accounts")
+		require.NotNil(t, fs.LastFailoverErr, "strict mode must preserve the last upstream error")
+	})
+
 	t.Run("503且SwitchCount等于MaxSwitches_仍可重试", func(t *testing.T) {
 		fs := NewFailoverState(2, false)
 		fs.LastFailoverErr = newTestFailoverErr(503, false, false)
@@ -895,6 +925,20 @@ func TestHandleSelectionExhausted(t *testing.T) {
 
 		action := fs.HandleSelectionExhausted(context.Background())
 		require.Equal(t, FailoverContinue, action)
+	})
+
+	t.Run("连续3次503退避后第4次返回Exhausted", func(t *testing.T) {
+		fs := NewFailoverState(10, false)
+		fs.LastFailoverErr = newTestFailoverErr(503, false, false)
+		fs.SwitchCount = 1
+		fs.consecutiveSelectionBackoffs = 3
+
+		start := time.Now()
+		action := fs.HandleSelectionExhausted(context.Background())
+		elapsed := time.Since(start)
+
+		require.Equal(t, FailoverExhausted, action, "4th consecutive backoff must return Exhausted")
+		require.Less(t, elapsed, 100*time.Millisecond, "must not sleep when backoff cap is reached")
 	})
 }
 

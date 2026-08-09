@@ -49,6 +49,13 @@ func TestLoadRedisUsernameFromEnvironment(t *testing.T) {
 	require.Equal(t, "app-user", cfg.Redis.Username)
 }
 
+func TestLoadStrictPriorityFallbackDefaultsToOptIn(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.False(t, cfg.Gateway.Scheduling.StrictPriorityFallback)
+}
+
 func TestLoadHTTPIngressSafetyDefaults(t *testing.T) {
 	resetViperWithJWTSecret(t)
 	cfg, err := Load()

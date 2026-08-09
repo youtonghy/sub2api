@@ -1209,8 +1209,12 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_ForwardDirect_UpstreamRequest
 	result, err := svc.forwardAnthropicAPIKeyPassthrough(context.Background(), c, account, []byte(`{"model":"x"}`), "x", "x", false, time.Now())
 	require.Nil(t, result)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "upstream request failed")
-	require.Equal(t, http.StatusBadGateway, rec.Code)
+	var failoverErr *UpstreamFailoverError
+	require.True(t, errors.As(err, &failoverErr), "transport error should return UpstreamFailoverError, got: %T", err)
+	require.Equal(t, http.StatusBadGateway, failoverErr.StatusCode)
+	require.JSONEq(t, anthropicTransportFailoverBody, string(failoverErr.ResponseBody))
+	require.Equal(t, http.StatusOK, rec.Code, "transport error must not write a terminal response")
+	require.Empty(t, rec.Body.String())
 }
 
 func TestGatewayService_AnthropicAPIKeyPassthrough_ForwardDirect_EmptyResponseBody(t *testing.T) {

@@ -117,6 +117,14 @@ func NewGatewayHandler(
 	}
 }
 
+func (h *GatewayHandler) newFailoverState(maxSwitches int, hasBoundSession bool) *FailoverState {
+	strictPriorityFallback := false
+	if h != nil && h.cfg != nil {
+		strictPriorityFallback = h.cfg.Gateway.Scheduling.StrictPriorityFallback
+	}
+	return NewFailoverStateWithStrictPriority(maxSwitches, hasBoundSession, strictPriorityFallback)
+}
+
 // Messages handles Claude API compatible messages endpoint
 // POST /v1/messages
 func (h *GatewayHandler) Messages(c *gin.Context) {
@@ -304,7 +312,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	hasBoundSession := sessionKey != "" && sessionBoundAccountID > 0
 
 	if platform == service.PlatformGemini {
-		fs := NewFailoverState(h.maxAccountSwitchesGemini, hasBoundSession)
+		fs := h.newFailoverState(h.maxAccountSwitchesGemini, hasBoundSession)
 
 		// 单账号分组提前设置 SingleAccountRetry 标记，让 Service 层首次 503 就不设模型限流标记。
 		// 避免单账号分组收到 503 (MODEL_CAPACITY_EXHAUSTED) 时设 29s 限流，导致后续请求连续快速失败。
@@ -316,7 +324,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		for {
 			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), apiKey.GroupID, sessionKey, reqModel, fs.FailedAccountIDs, "", int64(0)) // Gemini 不使用会话限制
 			if err != nil {
-				if len(fs.FailedAccountIDs) == 0 {
+				if fs.LastFailoverErr == nil {
 					cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, service.PlatformGemini)
 					if !cls.ModelNotFound {
 						markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
@@ -609,7 +617,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	}
 
 	for {
-		fs := NewFailoverState(h.maxAccountSwitches, hasBoundSession)
+		fs := h.newFailoverState(h.maxAccountSwitches, hasBoundSession)
 		retryWithFallback := false
 
 		for {
@@ -628,7 +636,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			)
 			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), currentAPIKey.GroupID, sessionKey, reqModel, fs.FailedAccountIDs, parsedReq.MetadataUserID, subject.UserID)
 			if err != nil {
-				if len(fs.FailedAccountIDs) == 0 {
+				if fs.LastFailoverErr == nil {
 					cls := classifyNoAccountErrorFromGin(c, h.gatewayService, currentAPIKey, reqModel, reqModel, platform)
 					if !cls.ModelNotFound {
 						markOpsRoutingCapacityLimitedIfNoAvailable(c, err)

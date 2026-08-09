@@ -160,9 +160,9 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		selectionSessionHash = "gemini:" + selectionSessionHash
 	}
 	// 3. Account selection + failover loop
-	fs := NewFailoverState(h.maxAccountSwitches, false)
+	fs := h.newFailoverState(h.maxAccountSwitches, false)
 	if groupPlatform == service.PlatformGemini {
-		fs = NewFailoverState(h.maxAccountSwitchesGemini, false)
+		fs = h.newFailoverState(h.maxAccountSwitchesGemini, false)
 	}
 
 	for {
@@ -171,7 +171,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		}
 		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), apiKey.GroupID, selectionSessionHash, reqModel, fs.FailedAccountIDs, "", int64(0))
 		if err != nil {
-			if len(fs.FailedAccountIDs) == 0 {
+			if fs.LastFailoverErr == nil {
 				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, groupPlatform)
 				if !cls.ModelNotFound {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)

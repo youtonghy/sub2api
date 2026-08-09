@@ -213,6 +213,12 @@ gateway:
   openai_first_output_timeout_seconds: 0
   # Optional high/xhigh/max override (seconds, 0=use the standard timeout)
   openai_high_effort_first_output_timeout_seconds: 0
+  # Per-attempt upstream forward timeout (seconds, 0=disabled). When set, a single
+  # upstream attempt that accepts the connection but never responds triggers a 504
+  # failover to the next account. Defaults to 0 (disabled).
+  # 单次上游转发超时（秒，0=不启用）。超时后按 504 触发 failover 切换到下一个账号。
+  # 默认 0（不启用）。
+  response_timeout: 0
   # Max request body size in bytes (default: 256MB)
   # 请求体最大字节数（默认 256MB）
   max_body_size: 268435456
@@ -543,6 +549,12 @@ gateway:
     # Fallback max waiting queue size
     # 兜底最大排队长度
     fallback_max_waiting: 100
+    # Strict priority fallback: skip sticky/weighted selection and advance to the
+    # next account by priority after an upstream failure. This is opt-in and
+    # defaults to false, preserving sticky/load/weighted scheduling.
+    # 严格优先级回退：失败后跳过粘性/加权，按优先级立即切到下一个账号。
+    # 默认 false，保持原有粘性/负载/加权调度；需要时显式开启。
+    strict_priority_fallback: false
     # Prefer the account whose session window resets soonest (use-it-or-lose-it).
     # 负载感知选择时优先用尽「会话窗口最早重置」的账号；false 保持
     # 原有「优先级 → 负载率 → LRU」行为（默认）。
