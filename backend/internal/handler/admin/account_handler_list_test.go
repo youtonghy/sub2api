@@ -19,7 +19,59 @@ func setupAccountListRouter() (*gin.Engine, *stubAdminService) {
 	adminSvc := newStubAdminService()
 	handler := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	router.GET("/api/v1/admin/accounts", handler.List)
+	router.GET("/api/v1/admin/accounts/model-options", handler.GetModelOptions)
 	return router, adminSvc
+}
+
+func TestAccountHandlerListFiltersByModelBeforePagination(t *testing.T) {
+	router, adminSvc := setupAccountListRouter()
+	adminSvc.accounts = []service.Account{
+		{ID: 1, Name: "other", Platform: service.PlatformOpenAI, Credentials: map[string]any{"model_mapping": map[string]any{"gpt-other": "gpt-other"}}},
+		{ID: 2, Name: "match-1", Platform: service.PlatformOpenAI, Credentials: map[string]any{"model_mapping": map[string]any{"gpt-target": "gpt-target"}}},
+		{ID: 3, Name: "match-2", Platform: service.PlatformOpenAI, Credentials: map[string]any{"model_mapping": map[string]any{"gpt-*": "gpt-*"}}},
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts?page=1&page_size=1&model=gpt-target", nil)
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var payload struct {
+		Data struct {
+			Items []struct {
+				ID int64 `json:"id"`
+			} `json:"items"`
+			Total int64 `json:"total"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+	require.Equal(t, int64(2), payload.Data.Total)
+	require.Equal(t, int64(2), payload.Data.Items[0].ID)
+}
+
+func TestAccountHandlerModelOptionsIncludesCustomModelsAndExcludesWildcards(t *testing.T) {
+	router, adminSvc := setupAccountListRouter()
+	adminSvc.accounts = []service.Account{{
+		ID: 1,
+		Credentials: map[string]any{"model_mapping": map[string]any{
+			"custom-model": "upstream-model",
+			"gpt-*":        "gpt-*",
+		}},
+	}}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/model-options", nil)
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var payload struct {
+		Data struct {
+			Models []string `json:"models"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+	require.Contains(t, payload.Data.Models, "custom-model")
+	require.NotContains(t, payload.Data.Models, "gpt-*")
 }
 
 func TestAccountHandlerListIncludesCreatedAt(t *testing.T) {

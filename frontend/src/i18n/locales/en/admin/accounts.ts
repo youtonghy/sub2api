@@ -98,6 +98,7 @@ export default {
       notesPlaceholder: 'Enter notes',
       notesHint: 'Notes are optional',
       allPlatforms: 'All Platforms',
+      allModels: 'All Models',
       allTypes: 'All Types',
       allStatus: 'All Status',
       allGroups: 'All Groups',

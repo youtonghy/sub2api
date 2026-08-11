@@ -39,6 +39,7 @@ export async function list(
   pageSize: number = 20,
   filters?: {
     platform?: string
+    model?: string
     type?: string
     status?: string
     group?: string
@@ -75,6 +76,7 @@ export async function listWithEtag(
   pageSize: number = 20,
   filters?: {
     platform?: string
+    model?: string
     type?: string
     status?: string
     group?: string
@@ -130,6 +132,11 @@ export async function listWithEtag(
 export async function getById(id: number): Promise<Account> {
   const { data } = await apiClient.get<Account>(`/admin/accounts/${id}`)
   return data
+}
+
+export async function getModelOptions(): Promise<string[]> {
+  const { data } = await apiClient.get<{ models: string[] }>('/admin/accounts/model-options')
+  return data.models ?? []
 }
 
 /**
@@ -631,6 +638,7 @@ export async function exportData(options?: {
   ids?: number[]
   filters?: {
     platform?: string
+    model?: string
     type?: string
     status?: string
     group?: string
@@ -645,8 +653,9 @@ export async function exportData(options?: {
   if (options?.ids && options.ids.length > 0) {
     params.ids = options.ids.join(',')
   } else if (options?.filters) {
-    const { platform, type, status, group, privacy_mode, search, sort_by, sort_order } = options.filters
+    const { platform, model, type, status, group, privacy_mode, search, sort_by, sort_order } = options.filters
     if (platform) params.platform = platform
+    if (model) params.model = model
     if (type) params.type = type
     if (status) params.status = status
     if (group) params.group = group
@@ -987,6 +996,7 @@ export const accountsAPI = {
   list,
   listWithEtag,
   getById,
+  getModelOptions,
   create,
   duplicate,
   update,

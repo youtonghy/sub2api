@@ -1186,6 +1186,9 @@ func (s *adminServiceImpl) resolveBulkUpdateTargetIDs(ctx context.Context, filte
 			return nil, err
 		}
 		for _, account := range accounts {
+			if filters.Model != "" && !account.IsModelSupported(filters.Model) {
+				continue
+			}
 			accountIDs = append(accountIDs, account.ID)
 		}
 		if int64(len(accountIDs)) >= total || len(accounts) == 0 {

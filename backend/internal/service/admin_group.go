@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -256,6 +257,37 @@ func defaultModelsListCandidateIDs(platform string) []string {
 		}
 		return ids
 	}
+}
+
+// AccountModelOptions returns concrete model IDs administrators can use to
+// filter accounts. It combines built-in platform models with account-specific
+// mappings; wildcard mapping rules are intentionally not presented as models.
+func AccountModelOptions(accounts []Account) []string {
+	seen := make(map[string]struct{})
+	models := make([]string, 0)
+	add := func(model string) {
+		model = strings.TrimSpace(model)
+		if model == "" || strings.ContainsAny(model, "*?") {
+			return
+		}
+		if _, exists := seen[model]; exists {
+			return
+		}
+		seen[model] = struct{}{}
+		models = append(models, model)
+	}
+	for _, platform := range []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok} {
+		for _, model := range defaultModelsListCandidateIDs(platform) {
+			add(model)
+		}
+	}
+	for i := range accounts {
+		for model := range accounts[i].GetModelMapping() {
+			add(model)
+		}
+	}
+	sort.Strings(models)
+	return models
 }
 
 func defaultAllowImageGenerationForPlatform(platform string) bool {

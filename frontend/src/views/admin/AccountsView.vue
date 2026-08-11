@@ -7,6 +7,7 @@
             v-model:searchQuery="params.search"
             :filters="params"
             :groups="groups"
+            :models="modelOptions"
             @update:filters="(newFilters) => Object.assign(params, newFilters)"
             @change="debouncedReload"
             @update:searchQuery="debouncedReload"
@@ -571,6 +572,7 @@ const authStore = useAuthStore()
 
 const proxies = ref<AccountProxy[]>([])
 const groups = ref<AdminGroup[]>([])
+const modelOptions = ref<string[]>([])
 const accountTableRef = ref<HTMLElement | null>(null)
 const dataTableRef = ref<InstanceType<typeof DataTable> | null>(null)
 type AccountBulkEditTarget =
@@ -584,6 +586,7 @@ type AccountBulkEditTarget =
       mode: 'filtered'
       filters: {
         platform?: string
+        model?: string
         type?: string
         status?: string
         group?: string
@@ -1135,6 +1138,7 @@ const {
   fetchFn: adminAPI.accounts.list,
   initialParams: {
     platform: '',
+    model: '',
     type: '',
     status: '',
     privacy_mode: '',
@@ -1960,6 +1964,7 @@ const buildBulkEditFilterSnapshot = () => {
   const sortOrder: AccountSortOrder = rawParams.sort_order === 'desc' ? 'desc' : 'asc'
   return {
     platform: typeof rawParams.platform === 'string' ? rawParams.platform : '',
+    model: typeof rawParams.model === 'string' ? rawParams.model : '',
     type: typeof rawParams.type === 'string' ? rawParams.type : '',
     status: typeof rawParams.status === 'string' ? rawParams.status : '',
     group: typeof rawParams.group === 'string' ? rawParams.group : '',
@@ -2037,6 +2042,7 @@ const ACCOUNT_UNGROUPED_GROUP_QUERY_VALUE = 'ungrouped'
 const ACCOUNT_PRIVACY_MODE_UNSET_QUERY_VALUE = '__unset__'
 const buildAccountQueryFilters = () => ({
   platform: params.platform || '',
+  model: params.model || '',
   type: params.type || '',
   status: params.status || '',
   group: params.group || '',
@@ -2162,6 +2168,11 @@ const handleProbeUpstreamBilling = async (account: Account) => {
   }
 }
 const handleAccountUpdated = (updatedAccount: Account) => {
+  if (params.model) {
+    void reload()
+    enterAutoRefreshSilentWindow()
+    return
+  }
   patchAccountInList(updatedAccount)
   enterAutoRefreshSilentWindow()
 }
@@ -2441,6 +2452,14 @@ onMounted(async () => {
     groups.value = g
   } catch (error) {
     console.error('Failed to load proxies/groups:', error)
+  }
+  try {
+    const loadModelOptions = adminAPI.accounts.getModelOptions
+    if (typeof loadModelOptions === 'function') {
+      modelOptions.value = await loadModelOptions()
+    }
+  } catch (error) {
+    console.error('Failed to load account model options:', error)
   }
   window.addEventListener('scroll', handleScroll, true)
   window.addEventListener('resize', handleViewportResize)
