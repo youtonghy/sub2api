@@ -59,6 +59,8 @@ export default {
       spendingRankingSpend: 'Spend',
       spendingRankingOther: 'Others',
       spendingRankingUsage: 'Usage',
+      accountRankingTitle: 'Account Usage Ranking',
+      account: 'Account',
       spendShort: 'Spend',
       requestsShort: 'Req',
       tokensShort: 'Tok',

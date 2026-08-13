@@ -787,6 +787,16 @@ export default {
           idle: 'Idle'
         }
       },
+      accountTTFT: {
+        title: 'Account Time to First Token (TTFT)',
+        description: 'Account TTFT over the last 30 minutes, sorted by slowest average. Refreshes every 30 seconds.',
+        account: 'Account',
+        average: 'Average TTFT',
+        maximum: 'Maximum',
+        samples: 'Samples',
+        empty: 'No first-token samples in the last 30 minutes',
+        loadFailed: 'Failed to load account TTFT data'
+      },
       realtime: {
         title: 'Realtime',
         connected: 'Realtime connected',

@@ -316,6 +316,61 @@
             <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
           </div>
 
+          <!-- Account Usage Ranking -->
+          <div class="card p-4">
+            <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.dashboard.accountRankingTitle') }}
+            </h3>
+            <div v-if="accountRankingLoading" class="flex h-48 items-center justify-center">
+              <LoadingSpinner size="md" />
+            </div>
+            <div
+              v-else-if="accountRankingError"
+              class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+            >
+              {{ t('admin.dashboard.failedToLoad') }}
+            </div>
+            <div v-else-if="accountRanking.length" class="max-h-80 overflow-auto">
+              <table class="w-full text-sm">
+                <thead class="sticky top-0 bg-white text-gray-500 dark:bg-dark-900 dark:text-gray-400">
+                  <tr>
+                    <th class="pb-2 text-left">{{ t('admin.dashboard.account') }}</th>
+                    <th class="pb-2 text-right">{{ t('admin.dashboard.requests') }}</th>
+                    <th class="pb-2 text-right">{{ t('admin.dashboard.tokens') }}</th>
+                    <th class="pb-2 text-right">{{ t('admin.dashboard.spendingRankingSpend') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="(item, index) in accountRanking"
+                    :key="item.account_id"
+                    class="border-t border-gray-100 dark:border-dark-700"
+                  >
+                    <td class="py-2 font-medium text-gray-900 dark:text-white">
+                      <span class="mr-2 inline-block w-7 text-xs text-gray-400">#{{ index + 1 }}</span>
+                      {{ item.account_name }}
+                    </td>
+                    <td class="py-2 text-right text-gray-600 dark:text-gray-400">
+                      {{ formatNumber(item.requests) }}
+                    </td>
+                    <td class="py-2 text-right text-gray-600 dark:text-gray-400">
+                      {{ formatTokens(item.tokens) }}
+                    </td>
+                    <td class="py-2 text-right font-medium text-green-600 dark:text-green-400">
+                      ${{ formatCost(item.actual_cost) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div
+              v-else
+              class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+            >
+              {{ t('admin.dashboard.noDataAvailable') }}
+            </div>
+          </div>
+
           <!-- User Usage Trend (Full Width) -->
           <div class="card p-4">
             <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
@@ -353,7 +408,8 @@ import type {
   TrendDataPoint,
   ModelStat,
   UserUsageTrendPoint,
-  UserSpendingRankingItem
+  UserSpendingRankingItem,
+  AccountUsageRankingItem
 } from '@/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
@@ -396,18 +452,22 @@ const chartsLoading = ref(false)
 const userTrendLoading = ref(false)
 const rankingLoading = ref(false)
 const rankingError = ref(false)
+const accountRankingLoading = ref(false)
+const accountRankingError = ref(false)
 
 // Chart data
 const trendData = ref<TrendDataPoint[]>([])
 const modelStats = ref<ModelStat[]>([])
 const userTrend = ref<UserUsageTrendPoint[]>([])
 const rankingItems = ref<UserSpendingRankingItem[]>([])
+const accountRanking = ref<AccountUsageRankingItem[]>([])
 const rankingTotalActualCost = ref(0)
 const rankingTotalRequests = ref(0)
 const rankingTotalTokens = ref(0)
 let chartLoadSeq = 0
 let usersTrendLoadSeq = 0
 let rankingLoadSeq = 0
+let accountRankingLoadSeq = 0
 const rankingLimit = 12
 
 // Helper function to format date in local timezone
@@ -732,11 +792,35 @@ const loadUserSpendingRanking = async () => {
   }
 }
 
+const loadAccountUsageRanking = async () => {
+  const currentSeq = ++accountRankingLoadSeq
+  accountRankingLoading.value = true
+  accountRankingError.value = false
+  try {
+    const response = await adminAPI.dashboard.getAccountUsageRanking({
+      start_date: startDate.value,
+      end_date: endDate.value
+    })
+    if (currentSeq !== accountRankingLoadSeq) return
+    accountRanking.value = response.ranking || []
+  } catch (error) {
+    if (currentSeq !== accountRankingLoadSeq) return
+    console.error('Error loading account usage ranking:', error)
+    accountRanking.value = []
+    accountRankingError.value = true
+  } finally {
+    if (currentSeq === accountRankingLoadSeq) {
+      accountRankingLoading.value = false
+    }
+  }
+}
+
 const loadDashboardStats = async () => {
   await Promise.all([
     loadDashboardSnapshot(true),
     loadUsersTrend(),
-    loadUserSpendingRanking()
+    loadUserSpendingRanking(),
+    loadAccountUsageRanking()
   ])
 }
 
@@ -744,7 +828,8 @@ const loadChartData = async () => {
   await Promise.all([
     loadDashboardSnapshot(false),
     loadUsersTrend(),
-    loadUserSpendingRanking()
+    loadUserSpendingRanking(),
+    loadAccountUsageRanking()
   ])
 }
 

@@ -1932,6 +1932,20 @@ export interface UserSpendingRankingResponse {
   end_date: string
 }
 
+export interface AccountUsageRankingItem {
+  account_id: number
+  account_name: string
+  requests: number
+  tokens: number
+  actual_cost: number
+}
+
+export interface AccountUsageRankingResponse {
+  ranking: AccountUsageRankingItem[]
+  start_date: string
+  end_date: string
+}
+
 export interface ApiKeyUsageTrendPoint {
   date: string
   api_key_id: number

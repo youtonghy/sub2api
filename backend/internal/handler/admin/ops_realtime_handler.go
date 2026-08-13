@@ -167,6 +167,45 @@ func (h *OpsHandler) GetAccountAvailability(c *gin.Context) {
 	response.Success(c, payload)
 }
 
+// GetAccountTTFTStats returns the slowest accounts by average time to first token.
+// GET /api/v1/admin/ops/account-ttft
+func (h *OpsHandler) GetAccountTTFTStats(c *gin.Context) {
+	if h.opsService == nil {
+		response.Error(c, http.StatusServiceUnavailable, "Ops service not available")
+		return
+	}
+	if err := h.opsService.RequireMonitoringEnabled(c.Request.Context()); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	endTime := time.Now().UTC()
+	filter := &service.OpsAccountTTFTFilter{
+		StartTime: endTime.Add(-30 * time.Minute),
+		EndTime:   endTime,
+		Platform:  strings.TrimSpace(c.Query("platform")),
+		Limit:     100,
+	}
+	if v := strings.TrimSpace(c.Query("group_id")); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || id <= 0 {
+			response.BadRequest(c, "Invalid group_id")
+			return
+		}
+		filter.GroupID = &id
+	}
+
+	data, err := h.opsService.GetAccountTTFTStats(c.Request.Context(), filter)
+	if err != nil {
+		if isOpsRealtimeRequestCanceled(c, err) {
+			return
+		}
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, data)
+}
+
 func isOpsRealtimeRequestCanceled(c *gin.Context, err error) bool {
 	if err == nil {
 		return false

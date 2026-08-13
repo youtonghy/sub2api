@@ -33,7 +33,8 @@ function concurrencyResponse() {
       '1': { account_id: 1, account_name: 'Serving', platform: 'openai', group_id: 2, group_name: 'Primary', current_in_use: 2, max_capacity: 10, load_percentage: 20, waiting_in_queue: 0 },
       '2': { account_id: 2, account_name: 'Cooling', platform: 'openai', group_id: 2, group_name: 'Primary', current_in_use: 0, max_capacity: 10, load_percentage: 0, waiting_in_queue: 0 },
       '3': { account_id: 3, account_name: 'Hot', platform: 'openai', group_id: 2, group_name: 'Primary', current_in_use: 9, max_capacity: 10, load_percentage: 92, waiting_in_queue: 1 },
-      '4': { account_id: 4, account_name: 'Broken', platform: 'openai', group_id: 2, group_name: 'Primary', current_in_use: 0, max_capacity: 10, load_percentage: 0, waiting_in_queue: 0 }
+      '4': { account_id: 4, account_name: 'Broken', platform: 'openai', group_id: 2, group_name: 'Primary', current_in_use: 0, max_capacity: 10, load_percentage: 0, waiting_in_queue: 0 },
+      '5': { account_id: 5, account_name: 'Idle', platform: 'openai', group_id: 2, group_name: 'Primary', current_in_use: 0, max_capacity: 10, load_percentage: 0, waiting_in_queue: 0 }
     }
   }
 }
@@ -47,7 +48,8 @@ function availabilityResponse() {
       '1': { account_id: 1, account_name: 'Serving', platform: 'openai', group_id: 2, group_name: 'Primary', status: 'active', is_available: true, is_rate_limited: false, is_overloaded: false, has_error: false },
       '2': { account_id: 2, account_name: 'Cooling', platform: 'openai', group_id: 2, group_name: 'Primary', status: 'active', is_available: false, is_rate_limited: false, is_overloaded: false, has_error: false, cooldown_remaining_sec: 45, temp_unschedulable_reason: 'strict_priority_fallback: upstream_status=503' },
       '3': { account_id: 3, account_name: 'Hot', platform: 'openai', group_id: 2, group_name: 'Primary', status: 'active', is_available: true, is_rate_limited: false, is_overloaded: false, has_error: false },
-      '4': { account_id: 4, account_name: 'Broken', platform: 'openai', group_id: 2, group_name: 'Primary', status: 'error', is_available: false, is_rate_limited: false, is_overloaded: false, has_error: true, error_message: 'Selected model is at capacity' }
+      '4': { account_id: 4, account_name: 'Broken', platform: 'openai', group_id: 2, group_name: 'Primary', status: 'error', is_available: false, is_rate_limited: false, is_overloaded: false, has_error: true, error_message: 'Selected model is at capacity' },
+      '5': { account_id: 5, account_name: 'Idle', platform: 'openai', group_id: 2, group_name: 'Primary', status: 'active', is_available: true, is_rate_limited: false, is_overloaded: false, has_error: false }
     }
   }
 }
@@ -63,7 +65,7 @@ describe('OpsProviderRealtimeMonitor', () => {
     vi.useRealTimers()
   })
 
-  it('renders active, saturated, cooling, and failing providers with live load', async () => {
+  it('only renders providers that are handling calls or have account errors', async () => {
     const wrapper = mount(OpsProviderRealtimeMonitor)
     await flushPromises()
 
@@ -74,6 +76,7 @@ describe('OpsProviderRealtimeMonitor', () => {
     expect(wrapper.get('[data-provider-id="3"]').text()).toContain('92%')
     expect(wrapper.get('[data-provider-id="4"]').attributes('data-provider-state')).toBe('error')
     expect(wrapper.get('[data-provider-id="4"]').text()).toContain('Selected model is at capacity')
+    expect(wrapper.find('[data-provider-id="5"]').exists()).toBe(false)
 
     wrapper.unmount()
   })

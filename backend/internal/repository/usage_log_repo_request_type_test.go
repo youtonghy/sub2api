@@ -741,6 +741,29 @@ func TestUsageLogRepositoryGetUserSpendingRanking(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestUsageLogRepositoryGetAccountUsageRanking(t *testing.T) {
+	db, mock := newSQLMock(t)
+	repo := &usageLogRepository{sql: db}
+
+	start := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := start.Add(24 * time.Hour)
+	rows := sqlmock.NewRows([]string{"account_id", "account_name", "requests", "tokens", "actual_cost"}).
+		AddRow(int64(11), "OpenAI Main", int64(12), int64(2400), 18.5).
+		AddRow(int64(27), "Claude Backup", int64(8), int64(1900), 10.25)
+
+	mock.ExpectQuery("SELECT[\\s\\S]+ul.account_id[\\s\\S]+GROUP BY ul.account_id, a.name[\\s\\S]+HAVING COALESCE\\(SUM\\(ul.actual_cost\\), 0\\) > 0[\\s\\S]+ORDER BY actual_cost DESC, tokens DESC, ul.account_id ASC").
+		WithArgs(start, end).
+		WillReturnRows(rows)
+
+	got, err := repo.GetAccountUsageRanking(context.Background(), start, end)
+	require.NoError(t, err)
+	require.Equal(t, []usagestats.AccountUsageRankingItem{
+		{AccountID: 11, AccountName: "OpenAI Main", Requests: 12, Tokens: 2400, ActualCost: 18.5},
+		{AccountID: 27, AccountName: "Claude Backup", Requests: 8, Tokens: 1900, ActualCost: 10.25},
+	}, got)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestBuildRequestTypeFilterConditionLegacyFallback(t *testing.T) {
 	tests := []struct {
 		name      string

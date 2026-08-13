@@ -37,7 +37,7 @@
         </div>
 
         <template v-if="!loading">
-          <template v-for="account in accounts" :key="account.id">
+          <template v-for="account in activeAccounts" :key="account.id">
             <div class="sticky left-0 z-10 flex min-w-0 items-center border-b border-r border-gray-100 bg-white px-3 py-2 dark:border-dark-800 dark:bg-dark-900">
               <div class="min-w-0">
                 <div class="truncate text-sm font-medium text-gray-800 dark:text-gray-200" :title="account.name">
@@ -72,7 +72,7 @@
       <div v-if="loading" class="flex h-40 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
         {{ t('common.loading') }}
       </div>
-      <div v-else-if="accounts.length === 0" class="flex h-40 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+      <div v-else-if="activeAccounts.length === 0" class="flex h-40 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
         {{ t('common.noData') }}
       </div>
     </div>
@@ -80,6 +80,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Account } from '@/types'
 import type { AccountHourlyFailureBucket } from '@/api/admin/ops'
@@ -101,6 +102,10 @@ const props = withDefaults(defineProps<{
 
 const { t } = useI18n()
 const hours = Array.from({ length: 24 }, (_, hour) => hour)
+
+const activeAccounts = computed(() => props.accounts.filter(account => (
+  props.byAccount[String(account.id)]?.some(bucket => bucket.request_count > 0) ?? false
+)))
 
 const emptyBucket = (accountID: number, hour: number): AccountHourlyFailureBucket => ({
   account_id: accountID,

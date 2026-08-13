@@ -90,7 +90,7 @@ function resolveDetail(state: ProviderState, avail: Partial<AccountAvailability>
   return t('admin.ops.providerMonitor.readyDetail')
 }
 
-const rows = computed<ProviderRow[]>(() => {
+const allRows = computed<ProviderRow[]>(() => {
   const concMap = concurrency.value?.account || {}
   const availMap = availability.value?.account || {}
   const ids = new Set([...Object.keys(concMap), ...Object.keys(availMap)])
@@ -127,6 +127,8 @@ const rows = computed<ProviderRow[]>(() => {
     })
     .sort((a, b) => stateRank[a.state] - stateRank[b.state] || b.load - a.load || a.id - b.id)
 })
+
+const rows = computed(() => allRows.value.filter((row) => row.current > 0 || row.state !== 'idle'))
 
 const activeCount = computed(() => rows.value.filter((row) => row.current > 0).length)
 const coolingCount = computed(() => rows.value.filter((row) => ['cooling', 'overloaded', 'rate_limited'].includes(row.state)).length)

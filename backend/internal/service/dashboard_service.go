@@ -33,6 +33,10 @@ type dashboardStatsRangeFetcher interface {
 	GetDashboardStatsWithRange(ctx context.Context, start, end time.Time) (*usagestats.DashboardStats, error)
 }
 
+type accountUsageRankingReader interface {
+	GetAccountUsageRanking(ctx context.Context, start, end time.Time) ([]usagestats.AccountUsageRankingItem, error)
+}
+
 type dashboardStatsCacheEntry struct {
 	Stats     *usagestats.DashboardStats `json:"stats"`
 	UpdatedAt int64                      `json:"updated_at"`
@@ -404,6 +408,18 @@ func (s *DashboardService) GetUserSpendingRanking(ctx context.Context, startTime
 	ranking, err := s.usageRepo.GetUserSpendingRanking(ctx, startTime, endTime, limit)
 	if err != nil {
 		return nil, fmt.Errorf("get user spending ranking: %w", err)
+	}
+	return ranking, nil
+}
+
+func (s *DashboardService) GetAccountUsageRanking(ctx context.Context, startTime, endTime time.Time) ([]usagestats.AccountUsageRankingItem, error) {
+	repo, ok := s.usageRepo.(accountUsageRankingReader)
+	if !ok {
+		return nil, errors.New("account usage ranking is not supported")
+	}
+	ranking, err := repo.GetAccountUsageRanking(ctx, startTime, endTime)
+	if err != nil {
+		return nil, fmt.Errorf("get account usage ranking: %w", err)
 	}
 	return ranking, nil
 }

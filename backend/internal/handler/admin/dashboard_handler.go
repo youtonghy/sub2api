@@ -506,6 +506,7 @@ type BatchUsersUsageRequest struct {
 }
 
 var dashboardUsersRankingCache = newSnapshotCache(5 * time.Minute)
+var dashboardAccountsRankingCache = newSnapshotCache(5 * time.Minute)
 var dashboardBatchUsersUsageCache = newSnapshotCache(30 * time.Second)
 var dashboardBatchAPIKeysUsageCache = newSnapshotCache(30 * time.Second)
 
@@ -557,6 +558,33 @@ func (h *DashboardHandler) GetUserSpendingRanking(c *gin.Context) {
 		"end_date":          endTime.Add(-24 * time.Hour).Format("2006-01-02"),
 	}
 	dashboardUsersRankingCache.Set(cacheKey, payload)
+	c.Header("X-Snapshot-Cache", "miss")
+	response.Success(c, payload)
+}
+
+// GetAccountUsageRanking handles upstream account consumption and token ranking data.
+// GET /api/v1/admin/dashboard/accounts-ranking
+func (h *DashboardHandler) GetAccountUsageRanking(c *gin.Context) {
+	startTime, endTime := parseTimeRange(c)
+	cacheKey := startTime.UTC().Format(time.RFC3339) + ":" + endTime.UTC().Format(time.RFC3339)
+	if cached, ok := dashboardAccountsRankingCache.Get(cacheKey); ok {
+		c.Header("X-Snapshot-Cache", "hit")
+		response.Success(c, cached.Payload)
+		return
+	}
+
+	ranking, err := h.dashboardService.GetAccountUsageRanking(c.Request.Context(), startTime, endTime)
+	if err != nil {
+		response.Error(c, 500, "Failed to get account usage ranking")
+		return
+	}
+
+	payload := gin.H{
+		"ranking":    ranking,
+		"start_date": startTime.Format("2006-01-02"),
+		"end_date":   endTime.Add(-24 * time.Hour).Format("2006-01-02"),
+	}
+	dashboardAccountsRankingCache.Set(cacheKey, payload)
 	c.Header("X-Snapshot-Cache", "miss")
 	response.Success(c, payload)
 }

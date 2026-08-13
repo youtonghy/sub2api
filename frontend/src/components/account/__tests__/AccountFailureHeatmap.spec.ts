@@ -37,6 +37,12 @@ const account = {
   session_window_status: null
 } as Account
 
+const idleAccount = {
+  ...account,
+  id: 8,
+  name: 'Idle OpenAI'
+} as Account
+
 describe('AccountFailureHeatmap', () => {
   it('renders 24 chronological cells with blank, green, and red states', () => {
     const wrapper = mount(AccountFailureHeatmap, {
@@ -62,5 +68,38 @@ describe('AccountFailureHeatmap', () => {
     expect(cells[1].attributes('title')).toContain('100.00%')
     expect(cells[23].attributes('title')).toContain('23:00-23:59')
     expect(wrapper.text()).toContain('admin.accounts.failureHeatmap.todayRate 16.67%')
+  })
+
+  it('only renders accounts that have calls for the displayed day', () => {
+    const wrapper = mount(AccountFailureHeatmap, {
+      props: {
+        accounts: [account, idleAccount],
+        byAccount: {
+          '7': [
+            { account_id: 7, hour: 12, request_count: 1, failure_count: 0, failure_rate: 0 }
+          ],
+          '8': [
+            { account_id: 8, hour: 12, request_count: 0, failure_count: 0, failure_rate: 0 }
+          ]
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Primary OpenAI')
+    expect(wrapper.text()).not.toContain('Idle OpenAI')
+    expect(wrapper.findAll('button[aria-label]')).toHaveLength(24)
+  })
+
+  it('shows the empty state when none of the accounts have calls', () => {
+    const wrapper = mount(AccountFailureHeatmap, {
+      props: {
+        accounts: [idleAccount],
+        byAccount: {}
+      }
+    })
+
+    expect(wrapper.text()).not.toContain('Idle OpenAI')
+    expect(wrapper.text()).toContain('common.noData')
+    expect(wrapper.findAll('button[aria-label]')).toHaveLength(0)
   })
 })

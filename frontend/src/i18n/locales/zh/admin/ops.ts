@@ -788,6 +788,16 @@ export default {
           idle: '空闲'
         }
       },
+      accountTTFT: {
+        title: '账号首 Token（TTFT）',
+        description: '近 30 分钟账号首 Token 延迟，按平均值从高到低排列，每 30 秒刷新。',
+        account: '账号',
+        average: '平均 TTFT',
+        maximum: '最大值',
+        samples: '样本数',
+        empty: '近 30 分钟暂无首 Token 数据',
+        loadFailed: '加载账号 TTFT 数据失败'
+      },
       realtime: {
         title: '实时信息',
         connected: '实时已连接',

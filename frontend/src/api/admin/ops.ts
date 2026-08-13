@@ -417,6 +417,22 @@ export interface OpsAccountAvailabilityStatsResponse {
   timestamp?: string
 }
 
+export interface OpsAccountTTFTItem {
+  account_id: number
+  account_name: string
+  platform: string
+  avg_ms: number
+  p95_ms: number
+  max_ms: number
+  sample_count: number
+}
+
+export interface OpsAccountTTFTResponse {
+  start_time: string
+  end_time: string
+  items: OpsAccountTTFTItem[]
+}
+
 export async function getAccountAvailabilityStats(platform?: string, groupId?: number | null): Promise<OpsAccountAvailabilityStatsResponse> {
   const params: Record<string, any> = {}
   if (platform) {
@@ -426,6 +442,14 @@ export async function getAccountAvailabilityStats(platform?: string, groupId?: n
     params.group_id = groupId
   }
   const { data } = await apiClient.get<OpsAccountAvailabilityStatsResponse>('/admin/ops/account-availability', { params })
+  return data
+}
+
+export async function getAccountTTFTStats(platform?: string, groupId?: number | null): Promise<OpsAccountTTFTResponse> {
+  const params: Record<string, any> = {}
+  if (platform) params.platform = platform
+  if (typeof groupId === 'number' && groupId > 0) params.group_id = groupId
+  const { data } = await apiClient.get<OpsAccountTTFTResponse>('/admin/ops/account-ttft', { params })
   return data
 }
 
@@ -1340,6 +1364,7 @@ export const opsAPI = {
   getConcurrencyStats,
   getUserConcurrencyStats,
   getAccountAvailabilityStats,
+  getAccountTTFTStats,
   getAccountHourlyFailures,
   getRealtimeTrafficSummary,
   subscribeQPS,

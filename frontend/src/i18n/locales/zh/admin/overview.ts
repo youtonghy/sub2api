@@ -59,6 +59,8 @@ export default {
       spendingRankingSpend: '消费',
       spendingRankingOther: '其他',
       spendingRankingUsage: '用量',
+      accountRankingTitle: '账号消费排行',
+      account: '账号',
       spendShort: '消费',
       requestsShort: '请求',
       tokensShort: 'Token',

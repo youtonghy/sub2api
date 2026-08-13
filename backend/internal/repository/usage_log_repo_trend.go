@@ -222,6 +222,49 @@ func (r *usageLogRepository) GetUserSpendingRanking(ctx context.Context, startTi
 	}, nil
 }
 
+// GetAccountUsageRanking returns accounts with positive spend in descending
+// spend order for the requested time range.
+func (r *usageLogRepository) GetAccountUsageRanking(ctx context.Context, startTime, endTime time.Time) (results []usagestats.AccountUsageRankingItem, err error) {
+	query := `
+		SELECT
+			ul.account_id,
+			COALESCE(NULLIF(a.name, ''), 'Account #' || ul.account_id::text) as account_name,
+			COUNT(*) as requests,
+			COALESCE(SUM(ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens), 0) as tokens,
+			COALESCE(SUM(ul.actual_cost), 0) as actual_cost
+		FROM usage_logs ul
+		LEFT JOIN accounts a ON a.id = ul.account_id
+		WHERE ul.created_at >= $1 AND ul.created_at < $2
+		GROUP BY ul.account_id, a.name
+		HAVING COALESCE(SUM(ul.actual_cost), 0) > 0
+		ORDER BY actual_cost DESC, tokens DESC, ul.account_id ASC
+	`
+
+	rows, err := r.sql.QueryContext(ctx, query, startTime, endTime)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = closeErr
+			results = nil
+		}
+	}()
+
+	results = make([]usagestats.AccountUsageRankingItem, 0)
+	for rows.Next() {
+		var row usagestats.AccountUsageRankingItem
+		if err = rows.Scan(&row.AccountID, &row.AccountName, &row.Requests, &row.Tokens, &row.ActualCost); err != nil {
+			return nil, err
+		}
+		results = append(results, row)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 // GetUserUsageTrendByUserID 获取指定用户的使用趋势
 func (r *usageLogRepository) GetUserUsageTrendByUserID(ctx context.Context, userID int64, startTime, endTime time.Time, granularity string) (results []TrendDataPoint, err error) {
 	dateFormat := safeDateFormat(granularity)
