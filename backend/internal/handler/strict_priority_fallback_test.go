@@ -25,8 +25,9 @@ func TestFailoverStateStrictPriorityRetriesThenCoolsProvider(t *testing.T) {
 	state := NewFailoverState(0, false)
 	state.StrictPriorityFallback = true
 	cooldownCalls := 0
-	state.SetStrictPriorityPolicy(2, 15*time.Minute, func(_ context.Context, accountID int64, _ *service.UpstreamFailoverError) {
+	state.SetStrictPriorityPolicy(2, 15*time.Minute, func(_ context.Context, accountID int64, cooldown time.Duration, _ *service.UpstreamFailoverError) {
 		require.Equal(t, int64(7), accountID)
+		require.Equal(t, 15*time.Minute, cooldown)
 		cooldownCalls++
 	})
 	err := &service.UpstreamFailoverError{StatusCode: http.StatusServiceUnavailable, RetryableOnSameAccount: true}

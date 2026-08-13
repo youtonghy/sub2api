@@ -27,6 +27,7 @@ import (
 	gocache "github.com/patrickmn/go-cache"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
+	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -721,6 +722,30 @@ func (s *GatewayService) TempUnscheduleRetryableError(ctx context.Context, accou
 		tempUnscheduleGoogleConfigError(ctx, s.accountRepo, accountID, "[handler]")
 	case http.StatusBadGateway:
 		tempUnscheduleEmptyResponse(ctx, s.accountRepo, accountID, "[handler]")
+	}
+}
+
+// TempUnscheduleStrictPriorityFailure removes a failed account for the
+// operator-configured strict-priority cooldown period.
+func (s *GatewayService) TempUnscheduleStrictPriorityFailure(
+	ctx context.Context,
+	accountID int64,
+	cooldown time.Duration,
+	failoverErr *UpstreamFailoverError,
+) {
+	if s == nil || s.accountRepo == nil || cooldown <= 0 {
+		return
+	}
+	statusCode := 0
+	if failoverErr != nil {
+		statusCode = failoverErr.StatusCode
+	}
+	reason := fmt.Sprintf("strict_priority_fallback: upstream_status=%d", statusCode)
+	if err := s.accountRepo.SetTempUnschedulable(ctx, accountID, time.Now().Add(cooldown), reason); err != nil {
+		logger.FromContext(ctx).Warn("gateway.strict_priority_cooldown_failed",
+			zap.Int64("account_id", accountID),
+			zap.Error(err),
+		)
 	}
 }
 

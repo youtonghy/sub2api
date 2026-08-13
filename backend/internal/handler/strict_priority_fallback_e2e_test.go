@@ -304,6 +304,18 @@ func (c *strictFailoverGatewayCache) DeleteSessionAccountID(_ context.Context, _
 	}
 	return nil
 }
+func (c *strictFailoverGatewayCache) SetGrokVideoPendingBilling(context.Context, string, []byte, time.Duration) error {
+	return nil
+}
+func (c *strictFailoverGatewayCache) GetGrokVideoPendingBilling(context.Context, string) ([]byte, error) {
+	return nil, nil
+}
+func (c *strictFailoverGatewayCache) ClaimGrokVideoBilled(context.Context, string, time.Duration) (bool, error) {
+	return true, nil
+}
+func (c *strictFailoverGatewayCache) ReleaseGrokVideoBilled(context.Context, string) error {
+	return nil
+}
 
 // strictFailoverSimpleRepo backs the generic GatewayService with both listing
 // and the mutation methods the failover loop may call (e.g. SetTempUnschedulable

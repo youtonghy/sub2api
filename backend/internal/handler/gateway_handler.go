@@ -119,10 +119,18 @@ func NewGatewayHandler(
 
 func (h *GatewayHandler) newFailoverState(maxSwitches int, hasBoundSession bool) *FailoverState {
 	strictPriorityFallback := false
+	strictPriorityRetries := 0
+	strictPriorityCooldown := time.Duration(0)
 	if h != nil && h.cfg != nil {
 		strictPriorityFallback = h.cfg.Gateway.Scheduling.StrictPriorityFallback
+		strictPriorityRetries = h.cfg.Gateway.Scheduling.StrictPriorityRetryCount
+		strictPriorityCooldown = time.Duration(h.cfg.Gateway.Scheduling.StrictPriorityCooldownMinutes) * time.Minute
 	}
-	return NewFailoverStateWithStrictPriority(maxSwitches, hasBoundSession, strictPriorityFallback)
+	state := NewFailoverStateWithStrictPriority(maxSwitches, hasBoundSession, strictPriorityFallback)
+	if strictPriorityFallback && h.gatewayService != nil {
+		state.SetStrictPriorityPolicy(strictPriorityRetries, strictPriorityCooldown, h.gatewayService.TempUnscheduleStrictPriorityFailure)
+	}
+	return state
 }
 
 // Messages handles Claude API compatible messages endpoint
@@ -1257,7 +1265,7 @@ func writeGrokModelsList(c *gin.Context, modelIDs []string) {
 
 func grokModelSupportsConfigurableReasoning(modelID string) bool {
 	switch strings.ToLower(strings.TrimSpace(modelID)) {
-	case "grok-4.5", "grok-4.5-latest", "grok", "grok-latest", "grok-build", "grok-build-latest", "grok-build-0.1":
+	case "grok-4.6", "grok-4.6-latest", "grok-4.5", "grok-4.5-latest", "grok", "grok-latest", "grok-build", "grok-build-latest", "grok-build-0.1":
 		return true
 	default:
 		return false
