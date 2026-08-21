@@ -56,7 +56,13 @@ const (
 const profitVetoExhaustedMessage = "No available accounts: all candidates rejected by group profit control"
 
 func sameAccountRetryDelayFor(failoverErr *service.UpstreamFailoverError, retryCount int) time.Duration {
-	if failoverErr == nil || !failoverErr.RequestScopedTransient || retryCount <= 1 {
+	if failoverErr == nil {
+		return sameAccountRetryDelay
+	}
+	if failoverErr.SameAccountRetryDelay > 0 {
+		return failoverErr.SameAccountRetryDelay
+	}
+	if !failoverErr.RequestScopedTransient || retryCount <= 1 {
 		return sameAccountRetryDelay
 	}
 
@@ -70,19 +76,60 @@ func sameAccountRetryDelayFor(failoverErr *service.UpstreamFailoverError, retryC
 	return delay
 }
 
+func sameAccountRetryAllowed(failoverErr *service.UpstreamFailoverError, retryCount, retryLimit int) bool {
+	if failoverErr == nil || !failoverErr.RetryableOnSameAccount {
+		return false
+	}
+	if !sameAccountRetryDeadlineAllows(failoverErr) {
+		return false
+	}
+	// Error-specific caps (Grok capacity/stream-idle) remain hard limits even
+	// when the error also carries a freshly reconstructed deadline.
+	if failoverErr.SameAccountRetryMax > 0 {
+		if retryLimit <= 0 {
+			return false
+		}
+		if failoverErr.SameAccountRetryMax < retryLimit {
+			retryLimit = failoverErr.SameAccountRetryMax
+		}
+		return retryCount < retryLimit
+	}
+	// OAuth 429 explicitly opts into a deadline window. It is intentionally not
+	// bounded by the ordinary/default pool retry count.
+	if !failoverErr.SameAccountRetryDeadline.IsZero() {
+		return true
+	}
+	return retryLimit > 0 && retryCount < retryLimit
+}
+
+// sameAccountRetryDeadlineAllows prevents a retry from starting after the
+// service-provided same-account retry window has elapsed.
+func sameAccountRetryDeadlineAllows(failoverErr *service.UpstreamFailoverError) bool {
+	return failoverErr == nil || failoverErr.SameAccountRetryDeadline.IsZero() || time.Now().Before(failoverErr.SameAccountRetryDeadline)
+}
+
+// effectiveSameAccountRetryLimit applies an error-specific cap without
+// overriding an explicit account setting of zero (which disables retries).
+func effectiveSameAccountRetryLimit(failoverErr *service.UpstreamFailoverError, account *service.Account) int {
+	if account == nil {
+		return 0
+	}
+	limit := account.GetPoolModeRetryCount()
+	if limit > 0 && failoverErr != nil && failoverErr.SameAccountRetryMax > 0 && failoverErr.SameAccountRetryMax < limit {
+		return failoverErr.SameAccountRetryMax
+	}
+	return limit
+}
+
 // FailoverState 跨循环迭代共享的 failover 状态
 type FailoverState struct {
-	SwitchCount            int
-	MaxSwitches            int
-	FailedAccountIDs       map[int64]struct{}
-	SameAccountRetryCount  map[int64]int
-	LastFailoverErr        *service.UpstreamFailoverError
-	ForceCacheBilling      bool
-	StrictPriorityFallback bool
-	hasBoundSession        bool
-	strictPriorityRetries  int
-	strictPriorityCooldown time.Duration
-	strictPriorityCooler   func(context.Context, int64, time.Duration, *service.UpstreamFailoverError)
+	SwitchCount           int
+	MaxSwitches           int
+	FailedAccountIDs      map[int64]struct{}
+	SameAccountRetryCount map[int64]int
+	LastFailoverErr       *service.UpstreamFailoverError
+	ForceCacheBilling     bool
+	hasBoundSession       bool
 
 	// profitVetoedAccountIDs 记录被分组利润门终检否决的账号，是 FailedAccountIDs
 	// 的子集。之所以单独维护：HandleSelectionExhausted 的 503 退避分支会清空
@@ -92,45 +139,17 @@ type FailoverState struct {
 	profitVetoedAccountIDs map[int64]struct{}
 	// profitVetoCount 本次请求累计的利润否决次数，用于 maxProfitVetoAttempts 上限。
 	profitVetoCount int
-	// consecutiveSelectionBackoffs 连续 503 退避重试次数，达到上限后直接耗尽。
-	consecutiveSelectionBackoffs int
 }
 
-// NewFailoverStateWithStrictPriority 创建 failover 状态，并显式携带严格优先级回退标记。
-func NewFailoverStateWithStrictPriority(maxSwitches int, hasBoundSession bool, strictPriorityFallback bool) *FailoverState {
+// NewFailoverState 创建 failover 状态
+func NewFailoverState(maxSwitches int, hasBoundSession bool) *FailoverState {
 	return &FailoverState{
 		MaxSwitches:            maxSwitches,
 		FailedAccountIDs:       make(map[int64]struct{}),
 		SameAccountRetryCount:  make(map[int64]int),
 		hasBoundSession:        hasBoundSession,
-		StrictPriorityFallback: strictPriorityFallback,
 		profitVetoedAccountIDs: make(map[int64]struct{}),
 	}
-}
-
-const maxConsecutiveSelectionBackoffs = 3
-
-// NewFailoverState 创建 failover 状态（默认不启用严格优先级回退）。
-func NewFailoverState(maxSwitches int, hasBoundSession bool) *FailoverState {
-	return NewFailoverStateWithStrictPriority(maxSwitches, hasBoundSession, false)
-}
-
-// SetStrictPriorityPolicy configures retries before advancing to the next
-// priority and an optional account cooldown after those retries are exhausted.
-func (s *FailoverState) SetStrictPriorityPolicy(
-	retries int,
-	cooldown time.Duration,
-	cooler func(context.Context, int64, time.Duration, *service.UpstreamFailoverError),
-) {
-	if retries < 0 {
-		retries = 0
-	}
-	if cooldown < 0 {
-		cooldown = 0
-	}
-	s.strictPriorityRetries = retries
-	s.strictPriorityCooldown = cooldown
-	s.strictPriorityCooler = cooler
 }
 
 // RecordProfitVeto 记录一次分组利润门终检否决：把账号加入排除列表（同时登记到
@@ -190,35 +209,16 @@ func (s *FailoverState) HandleFailoverError(
 	}
 
 	// 同账号重试不算切换账号，粘性会话仅在实际切换时强制缓存计费。
-	sameAccountRetry := !s.StrictPriorityFallback && failoverErr.RetryableOnSameAccount && s.SameAccountRetryCount[accountID] < retryLimit
+	retryCount := s.SameAccountRetryCount[accountID]
+	sameAccountRetry := sameAccountRetryAllowed(failoverErr, retryCount, retryLimit)
 	if needForceCacheBilling(s.hasBoundSession, failoverErr, sameAccountRetry) {
 		s.ForceCacheBilling = true
 	}
 
-	if s.StrictPriorityFallback {
-		if s.SameAccountRetryCount[accountID] < s.strictPriorityRetries {
-			s.SameAccountRetryCount[accountID]++
-			s.consecutiveSelectionBackoffs = 0
-			return FailoverContinue
-		}
-
-		if s.strictPriorityCooldown > 0 && s.strictPriorityCooler != nil {
-			s.strictPriorityCooler(ctx, accountID, s.strictPriorityCooldown, failoverErr)
-		} else if failoverErr.RetryableOnSameAccount {
-			gatewayService.TempUnscheduleRetryableError(ctx, accountID, failoverErr)
-		}
-		s.FailedAccountIDs[accountID] = struct{}{}
-		s.SwitchCount++
-		s.consecutiveSelectionBackoffs = 0
-		return FailoverContinue
-	}
-
 	// 同账号重试：对 RetryableOnSameAccount 的临时性错误，先在同一账号上重试。
 	// 重试次数上限 retryLimit 由调用方传入（账号级 pool_mode_retry_count 配置）。
-	// 严格优先级回退直接切换到下一个优先级账号，不做同账号重试。
-	if !s.StrictPriorityFallback && failoverErr.RetryableOnSameAccount && s.SameAccountRetryCount[accountID] < retryLimit {
+	if sameAccountRetry {
 		s.SameAccountRetryCount[accountID]++
-		s.consecutiveSelectionBackoffs = 0 // 真正的转发尝试重置连续退避计数
 		retryDelay := sameAccountRetryDelayFor(failoverErr, s.SameAccountRetryCount[accountID])
 		logger.FromContext(ctx).Warn("gateway.failover_same_account_retry",
 			zap.Int64("account_id", accountID),
@@ -248,7 +248,6 @@ func (s *FailoverState) HandleFailoverError(
 
 	// 递增切换计数
 	s.SwitchCount++
-	s.consecutiveSelectionBackoffs = 0 // 真正的转发尝试重置连续退避计数
 	logger.FromContext(ctx).Warn("gateway.failover_switch_account",
 		zap.Int64("account_id", accountID),
 		zap.Int("upstream_status", failoverErr.StatusCode),
@@ -281,22 +280,6 @@ func (s *FailoverState) HandleSelectionExhausted(ctx context.Context) FailoverAc
 		return FailoverCanceled
 	}
 
-	// 严格优先级回退不做 503 排除列表清空/退避重试：失败账号必须保持排除，
-	// 直接耗尽并保留最后一次上游错误，避免反复调度已失败的优先级账号。
-	if s.StrictPriorityFallback {
-		return FailoverExhausted
-	}
-
-	// 连续退避达到上限后直接耗尽，防止无界空转。
-	if s.consecutiveSelectionBackoffs >= maxConsecutiveSelectionBackoffs {
-		logger.FromContext(ctx).Warn("gateway.failover_selection_exhausted_backoff_cap",
-			zap.Int("consecutive_backoffs", s.consecutiveSelectionBackoffs),
-			zap.Int("switch_count", s.SwitchCount),
-			zap.Int("max_switches", s.MaxSwitches),
-		)
-		return FailoverExhausted
-	}
-
 	if s.LastFailoverErr != nil &&
 		s.LastFailoverErr.StatusCode == http.StatusServiceUnavailable &&
 		s.SwitchCount <= s.MaxSwitches {
@@ -312,13 +295,10 @@ func (s *FailoverState) HandleSelectionExhausted(ctx context.Context) FailoverAc
 			return FailoverExhausted
 		}
 
-		s.consecutiveSelectionBackoffs++
-
 		logger.FromContext(ctx).Warn("gateway.failover_single_account_backoff",
 			zap.Duration("backoff_delay", singleAccountBackoffDelay),
 			zap.Int("switch_count", s.SwitchCount),
 			zap.Int("max_switches", s.MaxSwitches),
-			zap.Int("consecutive_backoffs", s.consecutiveSelectionBackoffs),
 		)
 		if !sleepWithContext(ctx, singleAccountBackoffDelay) {
 			return FailoverCanceled
@@ -326,7 +306,6 @@ func (s *FailoverState) HandleSelectionExhausted(ctx context.Context) FailoverAc
 		logger.FromContext(ctx).Warn("gateway.failover_single_account_retry",
 			zap.Int("switch_count", s.SwitchCount),
 			zap.Int("max_switches", s.MaxSwitches),
-			zap.Int("consecutive_backoffs", s.consecutiveSelectionBackoffs),
 		)
 		s.FailedAccountIDs = make(map[int64]struct{})
 		// 利润门否决的账号不参与退避重试的解除：判定依据（冻结的下游倍率）在
