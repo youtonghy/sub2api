@@ -116,6 +116,14 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	}
 
 	originalBody := body
+	if s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx) {
+		if normalized, changed, normalizeErr := rewriteOpenAIParallelToolCallsToFalse(body); normalizeErr != nil {
+			return nil, normalizeErr
+		} else if changed {
+			body = normalized
+			originalBody = normalized
+		}
+	}
 	requestView := newOpenAIRequestView(body)
 	reqModel, reqStream, promptCacheKey := requestView.Model, requestView.Stream, requestView.PromptCacheKey
 	originalModel := reqModel

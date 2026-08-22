@@ -35,6 +35,14 @@
                 >
                   {{ t('admin.accounts.failureLog') }}
                 </button>
+                <button
+                  type="button"
+                  class="h-7 px-2.5 text-sm transition-colors"
+                  :class="accountView === 'test' ? 'bg-white font-medium text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'"
+                  @click="setAccountView('test')"
+                >
+                  {{ t('admin.accounts.accountTest') }}
+                </button>
               </div>
 
               <!-- Auto Refresh Dropdown -->
@@ -469,13 +477,19 @@
           </template>
         </DataTable>
         <AccountFailureHeatmap
-          v-else
+          v-else-if="accountView === 'failures'"
           :accounts="accounts"
           :by-account="hourlyFailureData.by_account"
           :date="hourlyFailureData.date"
           :timezone="hourlyFailureData.timezone"
           :loading="loading || hourlyFailureLoading"
           :error="hourlyFailureError"
+        />
+        <AccountModelTestPanel
+          v-else
+          :accounts="accounts"
+          :platform="params.platform"
+          :active="accountView === 'test'"
         />
         </div>
       </template>
@@ -542,6 +556,7 @@ import AccountActionMenu from '@/components/admin/account/AccountActionMenu.vue'
 import ImportDataModal from '@/components/admin/account/ImportDataModal.vue'
 import ReAuthAccountModal from '@/components/admin/account/ReAuthAccountModal.vue'
 import AccountTestModal from '@/components/admin/account/AccountTestModal.vue'
+import AccountModelTestPanel from '@/components/admin/account/AccountModelTestPanel.vue'
 import AccountStatsModal from '@/components/admin/account/AccountStatsModal.vue'
 import ScheduledTestsPanel from '@/components/admin/account/ScheduledTestsPanel.vue'
 import type { SelectOption } from '@/components/common/Select.vue'
@@ -730,7 +745,7 @@ const todayStatsError = ref<string | null>(null)
 const todayStatsReqSeq = ref(0)
 const pendingTodayStatsRefresh = ref(false)
 const usageManualRefreshToken = ref(0)
-const accountView = ref<'list' | 'failures'>('list')
+const accountView = ref<'list' | 'failures' | 'test'>('list')
 const hourlyFailureLoading = ref(false)
 const hourlyFailureError = ref<string | null>(null)
 const hourlyFailureReqSeq = ref(0)
@@ -758,7 +773,7 @@ const refreshHourlyFailures = async () => {
   }
 }
 
-const setAccountView = (view: 'list' | 'failures') => {
+const setAccountView = (view: 'list' | 'failures' | 'test') => {
   accountView.value = view
   if (view === 'failures') void refreshHourlyFailures()
 }
@@ -2531,19 +2546,12 @@ onMounted(async () => {
 
   load()
   loadUpstreamBillingProbeGlobalState()
-  const [proxiesResult, groupsResult] = await Promise.allSettled([
-    adminAPI.proxies.getAll(),
-    adminAPI.groups.getAll()
-  ])
-  if (proxiesResult.status === 'fulfilled') {
-    proxies.value = proxiesResult.value
-  } else {
-    console.error('Failed to load proxies:', proxiesResult.reason)
-  }
-  if (groupsResult.status === 'fulfilled') {
-    groups.value = groupsResult.value
-  } else {
-    console.error('Failed to load groups:', groupsResult.reason)
+  try {
+    const [p, g] = await Promise.all([adminAPI.proxies.getAll(), adminAPI.groups.getAll()])
+    proxies.value = p
+    groups.value = g
+  } catch (error) {
+    console.error('Failed to load proxies/groups:', error)
   }
   try {
     const loadModelOptions = adminAPI.accounts.getModelOptions

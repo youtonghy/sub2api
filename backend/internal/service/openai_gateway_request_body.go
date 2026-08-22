@@ -377,6 +377,18 @@ func normalizeOpenAIParallelToolCallsWithoutTools(body []byte) ([]byte, bool, er
 	return normalized, true, nil
 }
 
+func rewriteOpenAIParallelToolCallsToFalse(body []byte) ([]byte, bool, error) {
+	parallel := gjson.GetBytes(body, "parallel_tool_calls")
+	if parallel.Type != gjson.True {
+		return body, false, nil
+	}
+	normalized, err := sjson.SetBytes(body, "parallel_tool_calls", false)
+	if err != nil {
+		return body, false, fmt.Errorf("rewrite parallel_tool_calls to false: %w", err)
+	}
+	return normalized, true, nil
+}
+
 func normalizeOpenAIAPIKeyStoreFalseReasoningReplay(body []byte, knownStoreFalse bool) ([]byte, bool, error) {
 	if !knownStoreFalse && gjson.GetBytes(body, "store").Type != gjson.False {
 		return body, false, nil

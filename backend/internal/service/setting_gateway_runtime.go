@@ -55,6 +55,7 @@ const backendModeDBTimeout = 5 * time.Second
 type cachedGatewayForwardingSettings struct {
 	fingerprintUnification           bool
 	metadataPassthrough              bool
+	rewriteParallelToolCallsToFalse  bool
 	cchSigning                       bool
 	claudeOAuthSystemPromptInjection bool
 	claudeOAuthSystemPrompt          string
@@ -736,9 +737,9 @@ func (s *SettingService) IsBackendModeEnabled(ctx context.Context) bool {
 }
 
 type gatewayForwardingSettingsResult struct {
-	fp, mp, cch, claudeOAuthSystemPromptInjection, cacheTTL1h, rewriteMessageCacheControl bool
-	clientDatelineNormalization                                                           bool
-	claudeOAuthSystemPrompt, claudeOAuthSystemPromptBlocks                                string
+	fp, mp, cch, rewriteParallelToolCallsToFalse, claudeOAuthSystemPromptInjection, cacheTTL1h, rewriteMessageCacheControl bool
+	clientDatelineNormalization                                                                                            bool
+	claudeOAuthSystemPrompt, claudeOAuthSystemPromptBlocks                                                                 string
 }
 
 func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context) gatewayForwardingSettingsResult {
@@ -747,6 +748,7 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 			return gatewayForwardingSettingsResult{
 				fp:                               cached.fingerprintUnification,
 				mp:                               cached.metadataPassthrough,
+				rewriteParallelToolCallsToFalse:  cached.rewriteParallelToolCallsToFalse,
 				cch:                              cached.cchSigning,
 				claudeOAuthSystemPromptInjection: cached.claudeOAuthSystemPromptInjection,
 				claudeOAuthSystemPrompt:          cached.claudeOAuthSystemPrompt,
@@ -763,6 +765,7 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 				return gatewayForwardingSettingsResult{
 					fp:                               cached.fingerprintUnification,
 					mp:                               cached.metadataPassthrough,
+					rewriteParallelToolCallsToFalse:  cached.rewriteParallelToolCallsToFalse,
 					cch:                              cached.cchSigning,
 					claudeOAuthSystemPromptInjection: cached.claudeOAuthSystemPromptInjection,
 					claudeOAuthSystemPrompt:          cached.claudeOAuthSystemPrompt,
@@ -778,6 +781,7 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 		values, err := s.settingRepo.GetMultiple(dbCtx, []string{
 			SettingKeyEnableFingerprintUnification,
 			SettingKeyEnableMetadataPassthrough,
+			SettingKeyRewriteParallelToolCallsToFalse,
 			SettingKeyEnableCCHSigning,
 			SettingKeyEnableClaudeOAuthSystemPromptInjection,
 			SettingKeyClaudeOAuthSystemPrompt,
@@ -805,6 +809,7 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 			fp = v == "true"
 		}
 		mp := values[SettingKeyEnableMetadataPassthrough] == "true"
+		rewriteParallelToolCallsToFalse := values[SettingKeyRewriteParallelToolCallsToFalse] == "true"
 		cch := values[SettingKeyEnableCCHSigning] == "true"
 		systemPromptInjection := true
 		if v, ok := values[SettingKeyEnableClaudeOAuthSystemPromptInjection]; ok && v != "" {
@@ -824,6 +829,7 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 		gatewayForwardingCache.Store(&cachedGatewayForwardingSettings{
 			fingerprintUnification:           fp,
 			metadataPassthrough:              mp,
+			rewriteParallelToolCallsToFalse:  rewriteParallelToolCallsToFalse,
 			cchSigning:                       cch,
 			claudeOAuthSystemPromptInjection: systemPromptInjection,
 			claudeOAuthSystemPrompt:          systemPrompt,
@@ -836,6 +842,7 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 		return gatewayForwardingSettingsResult{
 			fp:                               fp,
 			mp:                               mp,
+			rewriteParallelToolCallsToFalse:  rewriteParallelToolCallsToFalse,
 			cch:                              cch,
 			claudeOAuthSystemPromptInjection: systemPromptInjection,
 			claudeOAuthSystemPrompt:          systemPrompt,
@@ -857,6 +864,12 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 func (s *SettingService) GetGatewayForwardingSettings(ctx context.Context) (fingerprintUnification, metadataPassthrough, cchSigning bool) {
 	result := s.getGatewayForwardingSettingsCached(ctx)
 	return result.fp, result.mp, result.cch
+}
+
+// IsParallelToolCallsRewriteEnabled reports whether Responses requests should
+// downgrade parallel_tool_calls=true to false for upstream compatibility.
+func (s *SettingService) IsParallelToolCallsRewriteEnabled(ctx context.Context) bool {
+	return s.getGatewayForwardingSettingsCached(ctx).rewriteParallelToolCallsToFalse
 }
 
 // IsAnthropicCacheTTL1hInjectionEnabled 检查是否对 Anthropic OAuth/SetupToken 请求体注入 1h cache_control ttl。

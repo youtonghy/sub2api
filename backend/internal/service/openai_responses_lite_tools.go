@@ -206,7 +206,19 @@ func normalizeOpenAIResponsesLiteToolsPayload(body []byte) ([]byte, bool, error)
 	}
 	changed, err := normalizeOpenAIResponsesLiteTools(requestBody)
 	if err != nil || !changed {
-		return body, false, err
+		if err != nil {
+			return body, false, err
+		}
+	}
+	// Responses Lite does not support parallel tool execution. Always send an
+	// explicit false, including when the client omitted the field (the upstream
+	// endpoint may otherwise apply a parallel-enabled default).
+	if parallel, ok := requestBody["parallel_tool_calls"].(bool); !ok || parallel {
+		requestBody["parallel_tool_calls"] = false
+		changed = true
+	}
+	if !changed {
+		return body, false, nil
 	}
 	rebuilt, err := marshalOpenAIUpstreamJSON(requestBody)
 	if err != nil {

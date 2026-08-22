@@ -5348,6 +5348,21 @@
                 <Toggle v-model="form.enable_metadata_passthrough" />
               </div>
 
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t("admin.settings.gatewayForwarding.rewriteParallelToolCalls") }}
+                  </label>
+                  <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.gatewayForwarding.rewriteParallelToolCallsHint") }}
+                  </p>
+                </div>
+                <Toggle
+                  v-model="form.rewrite_parallel_tool_calls_to_false"
+                  data-testid="rewrite-parallel-tool-calls-toggle"
+                />
+              </div>
+
               <!-- CCH Signing -->
               <div class="flex items-center justify-between">
                 <div>
@@ -9752,6 +9767,7 @@ const form = reactive<SettingsForm>({
   // Gateway forwarding behavior
   enable_fingerprint_unification: true,
   enable_metadata_passthrough: false,
+  rewrite_parallel_tool_calls_to_false: false,
   enable_cch_signing: false,
   enable_claude_oauth_system_prompt_injection: true,
   claude_oauth_system_prompt: "",
@@ -11326,6 +11342,8 @@ async function saveSettings() {
       strict_priority_cooldown_minutes: form.strict_priority_cooldown_minutes,
       enable_fingerprint_unification: form.enable_fingerprint_unification,
       enable_metadata_passthrough: form.enable_metadata_passthrough,
+      rewrite_parallel_tool_calls_to_false:
+        form.rewrite_parallel_tool_calls_to_false,
       enable_cch_signing: form.enable_cch_signing,
       enable_claude_oauth_system_prompt_injection:
         form.enable_claude_oauth_system_prompt_injection,

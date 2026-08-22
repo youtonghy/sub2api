@@ -270,3 +270,24 @@ func TestNormalizeOpenAIParallelToolCallsWithoutTools(t *testing.T) {
 	require.True(t, changed)
 	require.False(t, gjson.GetBytes(normalized, "parallel_tool_calls").Exists())
 }
+
+func TestRewriteOpenAIParallelToolCallsToFalse(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		changed bool
+		want    string
+	}{
+		{name: "true is rewritten", body: `{"parallel_tool_calls":true,"input":"hi"}`, changed: true, want: `{"parallel_tool_calls":false,"input":"hi"}`},
+		{name: "false is preserved", body: `{"parallel_tool_calls":false}`, want: `{"parallel_tool_calls":false}`},
+		{name: "missing is preserved", body: `{"input":"hi"}`, want: `{"input":"hi"}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, changed, err := rewriteOpenAIParallelToolCallsToFalse([]byte(tt.body))
+			require.NoError(t, err)
+			require.Equal(t, tt.changed, changed)
+			require.JSONEq(t, tt.want, string(got))
+		})
+	}
+}

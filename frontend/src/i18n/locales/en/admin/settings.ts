@@ -477,6 +477,8 @@ export default {
         fingerprintUnificationHint: 'Unify X-Stainless-* headers across users sharing the same OAuth account. Disabling passes through each client\'s original headers.',
         metadataPassthrough: 'Metadata Passthrough',
         metadataPassthroughHint: 'Pass through client\'s original metadata.user_id without rewriting. May improve upstream cache hit rates.',
+        rewriteParallelToolCalls: 'Parallel Tool Calls Compatibility',
+        rewriteParallelToolCallsHint: 'Rewrite parallel_tool_calls=true to false in OpenAI Responses requests for upstreams that require serial tool calls.',
         cchSigning: 'CCH Signing',
         cchSigningHint: 'Sign the billing header in forwarded requests with CCH hash. When disabled, the placeholder is preserved.',
         claudeOAuthSystemPromptInjection: 'Claude OAuth System Blocks',

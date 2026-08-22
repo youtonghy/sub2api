@@ -206,6 +206,7 @@ type SystemSettings struct {
 	// Gateway forwarding behavior
 	EnableFingerprintUnification           bool   `json:"enable_fingerprint_unification"`
 	EnableMetadataPassthrough              bool   `json:"enable_metadata_passthrough"`
+	RewriteParallelToolCallsToFalse        bool   `json:"rewrite_parallel_tool_calls_to_false"`
 	EnableCCHSigning                       bool   `json:"enable_cch_signing"`
 	EnableClaudeOAuthSystemPromptInjection bool   `json:"enable_claude_oauth_system_prompt_injection"`
 	ClaudeOAuthSystemPrompt                string `json:"claude_oauth_system_prompt"`

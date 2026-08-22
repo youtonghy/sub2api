@@ -467,6 +467,7 @@ const baseSettingsResponse = {
   strict_priority_fallback: true,
   enable_fingerprint_unification: true,
   enable_metadata_passthrough: false,
+  rewrite_parallel_tool_calls_to_false: false,
   enable_cch_signing: false,
   enable_claude_oauth_system_prompt_injection: true,
   claude_oauth_system_prompt: "",

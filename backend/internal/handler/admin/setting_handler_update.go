@@ -248,6 +248,7 @@ type UpdateSettingsRequest struct {
 	// Gateway forwarding behavior
 	EnableFingerprintUnification           *bool   `json:"enable_fingerprint_unification"`
 	EnableMetadataPassthrough              *bool   `json:"enable_metadata_passthrough"`
+	RewriteParallelToolCallsToFalse        *bool   `json:"rewrite_parallel_tool_calls_to_false"`
 	EnableCCHSigning                       *bool   `json:"enable_cch_signing"`
 	EnableClaudeOAuthSystemPromptInjection *bool   `json:"enable_claude_oauth_system_prompt_injection"`
 	ClaudeOAuthSystemPrompt                *string `json:"claude_oauth_system_prompt"`
@@ -1700,6 +1701,12 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.EnableMetadataPassthrough
 		}(),
+		RewriteParallelToolCallsToFalse: func() bool {
+			if req.RewriteParallelToolCallsToFalse != nil {
+				return *req.RewriteParallelToolCallsToFalse
+			}
+			return previousSettings.RewriteParallelToolCallsToFalse
+		}(),
 		EnableCCHSigning: func() bool {
 			if req.EnableCCHSigning != nil {
 				return *req.EnableCCHSigning
@@ -2283,6 +2290,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		BackendModeEnabled:                                     updatedSettings.BackendModeEnabled,
 		EnableFingerprintUnification:                           updatedSettings.EnableFingerprintUnification,
 		EnableMetadataPassthrough:                              updatedSettings.EnableMetadataPassthrough,
+		RewriteParallelToolCallsToFalse:                        updatedSettings.RewriteParallelToolCallsToFalse,
 		EnableCCHSigning:                                       updatedSettings.EnableCCHSigning,
 		EnableClaudeOAuthSystemPromptInjection:                 updatedSettings.EnableClaudeOAuthSystemPromptInjection,
 		ClaudeOAuthSystemPrompt:                                updatedSettings.ClaudeOAuthSystemPrompt,

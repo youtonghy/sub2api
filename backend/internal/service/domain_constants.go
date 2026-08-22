@@ -589,9 +589,9 @@ const (
 	SettingKeyMaxClaudeCodeVersion = "max_claude_code_version"
 
 	// SettingKeyAllowUngroupedKeyScheduling 允许未分组 API Key 调度（默认 false：未分组 Key 返回 403）
-	SettingKeyAllowUngroupedKeyScheduling = "allow_ungrouped_key_scheduling"
-	SettingKeyStrictPriorityFallback = "strict_priority_fallback"
-	SettingKeyStrictPriorityRetryCount = "strict_priority_retry_count"
+	SettingKeyAllowUngroupedKeyScheduling   = "allow_ungrouped_key_scheduling"
+	SettingKeyStrictPriorityFallback        = "strict_priority_fallback"
+	SettingKeyStrictPriorityRetryCount      = "strict_priority_retry_count"
 	SettingKeyStrictPriorityCooldownMinutes = "strict_priority_cooldown_minutes"
 	// SettingKeyOpenAILowUpstreamRatePriorityEnabled 旧调度是否按上游 token 倍率优先。
 	SettingKeyOpenAILowUpstreamRatePriorityEnabled = "openai_low_upstream_rate_priority_enabled"
@@ -621,6 +621,8 @@ const (
 	SettingKeyEnableFingerprintUnification = "enable_fingerprint_unification"
 	// SettingKeyEnableMetadataPassthrough 是否透传客户端原始 metadata.user_id（默认 false）
 	SettingKeyEnableMetadataPassthrough = "enable_metadata_passthrough"
+	// SettingKeyRewriteParallelToolCallsToFalse 是否将 Responses 请求中的 parallel_tool_calls=true 改写为 false（默认 false）
+	SettingKeyRewriteParallelToolCallsToFalse = "rewrite_parallel_tool_calls_to_false"
 	// SettingKeyEnableCCHSigning 已废弃（no-op）：新版 Claude Code CLI 已取消 cch 签名字段，
 	// 网关随之不再注入/签名 cch（见 buildBillingAttributionText）。保留该 key 仅为向后兼容，
 	// 开关不再产生任何效果。

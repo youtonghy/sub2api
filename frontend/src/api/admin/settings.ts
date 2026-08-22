@@ -625,6 +625,7 @@ export interface SystemSettings {
   // Gateway forwarding behavior
   enable_fingerprint_unification: boolean;
   enable_metadata_passthrough: boolean;
+  rewrite_parallel_tool_calls_to_false: boolean;
   enable_cch_signing: boolean;
   enable_claude_oauth_system_prompt_injection: boolean;
   claude_oauth_system_prompt: string;
@@ -942,6 +943,7 @@ export interface UpdateSettingsRequest {
   strict_priority_cooldown_minutes?: number;
   enable_fingerprint_unification?: boolean;
   enable_metadata_passthrough?: boolean;
+  rewrite_parallel_tool_calls_to_false?: boolean;
   enable_cch_signing?: boolean;
   enable_claude_oauth_system_prompt_injection?: boolean;
   claude_oauth_system_prompt?: string;

@@ -464,6 +464,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.EnableMetadataPassthrough != after.EnableMetadataPassthrough {
 		changed = append(changed, "enable_metadata_passthrough")
 	}
+	if before.RewriteParallelToolCallsToFalse != after.RewriteParallelToolCallsToFalse {
+		changed = append(changed, "rewrite_parallel_tool_calls_to_false")
+	}
 	if before.EnableCCHSigning != after.EnableCCHSigning {
 		changed = append(changed, "enable_cch_signing")
 	}
