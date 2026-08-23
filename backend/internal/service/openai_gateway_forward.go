@@ -1355,9 +1355,20 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 	// Header overrides are applied after the inbound-header normalization above.
 	// An account can therefore add the Responses Lite marker at this point;
 	// close the body/header pair here before the request leaves the gateway.
-	if isOpenAIResponsesLiteRequestHeader(req.Header) ||
+	// Lite requests force an explicit false even when intermediate
+	// normalization dropped the field; the setting-only path keeps rewriting an
+	// explicit true to preserve non-Lite behavior.
+	liteOutbound := isOpenAIResponsesLiteRequestHeader(req.Header)
+	if liteOutbound ||
 		(s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx)) {
-		normalized, changed, normalizeErr := rewriteOpenAIParallelToolCallsToFalse(body)
+		var normalized []byte
+		var changed bool
+		var normalizeErr error
+		if liteOutbound {
+			normalized, changed, normalizeErr = forceOpenAIParallelToolCallsFalse(body)
+		} else {
+			normalized, changed, normalizeErr = rewriteOpenAIParallelToolCallsToFalse(body)
+		}
 		if normalizeErr != nil {
 			return nil, normalizeErr
 		}

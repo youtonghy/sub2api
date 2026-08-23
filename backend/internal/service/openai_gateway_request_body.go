@@ -366,8 +366,7 @@ func normalizeOpenAIParallelToolCallsWithoutTools(body []byte) ([]byte, bool, er
 	if !parallel.Exists() {
 		return body, false, nil
 	}
-	tools := gjson.GetBytes(body, "tools")
-	if tools.IsArray() && len(tools.Array()) > 0 {
+	if openAIRequestBodyHasEffectiveTools(body) {
 		return body, false, nil
 	}
 	normalized, err := sjson.DeleteBytes(body, "parallel_tool_calls")
@@ -375,6 +374,35 @@ func normalizeOpenAIParallelToolCallsWithoutTools(body []byte) ([]byte, bool, er
 		return body, false, fmt.Errorf("normalize parallel_tool_calls without tools: %w", err)
 	}
 	return normalized, true, nil
+}
+
+// openAIRequestBodyHasEffectiveTools reports whether the request declares
+// tools at the top level or through Responses Lite input.additional_tools
+// items. parallel_tool_calls must be preserved in both cases: the platform API
+// rejects the field only for tool-free requests, and dropping it after the
+// Lite namespace migration would violate the Lite serial-tool-call contract.
+func openAIRequestBodyHasEffectiveTools(body []byte) bool {
+	tools := gjson.GetBytes(body, "tools")
+	if tools.IsArray() && len(tools.Array()) > 0 {
+		return true
+	}
+	input := gjson.GetBytes(body, "input")
+	if !input.IsArray() {
+		return false
+	}
+	found := false
+	input.ForEach(func(_, item gjson.Result) bool {
+		if openAIJSONString(item.Get("type")) != "additional_tools" {
+			return true
+		}
+		additional := item.Get("tools")
+		if additional.IsArray() && len(additional.Array()) > 0 {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
 }
 
 func rewriteOpenAIParallelToolCallsToFalse(body []byte) ([]byte, bool, error) {
@@ -389,6 +417,22 @@ func rewriteOpenAIParallelToolCallsToFalse(body []byte) ([]byte, bool, error) {
 	return normalized, true, nil
 }
 
+// forceOpenAIParallelToolCallsFalse guarantees an explicit false value,
+// including when the field is missing entirely. The Responses Lite endpoint
+// rejects tool-bearing requests whose parallel_tool_calls is absent because
+// the upstream default is parallel-enabled; rewriteOpenAIParallelToolCallsToFalse
+// only covers an explicit true.
+func forceOpenAIParallelToolCallsFalse(body []byte) ([]byte, bool, error) {
+	if gjson.GetBytes(body, "parallel_tool_calls").Type == gjson.False {
+		return body, false, nil
+	}
+	normalized, err := sjson.SetBytes(body, "parallel_tool_calls", false)
+	if err != nil {
+		return body, false, fmt.Errorf("force parallel_tool_calls to false: %w", err)
+	}
+	return normalized, true, nil
+}
+
 // normalizeOpenAIParallelToolCallsForUpstream is the final outbound guard for
 // Responses Lite and the opt-in compatibility setting. Keeping this check at
 // request construction protects paths that mutate/adapt the body after the
@@ -398,6 +442,10 @@ func (s *OpenAIGatewayService) normalizeOpenAIParallelToolCallsForUpstream(ctx c
 	configured := s != nil && s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx)
 	if !lite && !configured {
 		return body, nil
+	}
+	if lite {
+		normalized, _, err := forceOpenAIParallelToolCallsFalse(body)
+		return normalized, err
 	}
 	normalized, _, err := rewriteOpenAIParallelToolCallsToFalse(body)
 	if err != nil {

@@ -271,6 +271,47 @@ func TestNormalizeOpenAIParallelToolCallsWithoutTools(t *testing.T) {
 	require.False(t, gjson.GetBytes(normalized, "parallel_tool_calls").Exists())
 }
 
+func TestNormalizeOpenAIParallelToolCallsWithoutToolsKeepsLiteAdditionalTools(t *testing.T) {
+	withAdditionalTools := []byte(`{
+		"parallel_tool_calls":false,
+		"input":[
+			{"type":"message","role":"user","content":"hi"},
+			{"type":"additional_tools","role":"developer","tools":[{"type":"namespace","name":"collaboration"}]}
+		]
+	}`)
+	normalized, changed, err := normalizeOpenAIParallelToolCallsWithoutTools(withAdditionalTools)
+	require.NoError(t, err)
+	require.False(t, changed)
+	require.Equal(t, gjson.False, gjson.GetBytes(normalized, "parallel_tool_calls").Type)
+
+	emptyAdditionalTools := []byte(`{"parallel_tool_calls":true,"input":[{"type":"additional_tools","role":"developer","tools":[]}]}`)
+	normalized, changed, err = normalizeOpenAIParallelToolCallsWithoutTools(emptyAdditionalTools)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.False(t, gjson.GetBytes(normalized, "parallel_tool_calls").Exists())
+}
+
+func TestForceOpenAIParallelToolCallsFalse(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		changed bool
+		want    string
+	}{
+		{name: "missing is forced", body: `{"tools":[{"type":"function","name":"lookup"}]}`, changed: true, want: `{"tools":[{"type":"function","name":"lookup"}],"parallel_tool_calls":false}`},
+		{name: "true is forced", body: `{"parallel_tool_calls":true}`, changed: true, want: `{"parallel_tool_calls":false}`},
+		{name: "false is preserved", body: `{"parallel_tool_calls":false}`, want: `{"parallel_tool_calls":false}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, changed, err := forceOpenAIParallelToolCallsFalse([]byte(tt.body))
+			require.NoError(t, err)
+			require.Equal(t, tt.changed, changed)
+			require.JSONEq(t, tt.want, string(got))
+		})
+	}
+}
+
 func TestRewriteOpenAIParallelToolCallsToFalse(t *testing.T) {
 	tests := []struct {
 		name    string

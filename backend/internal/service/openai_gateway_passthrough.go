@@ -687,9 +687,19 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 
 	// 账号级请求头覆写（仅 openai api_key 账号启用时生效；OAuth 路径 no-op）
 	account.ApplyHeaderOverrides(req.Header)
-	if isOpenAIResponsesLiteRequestHeader(req.Header) ||
+	// Lite 请求强制显式 false（字段缺失同样违规）；仅设置开关时保持只改写
+	// 显式 true 的非 Lite 行为。
+	liteOutbound := isOpenAIResponsesLiteRequestHeader(req.Header)
+	if liteOutbound ||
 		(s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx)) {
-		normalized, changed, normalizeErr := rewriteOpenAIParallelToolCallsToFalse(body)
+		var normalized []byte
+		var changed bool
+		var normalizeErr error
+		if liteOutbound {
+			normalized, changed, normalizeErr = forceOpenAIParallelToolCallsFalse(body)
+		} else {
+			normalized, changed, normalizeErr = rewriteOpenAIParallelToolCallsToFalse(body)
+		}
 		if normalizeErr != nil {
 			return nil, normalizeErr
 		}
