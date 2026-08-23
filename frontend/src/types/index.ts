@@ -1050,6 +1050,7 @@ export interface UpstreamBillingProbeSnapshot {
 
 export interface UpstreamBillingProbeSettings {
   enabled: boolean
+  all_accounts: boolean
   interval_minutes: number
 }
 

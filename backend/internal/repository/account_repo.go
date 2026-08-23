@@ -3499,7 +3499,7 @@ func (r *accountRepository) FindByExtraField(ctx context.Context, key string, va
 // Without this, every nanosecond timestamp is treated as malformed and the
 // fail-open ordering pins the cycle to the lowest account IDs, starving the
 // rest of the pool.
-func (r *accountRepository) ListDueUpstreamBillingProbeAccounts(ctx context.Context, now time.Time, limit int) ([]service.Account, error) {
+func (r *accountRepository) ListDueUpstreamBillingProbeAccounts(ctx context.Context, now time.Time, limit int, allAccounts bool) ([]service.Account, error) {
 	if limit <= 0 {
 		return []service.Account{}, nil
 	}
@@ -3517,7 +3517,7 @@ func (r *accountRepository) ListDueUpstreamBillingProbeAccounts(ctx context.Cont
 			WHERE deleted_at IS NULL
 				AND status = 'active'
 				AND type = 'apikey'
-				AND extra @> '{"upstream_billing_probe_enabled": true}'::jsonb
+				AND ($3 OR extra @> '{"upstream_billing_probe_enabled": true}'::jsonb)
 		), parsed AS MATERIALIZED (
 			SELECT
 				id,
@@ -3566,7 +3566,7 @@ func (r *accountRepository) ListDueUpstreamBillingProbeAccounts(ctx context.Cont
 			CASE WHEN valid_next_probe_at THEN parsed_next_probe_at::timestamptz END ASC NULLS FIRST,
 			id ASC
 		LIMIT $2
-	`, now.UTC(), limit)
+	`, now.UTC(), limit, allAccounts)
 	if err != nil {
 		return nil, err
 	}

@@ -1,0 +1,50 @@
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+name: Test
+jobs:
+  test:
+    name: Run tests
+    strategy:
+      matrix:
+        go-version: [1.25.x, 1.24.x, 1.23.x, 1.22.x, 1.21.x]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: false
+
+      - name: Test
+        run: make test-ci
+  codecov:
+    name: Coverage report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Test
+        run: make coverage
+
+      - uses: codecov/codecov-action@v5
+        with:
+          files: coverage.out
+          fail_ci_if_error: true
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

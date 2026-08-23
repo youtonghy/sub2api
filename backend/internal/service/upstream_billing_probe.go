@@ -98,6 +98,7 @@ const (
 // UpstreamBillingProbeSettings controls the periodic probe runner.
 type UpstreamBillingProbeSettings struct {
 	Enabled         bool `json:"enabled"`
+	AllAccounts     bool `json:"all_accounts"`
 	IntervalMinutes int  `json:"interval_minutes"`
 }
 
@@ -233,7 +234,7 @@ type upstreamBillingProbeSnapshotWriter interface {
 }
 
 type upstreamBillingProbeDueAccountLister interface {
-	ListDueUpstreamBillingProbeAccounts(context.Context, time.Time, int) ([]Account, error)
+	ListDueUpstreamBillingProbeAccounts(context.Context, time.Time, int, bool) ([]Account, error)
 }
 
 func NewUpstreamBillingProbeService(
@@ -358,14 +359,15 @@ func (s *UpstreamBillingProbeService) RunDue(ctx context.Context) error {
 	defer releaseUpstreamBillingProbeLeaderLock(cadenceRelease, lockNow.Truncate(upstreamBillingProbeCycleInterval).Add(upstreamBillingProbeCycleInterval))
 
 	now := s.currentTime()
-	accounts, err := s.listDueAccounts(ctx, now)
+	accounts, err := s.listDueAccounts(ctx, now, settings.AllAccounts)
 	if err != nil {
 		return fmt.Errorf("list enabled upstream billing probes: %w", err)
 	}
 	due := make([]Account, 0, len(accounts))
 	for i := range accounts {
 		account := accounts[i]
-		if !isUpstreamBillingProbeAccount(&account) || !account.IsActive() || !upstreamBillingProbeEnabled(&account) {
+		if !isUpstreamBillingProbeAccount(&account) || !account.IsActive() ||
+			(!settings.AllAccounts && !upstreamBillingProbeEnabled(&account)) {
 			continue
 		}
 		snapshot := decodeUpstreamBillingProbeSnapshot(account.Extra)
@@ -398,7 +400,7 @@ func (s *UpstreamBillingProbeService) RunDue(ctx context.Context) error {
 	for i := range due {
 		accountID := due[i].ID
 		group.Go(func() error {
-			if _, probeErr := s.probeScheduledAccount(ctx, accountID, settings.IntervalMinutes); probeErr != nil {
+			if _, probeErr := s.probeScheduledAccount(ctx, accountID, settings.IntervalMinutes, settings.AllAccounts); probeErr != nil {
 				logger.LegacyPrintf("service.upstream_billing_probe", "probe_due_failed: account_id=%d err=%v", accountID, probeErr)
 			}
 			return nil
@@ -407,12 +409,15 @@ func (s *UpstreamBillingProbeService) RunDue(ctx context.Context) error {
 	return group.Wait()
 }
 
-func (s *UpstreamBillingProbeService) listDueAccounts(ctx context.Context, now time.Time) ([]Account, error) {
+func (s *UpstreamBillingProbeService) listDueAccounts(ctx context.Context, now time.Time, allAccounts bool) ([]Account, error) {
 	if lister, ok := s.accountRepo.(upstreamBillingProbeDueAccountLister); ok {
-		return lister.ListDueUpstreamBillingProbeAccounts(ctx, now, upstreamBillingProbeMaxPerCycle)
+		return lister.ListDueUpstreamBillingProbeAccounts(ctx, now, upstreamBillingProbeMaxPerCycle, allAccounts)
 	}
 	// Non-production repositories and older adapters keep the generic path. The
 	// runner still truncates before issuing network requests.
+	if allAccounts {
+		return s.accountRepo.ListActive(ctx)
+	}
 	return s.accountRepo.FindByExtraField(ctx, UpstreamBillingProbeEnabledExtraKey, true)
 }
 
@@ -450,11 +455,11 @@ func (s *UpstreamBillingProbeService) probeAccount(ctx context.Context, accountI
 	return s.probeAccountWithMode(ctx, accountID, intervalMinutes, false)
 }
 
-func (s *UpstreamBillingProbeService) probeScheduledAccount(ctx context.Context, accountID int64, intervalMinutes int) (*UpstreamBillingProbeSnapshot, error) {
-	return s.probeAccountWithMode(ctx, accountID, intervalMinutes, true)
+func (s *UpstreamBillingProbeService) probeScheduledAccount(ctx context.Context, accountID int64, intervalMinutes int, allAccounts bool) (*UpstreamBillingProbeSnapshot, error) {
+	return s.probeAccountWithMode(ctx, accountID, intervalMinutes, true, allAccounts)
 }
 
-func (s *UpstreamBillingProbeService) probeAccountWithMode(ctx context.Context, accountID int64, intervalMinutes int, requireEnabled bool) (*UpstreamBillingProbeSnapshot, error) {
+func (s *UpstreamBillingProbeService) probeAccountWithMode(ctx context.Context, accountID int64, intervalMinutes int, requireEnabled bool, allAccounts ...bool) (*UpstreamBillingProbeSnapshot, error) {
 	key := strconv.FormatInt(accountID, 10)
 	value, err, _ := s.probeGroup.Do(key, func() (any, error) {
 		select {
@@ -471,7 +476,8 @@ func (s *UpstreamBillingProbeService) probeAccountWithMode(ctx context.Context, 
 			return nil, ErrUpstreamBillingProbeAccountInvalid
 		}
 		if requireEnabled {
-			if !account.IsActive() || !upstreamBillingProbeEnabled(account) {
+			probeAll := len(allAccounts) > 0 && allAccounts[0]
+			if !account.IsActive() || (!probeAll && !upstreamBillingProbeEnabled(account)) {
 				return nil, nil
 			}
 			if snapshot := decodeUpstreamBillingProbeSnapshot(account.Extra); snapshot != nil &&

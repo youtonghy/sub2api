@@ -58,6 +58,7 @@ const {
   getBetaPolicySettings: vi.fn(),
   getUpstreamBillingProbeSettings: vi.fn().mockResolvedValue({
     enabled: true,
+    all_accounts: false,
     interval_minutes: 30,
   }),
   updateUpstreamBillingProbeSettings: vi.fn().mockImplementation(async (payload) => payload),
@@ -199,7 +200,7 @@ vi.mock("vue-i18n", async () => {
     "admin.settings.openaiExperimentalScheduler.title": "OpenAI 实验调度策略",
     "admin.settings.openaiExperimentalScheduler.description": "默认关闭。开启后仅影响本网关在 OpenAI 账号间的实验性调度选择逻辑，不代表上游 OpenAI 官方能力。",
     "admin.settings.openaiExperimentalScheduler.lowRatePriorityTitle": "低倍率优先",
-    "admin.settings.openaiExperimentalScheduler.lowRatePriorityDescription": "开启后优先选择计费倍率较低的账号；倍率相同时，再比较账号优先级和当前负载等。启用实验调度策略后，此开关不生效。",
+    "admin.settings.openaiExperimentalScheduler.lowRatePriorityDescription": "开启后仍先比较账号优先级；同等优先级内严格按已探测计费倍率从低到高尝试，低倍率不可用时才回退到更高倍率。该严格顺序优先于实验调度评分。",
     "admin.settings.openaiExperimentalScheduler.oauthRateTitle": "OAuth 调度参考倍率",
     "admin.settings.openaiExperimentalScheduler.oauthRatePriorityDescription": "同一分组同时包含 API Key 和 OAuth 账号时，OAuth 账号按此倍率与已探测的 API Key 计费倍率一起排序。",
     "admin.settings.openaiExperimentalScheduler.oauthRateWeightedDescription": "同一分组同时包含 API Key 和 OAuth 账号时，计算“计费倍率”得分时，OAuth 账号按此倍率参与计算。",
@@ -701,6 +702,7 @@ describe("admin SettingsView payment visible method controls", () => {
     });
     getUpstreamBillingProbeSettings.mockResolvedValue({
       enabled: true,
+      all_accounts: false,
       interval_minutes: 30,
     });
     updateUpstreamBillingProbeSettings.mockImplementation(async (payload) => payload);
@@ -1325,6 +1327,7 @@ describe("admin SettingsView payment visible method controls", () => {
   it("loads and saves upstream billing probe settings from the gateway tab", async () => {
     getUpstreamBillingProbeSettings.mockResolvedValueOnce({
       enabled: false,
+      all_accounts: false,
       interval_minutes: 45,
     });
 
@@ -1343,12 +1346,14 @@ describe("admin SettingsView payment visible method controls", () => {
     expect(card.find('[data-testid="upstream-billing-probe-interval"]').exists()).toBe(false);
 
     await card.get('[data-testid="upstream-billing-probe-enabled"]').setValue(true);
+    await card.get('[data-testid="upstream-billing-probe-all-accounts"]').setValue(true);
     await card.get('[data-testid="upstream-billing-probe-interval"]').setValue(60);
     await card.get('[data-testid="upstream-billing-probe-save"]').trigger("click");
     await flushPromises();
 
     expect(updateUpstreamBillingProbeSettings).toHaveBeenCalledWith({
       enabled: true,
+      all_accounts: true,
       interval_minutes: 60,
     });
     expect(showSuccess).toHaveBeenCalledWith("上游倍率自动探测设置已保存");
@@ -1449,21 +1454,21 @@ describe("admin SettingsView payment visible method controls", () => {
       .setValue(true);
     expect(
       wrapper.find('[data-testid="openai-low-rate-priority-toggle"]').exists(),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       wrapper.find('[data-testid="openai-oauth-scheduling-rate-multiplier"]').exists(),
     ).toBe(true);
     const weightedModeText = wrapper.text();
     expect(weightedModeText).toContain(
-      "同一分组同时包含 API Key 和 OAuth 账号时，计算“计费倍率”得分时，OAuth 账号按此倍率参与计算。",
+      "同一分组同时包含 API Key 和 OAuth 账号时，OAuth 账号按此倍率与已探测的 API Key 计费倍率一起排序。",
     );
     expect(weightedModeText).not.toContain(
-      "OAuth 账号按此倍率与已探测的 API Key 计费倍率一起排序。",
-    );
-    expect(weightedModeText.indexOf("订阅优先")).toBeLessThan(
-      weightedModeText.indexOf("OAuth 调度参考倍率"),
+      "计算“计费倍率”得分时，OAuth 账号按此倍率参与计算。",
     );
     expect(weightedModeText.indexOf("OAuth 调度参考倍率")).toBeLessThan(
+      weightedModeText.indexOf("OpenAI 实验调度策略"),
+    );
+    expect(weightedModeText.indexOf("订阅优先")).toBeLessThan(
       weightedModeText.indexOf("调度权值覆盖"),
     );
     expect(weightedModeText).toContain("计费倍率");

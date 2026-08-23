@@ -31,7 +31,7 @@ type staleDueUpstreamBillingProbeAccountRepo struct {
 	due []Account
 }
 
-func (r *staleDueUpstreamBillingProbeAccountRepo) ListDueUpstreamBillingProbeAccounts(_ context.Context, _ time.Time, limit int) ([]Account, error) {
+func (r *staleDueUpstreamBillingProbeAccountRepo) ListDueUpstreamBillingProbeAccounts(_ context.Context, _ time.Time, limit int, _ bool) ([]Account, error) {
 	if limit < len(r.due) {
 		return append([]Account(nil), r.due[:limit]...), nil
 	}
@@ -147,6 +147,18 @@ func (r *upstreamBillingProbeAccountRepo) FindByExtraField(_ context.Context, ke
 	return result, nil
 }
 
+func (r *upstreamBillingProbeAccountRepo) ListActive(_ context.Context) ([]Account, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := make([]Account, 0, len(r.accounts))
+	for _, account := range r.accounts {
+		if account.IsActive() {
+			result = append(result, *account)
+		}
+	}
+	return result, nil
+}
+
 type upstreamBillingProbeSettingRepo struct {
 	SettingRepository
 	mu     sync.Mutex
@@ -233,6 +245,7 @@ func TestUpstreamBillingProbeSettingsDefaultsAndValidation(t *testing.T) {
 	settings, err := settingsService.GetUpstreamBillingProbeSettings(context.Background())
 	require.NoError(t, err)
 	require.True(t, settings.Enabled)
+	require.False(t, settings.AllAccounts)
 	require.Equal(t, 30, settings.IntervalMinutes)
 
 	err = settingsService.SetUpstreamBillingProbeSettings(context.Background(), &UpstreamBillingProbeSettings{
@@ -244,12 +257,14 @@ func TestUpstreamBillingProbeSettingsDefaultsAndValidation(t *testing.T) {
 
 	err = settingsService.SetUpstreamBillingProbeSettings(context.Background(), &UpstreamBillingProbeSettings{
 		Enabled:         false,
+		AllAccounts:     true,
 		IntervalMinutes: 60,
 	})
 	require.NoError(t, err)
 	settings, err = settingsService.GetUpstreamBillingProbeSettings(context.Background())
 	require.NoError(t, err)
 	require.False(t, settings.Enabled)
+	require.True(t, settings.AllAccounts)
 	require.Equal(t, 60, settings.IntervalMinutes)
 
 	repo.values[SettingKeyUpstreamBillingProbeSettings] = `{"interval_minutes":45}`
@@ -949,6 +964,32 @@ func TestUpstreamBillingProbeRunnerIsBoundedAndManualProbeIgnoresSwitches(t *tes
 	require.Equal(t, manualRate, *accounts[25].RateMultiplier)
 }
 
+func TestUpstreamBillingProbeRunnerCanProbeAllActiveAPIKeyAccounts(t *testing.T) {
+	accounts := map[int64]*Account{
+		1: {
+			ID: 1, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Concurrency: 1,
+			Credentials: map[string]any{"api_key": "sk-one", "base_url": "https://upstream.example"},
+			Extra:       map[string]any{},
+		},
+		2: {
+			ID: 2, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusDisabled, Concurrency: 1,
+			Credentials: map[string]any{"api_key": "sk-two", "base_url": "https://upstream.example"},
+			Extra:       map[string]any{},
+		},
+	}
+	repo := &upstreamBillingProbeAccountRepo{accounts: accounts}
+	settingsRepo := &upstreamBillingProbeSettingRepo{values: map[string]string{
+		SettingKeyUpstreamBillingProbeSettings: `{"enabled":true,"all_accounts":true,"interval_minutes":30}`,
+	}}
+	upstream := &upstreamBillingProbeHTTPStub{}
+	svc := newUpstreamBillingProbeTestService(repo, upstream, settingsRepo)
+
+	require.NoError(t, svc.RunDue(context.Background()))
+	require.Equal(t, int64(1), upstream.calls.Load())
+	require.Contains(t, accounts[1].Extra, UpstreamBillingProbeExtraKey)
+	require.NotContains(t, accounts[2].Extra, UpstreamBillingProbeExtraKey)
+}
+
 func TestUpstreamBillingProbeRunnerRechecksEnabledAfterDueSelection(t *testing.T) {
 	account := &Account{
 		ID:          26,
@@ -1216,7 +1257,7 @@ func TestUpstreamBillingProbeManualAndScheduledRequestsShareOneNetworkProbe(t *t
 
 	errs := make(chan error, 2)
 	go func() {
-		_, err := svc.probeScheduledAccount(context.Background(), account.ID, 30)
+		_, err := svc.probeScheduledAccount(context.Background(), account.ID, 30, false)
 		errs <- err
 	}()
 	select {
@@ -1256,7 +1297,7 @@ func TestUpstreamBillingProbeScheduledRechecksAfterWaitingForSlot(t *testing.T) 
 	}
 	result := make(chan error, 1)
 	go func() {
-		_, err := svc.probeScheduledAccount(context.Background(), account.ID, 30)
+		_, err := svc.probeScheduledAccount(context.Background(), account.ID, 30, false)
 		result <- err
 	}()
 	time.Sleep(20 * time.Millisecond)

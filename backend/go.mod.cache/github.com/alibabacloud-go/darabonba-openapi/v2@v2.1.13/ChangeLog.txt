@@ -1,0 +1,66 @@
+2024-09-23 Version: v2.0.10
+- Solve the inconsistency of credentials refresh in all methods.
+
+2023-02-07 Version: v2.0.3
+- Add ca configs.
+- Get accessDeniedDetail from error map.
+
+2022-11-14 Version: v2.0.2
+- Add gateway client setter
+
+2022-10-14 Version: v2.0.1
+- Return description and accessDeniedDetail in error info
+
+2022-09-23 Version: v2.0.0
+- Update with tea-utils
+
+2022-04-11 Version: v0.1.17
+- Support bearer token.
+- Support endpointOverride for OpenApiRequest.
+- Support xml response for pop.
+- Add statusCode for error.
+
+2021-02-22 Version: v0.1.4
+- Add requestid  in error message.
+
+2021-02-19 Version: v0.1.3
+- Add debug header.
+
+2021-02-19 Version: v0.1.2
+- Update go.mod.
+
+2021-01-27 Version: v0.1.1
+- Update go.mod.
+
+2021-01-24 Version: v0.1.0
+- Update go.mod.
+
+2021-01-07 Version: v0.0.10
+- Support POP S3.
+
+2020-12-11 Version: v0.0.9
+- Fix Error.
+
+2020-10-30 Version: v0.0.8
+- Update mod.
+
+2020-09-25 Version: v0.0.7
+- Support Array.
+
+2020-09-16 Version: v0.0.6
+- Improve Error.
+
+2020-09-14 Version: v0.0.5
+- Update mod.
+
+2020-09-08 Version: v0.0.4
+- Improve error.
+
+2020-08-24 Version: v0.0.3
+- Rm ToMap.
+
+2020-08-23 Version: v0.0.2
+- Fix content-type.
+
+2020-08-13 Version: v0.0.1
+- Init project.

@@ -4781,8 +4781,23 @@
 
                 <div
                   v-if="upstreamBillingProbeForm.enabled"
-                  class="border-t border-gray-100 pt-4 dark:border-dark-700"
+                  class="space-y-4 border-t border-gray-100 pt-4 dark:border-dark-700"
                 >
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <label class="font-medium text-gray-900 dark:text-white">
+                        {{ t("admin.settings.upstreamBillingProbe.allAccounts") }}
+                      </label>
+                      <p class="text-sm text-gray-500 dark:text-gray-400">
+                        {{ t("admin.settings.upstreamBillingProbe.allAccountsHint") }}
+                      </p>
+                    </div>
+                    <Toggle
+                      v-model="upstreamBillingProbeForm.all_accounts"
+                      :aria-label="t('admin.settings.upstreamBillingProbe.allAccounts')"
+                      data-testid="upstream-billing-probe-all-accounts"
+                    />
+                  </div>
                   <label
                     class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                     for="upstream-billing-probe-interval"
@@ -5044,10 +5059,7 @@
                 </div>
               </div>
 
-              <div
-                v-if="!form.openai_advanced_scheduler_enabled"
-                class="flex items-center justify-between border-t border-gray-100 pt-5 dark:border-dark-700"
-              >
+              <div class="flex items-center justify-between border-t border-gray-100 pt-5 dark:border-dark-700">
                 <div>
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -5067,7 +5079,7 @@
               </div>
 
               <div
-                v-if="!form.openai_advanced_scheduler_enabled && form.openai_low_upstream_rate_priority_enabled"
+                v-if="form.openai_low_upstream_rate_priority_enabled"
                 class="flex flex-col items-stretch gap-3 border-t border-gray-100 pt-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 dark:border-dark-700"
               >
                 <div class="min-w-0">
@@ -5156,7 +5168,7 @@
               </div>
 
               <div
-                v-if="form.openai_advanced_scheduler_enabled"
+                v-if="form.openai_advanced_scheduler_enabled && !form.openai_low_upstream_rate_priority_enabled"
                 class="flex flex-col items-stretch gap-3 border-t border-gray-100 pt-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 dark:border-dark-700"
               >
                 <div class="min-w-0">
@@ -8963,6 +8975,7 @@ const upstreamBillingProbeLoading = ref(true);
 const upstreamBillingProbeSaving = ref(false);
 const upstreamBillingProbeForm = reactive({
   enabled: true,
+  all_accounts: false,
   interval_minutes: 30,
 });
 

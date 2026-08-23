@@ -2265,7 +2265,8 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerOnce(
 	platform = NormalizeOpenAICompatiblePlatform(platform)
 	decision := OpenAIAccountScheduleDecision{}
 	scheduler := s.getOpenAIAccountScheduler(ctx)
-	if scheduler == nil || s.strictPriorityFallback() {
+	strictLowRatePriority := useUpstreamTokenCost && s.isOpenAILowUpstreamRatePriorityEnabled(ctx)
+	if scheduler == nil || s.strictPriorityFallback() || strictLowRatePriority {
 		if s.strictPriorityFallback() {
 			slog.Info("openai_strict_scheduler_bypass",
 				"group_id", derefGroupID(groupID),
@@ -2837,6 +2838,11 @@ func openAISchedulingRate(account *Account, now time.Time, oauthSchedulingRateMu
 // selected first, and 0 when the rate signal does not distinguish them.
 func (o openAILegacyUpstreamRateOrder) compare(a, b *Account) int {
 	if !o.enabled || a == nil || b == nil {
+		return 0
+	}
+	// Upstream rate is a strict secondary priority. It must never let a cheaper
+	// account jump ahead of an account in a higher configured priority tier.
+	if a.Priority != b.Priority {
 		return 0
 	}
 	aRate, aKnown := o.rates[a.ID]

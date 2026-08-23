@@ -1117,7 +1117,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 
 	if strictPriorityFallback {
 		candidates, baseCandidateCount := s.buildOpenAICandidateAccounts(ctx, accounts, groupID, platform, requestedModel, excludedIDs, requireCompact, requiredCapability, needsUpstreamCheck)
-		return s.selectStrictPriorityAccount(ctx, groupID, platform, requestedModel, candidates, baseCandidateCount, requireCompact, requiredCapability, needsUpstreamCheck, cfg, preferAccountID)
+		return s.selectStrictPriorityAccount(ctx, groupID, platform, requestedModel, candidates, baseCandidateCount, requireCompact, requiredCapability, needsUpstreamCheck, cfg, preferAccountID, preferLowUpstreamRate)
 	}
 
 	// ============ Layer 1: Sticky session ============
@@ -1416,24 +1416,32 @@ func (s *OpenAIGatewayService) buildOpenAICandidateAccounts(ctx context.Context,
 // filtered candidate list. It acquires a concurrency slot before doing the DB
 // recheck, releasing the slot if the fresh account is no longer schedulable.
 // preferAccountID is used for previous_response_id continuity and is honored
-// only when that account is at the current minimum priority tier.
-func (s *OpenAIGatewayService) selectStrictPriorityAccount(ctx context.Context, groupID *int64, platform string, requestedModel string, candidates []*Account, baseCandidateCount int, requireCompact bool, requiredCapability OpenAIEndpointCapability, needsUpstreamCheck bool, cfg config.GatewaySchedulingConfig, preferAccountID int64) (*AccountSelectionResult, error) {
+// only within the current minimum configured-priority and upstream-rate tier.
+func (s *OpenAIGatewayService) selectStrictPriorityAccount(ctx context.Context, groupID *int64, platform string, requestedModel string, candidates []*Account, baseCandidateCount int, requireCompact bool, requiredCapability OpenAIEndpointCapability, needsUpstreamCheck bool, cfg config.GatewaySchedulingConfig, preferAccountID int64, preferLowUpstreamRate bool) (*AccountSelectionResult, error) {
 	if len(candidates) == 0 {
 		if requireCompact && baseCandidateCount > 0 {
 			return nil, ErrNoAvailableCompactAccounts
 		}
 		return nil, ErrNoAvailableAccounts
 	}
+	rateOrder := openAILegacyUpstreamRateOrder{}
+	if preferLowUpstreamRate {
+		rateOrder = newOpenAILegacyUpstreamRateOrder(candidates, time.Now(), s.openAIOAuthSchedulingRateMultiplier(ctx))
+	}
 	sort.SliceStable(candidates, func(i, j int) bool {
 		if candidates[i].Priority != candidates[j].Priority {
 			return candidates[i].Priority < candidates[j].Priority
+		}
+		if rateCmp := rateOrder.compare(candidates[i], candidates[j]); rateCmp != 0 {
+			return rateCmp < 0
 		}
 		return candidates[i].ID < candidates[j].ID
 	})
 	if preferAccountID > 0 {
 		minPriority := candidates[0].Priority
 		for i := range candidates {
-			if candidates[i].ID == preferAccountID && candidates[i].Priority == minPriority {
+			if candidates[i].ID == preferAccountID && candidates[i].Priority == minPriority &&
+				rateOrder.compare(candidates[i], candidates[0]) == 0 {
 				if i != 0 {
 					preferred := candidates[i]
 					copy(candidates[1:i+1], candidates[0:i])

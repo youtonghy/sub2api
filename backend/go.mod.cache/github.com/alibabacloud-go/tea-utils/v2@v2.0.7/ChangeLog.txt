@@ -1,0 +1,71 @@
+2024-07-08 Version v2.0.6
+- Support extends query parameters.
+
+2024-05-13 Version v2.0.5
+- Support extends parameters.
+
+2023-07-24 Version: v2.0.4
+- Reduce the collision rate of method `GetNonce()`
+
+2023-06-26 Version: v2.0.3
+- Support static method `AssertAsInteger()`.
+
+2023-06-20 Version: v2.0.2
+- Fix stringify map value.
+
+2022-11-16 Version: v2.0.1
+- Support ca params for server and client.
+
+2022-09-20 Version: v2.0.0
+- Remove function panic.
+
+2020-12-29 Version: v1.3.8
+- Fix Sleep.
+
+2020-12-29 Version: v1.3.7
+- Support go 1.11.
+
+2020-10-29 Version: v1.3.6
+- Fix unmarshal error.
+
+2020-10-22 Version: v1.3.5
+- Close body after reading it.
+
+2020-08-27 Version: v1.3.4
+- Support AssertAsReadable and improve AssertAsMap.
+
+2020-08-25 Version: v1.3.3
+- Support toArray.
+
+2020-08-24 Version: v1.3.2
+- Support sleep.
+
+2020-07-29 Version: v1.3.1
+- Fix isUnset error when input is empty slice.
+
+2020-07-13 Version: v1.3.0
+- Fix ToFormString Error.
+
+2020-06-09 Version: v1.2.0
+- Add AssertAsBytes.
+
+2020-05-13 Version: v1.1.1
+- Fix error of assert.
+
+2020-05-11 Version: v1.1.0
+- Update tea.
+
+2020-05-09 Version: v1.0.3
+- Support map pointer value.
+
+2020-05-09 Version: v1.0.2
+- Update Tea.
+
+2020-05-09 Version: v1.0.1
+- Update Dependencies.
+
+2020-04-20 Version: v1.0.0
+- Use pointer params as input params.
+
+2020-04-15 Version: v0.0.1
+- Init project.
