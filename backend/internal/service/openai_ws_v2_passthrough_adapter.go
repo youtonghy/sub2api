@@ -679,15 +679,26 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 	if err := validateOpenAIWSBearerToken(account, token); err != nil {
 		return err
 	}
-	if isOpenAIResponsesLiteWebSocketPayload(firstClientMessage) {
-		liteFirstMessage, _, liteErr := normalizeOpenAIResponsesLiteToolsPayload(firstClientMessage)
+	liteFirstMessage := isOpenAIResponsesLiteWebSocketPayload(firstClientMessage)
+	if liteFirstMessage {
+		liteNormalized, _, liteErr := normalizeOpenAIResponsesLiteToolsPayload(firstClientMessage)
 		if liteErr != nil {
 			return NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, liteErr.Error(), liteErr)
 		}
-		firstClientMessage = liteFirstMessage
+		firstClientMessage = liteNormalized
 	}
-	if s != nil && s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx) {
-		if rewritten, changed, err := rewriteOpenAIParallelToolCallsToFalse(firstClientMessage); err == nil && changed {
+	// Lite requests require explicit parallel_tool_calls=false; the setting-only
+	// path keeps rewriting only explicit true values for non-Lite behavior.
+	if liteFirstMessage || (s != nil && s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx)) {
+		var rewritten []byte
+		var changed bool
+		var err error
+		if liteFirstMessage {
+			rewritten, changed, err = forceOpenAIParallelToolCallsFalse(firstClientMessage)
+		} else {
+			rewritten, changed, err = rewriteOpenAIParallelToolCallsToFalse(firstClientMessage)
+		}
+		if err == nil && changed {
 			firstClientMessage = rewritten
 		}
 	}
@@ -1001,15 +1012,26 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 				}
 			}
 			if isResponseCreate {
-				if isOpenAIResponsesLiteWebSocketPayload(payload) {
-					litePayload, _, liteErr := normalizeOpenAIResponsesLiteToolsPayload(payload)
+				litePayload := isOpenAIResponsesLiteWebSocketPayload(payload)
+				if litePayload {
+					liteNormalized, _, liteErr := normalizeOpenAIResponsesLiteToolsPayload(payload)
 					if liteErr != nil {
 						return payload, nil, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, liteErr.Error(), liteErr)
 					}
-					payload = litePayload
+					payload = liteNormalized
 				}
-				if s != nil && s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx) {
-					if rewritten, changed, err := rewriteOpenAIParallelToolCallsToFalse(payload); err == nil && changed {
+				// Lite requests require explicit parallel_tool_calls=false; the setting-only
+				// path keeps rewriting only explicit true values for non-Lite behavior.
+				if litePayload || (s != nil && s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx)) {
+					var rewritten []byte
+					var changed bool
+					var err error
+					if litePayload {
+						rewritten, changed, err = forceOpenAIParallelToolCallsFalse(payload)
+					} else {
+						rewritten, changed, err = rewriteOpenAIParallelToolCallsToFalse(payload)
+					}
+					if err == nil && changed {
 						payload = rewritten
 					}
 				}

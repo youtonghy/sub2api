@@ -307,8 +307,9 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			}
 			normalized = next
 		}
-		if isOpenAIResponsesLiteWebSocketPayload(normalized) {
-			litePayload, _, liteErr := normalizeOpenAIResponsesLiteToolsPayload(normalized)
+		litePayload := isOpenAIResponsesLiteWebSocketPayload(normalized)
+		if litePayload {
+			liteNormalized, _, liteErr := normalizeOpenAIResponsesLiteToolsPayload(normalized)
 			if liteErr != nil {
 				return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(
 					coderws.StatusPolicyViolation,
@@ -316,10 +317,20 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 					liteErr,
 				)
 			}
-			normalized = litePayload
+			normalized = liteNormalized
 		}
-		if s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx) {
-			if rewritten, changed, err := rewriteOpenAIParallelToolCallsToFalse(normalized); err == nil && changed {
+		// Lite requests require explicit parallel_tool_calls=false; the setting-only
+		// path keeps rewriting only explicit true values for non-Lite behavior.
+		if litePayload || (s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx)) {
+			var rewritten []byte
+			var changed bool
+			var err error
+			if litePayload {
+				rewritten, changed, err = forceOpenAIParallelToolCallsFalse(normalized)
+			} else {
+				rewritten, changed, err = rewriteOpenAIParallelToolCallsToFalse(normalized)
+			}
+			if err == nil && changed {
 				normalized = rewritten
 			}
 		}
