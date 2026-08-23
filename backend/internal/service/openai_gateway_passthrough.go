@@ -549,6 +549,10 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 	body []byte,
 	token string,
 ) (*http.Request, error) {
+	var err error
+	if body, err = s.normalizeOpenAIParallelToolCallsForUpstream(ctx, c, body); err != nil {
+		return nil, err
+	}
 	targetURL := openaiPlatformAPIURL
 	switch account.Type {
 	case AccountTypeOAuth:
@@ -683,6 +687,21 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 
 	// 账号级请求头覆写（仅 openai api_key 账号启用时生效；OAuth 路径 no-op）
 	account.ApplyHeaderOverrides(req.Header)
+	if isOpenAIResponsesLiteRequestHeader(req.Header) ||
+		(s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx)) {
+		normalized, changed, normalizeErr := rewriteOpenAIParallelToolCallsToFalse(body)
+		if normalizeErr != nil {
+			return nil, normalizeErr
+		}
+		if changed {
+			body = normalized
+			req.Body = io.NopCloser(bytes.NewReader(body))
+			req.ContentLength = int64(len(body))
+			req.GetBody = func() (io.ReadCloser, error) {
+				return io.NopCloser(bytes.NewReader(body)), nil
+			}
+		}
+	}
 	// x-codex-beta-features：按真实 Codex 的会话级行为补注（在账号级覆写之后，
 	// 保证不被覆盖丢失）。
 	applyOpenAICodexBetaFeatures(c, account, req.Header)

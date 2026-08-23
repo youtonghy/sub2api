@@ -679,12 +679,17 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 	if err := validateOpenAIWSBearerToken(account, token); err != nil {
 		return err
 	}
-	if account.IsOpenAIOAuthLike() && isOpenAIResponsesLiteWebSocketPayload(firstClientMessage) {
+	if isOpenAIResponsesLiteWebSocketPayload(firstClientMessage) {
 		liteFirstMessage, _, liteErr := normalizeOpenAIResponsesLiteToolsPayload(firstClientMessage)
 		if liteErr != nil {
 			return NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, liteErr.Error(), liteErr)
 		}
 		firstClientMessage = liteFirstMessage
+	}
+	if s != nil && s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx) {
+		if rewritten, changed, err := rewriteOpenAIParallelToolCallsToFalse(firstClientMessage); err == nil && changed {
+			firstClientMessage = rewritten
+		}
 	}
 	if hooks != nil && (hooks.MaxReasoningEffort != "" || len(hooks.ReasoningEffortMappings) > 0) {
 		if capped, changed := ApplyOpenAIReasoningEffortPolicy(firstClientMessage, hooks.MaxReasoningEffort, hooks.ReasoningEffortMappings); changed {
@@ -996,12 +1001,17 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 				}
 			}
 			if isResponseCreate {
-				if account.IsOpenAIOAuthLike() && isOpenAIResponsesLiteWebSocketPayload(payload) {
+				if isOpenAIResponsesLiteWebSocketPayload(payload) {
 					litePayload, _, liteErr := normalizeOpenAIResponsesLiteToolsPayload(payload)
 					if liteErr != nil {
 						return payload, nil, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, liteErr.Error(), liteErr)
 					}
 					payload = litePayload
+				}
+				if s != nil && s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx) {
+					if rewritten, changed, err := rewriteOpenAIParallelToolCallsToFalse(payload); err == nil && changed {
+						payload = rewritten
+					}
 				}
 				if hooks != nil && (hooks.MaxReasoningEffort != "" || len(hooks.ReasoningEffortMappings) > 0) {
 					if capped, changed := ApplyOpenAIReasoningEffortPolicy(payload, hooks.MaxReasoningEffort, hooks.ReasoningEffortMappings); changed {

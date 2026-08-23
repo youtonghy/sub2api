@@ -73,7 +73,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			body = reasoningBody
 		}
 	}
-	if account.IsOpenAIOAuthLike() && isOpenAIResponsesLiteHeader(c.GetHeader(responsesLiteHeader)) {
+	if c != nil && c.Request != nil && isOpenAIResponsesLiteRequestHeader(c.Request.Header) {
 		liteBody, changed, liteErr := normalizeOpenAIResponsesLiteToolsPayload(body)
 		if liteErr != nil {
 			setOpsUpstreamError(c, http.StatusBadRequest, liteErr.Error(), "")
@@ -301,7 +301,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		imageGenerationAllowed = GroupAllowsImageGeneration(apiKey.Group)
 	}
 	codexImageGenerationBridgeEnabled := isCodexCLI &&
-		!isOpenAIResponsesLiteHeader(c.GetHeader(responsesLiteHeader)) &&
+		!(c != nil && c.Request != nil && isOpenAIResponsesLiteRequestHeader(c.Request.Header)) &&
 		imageGenerationAllowed &&
 		codexImageGenerationExplicitToolPolicy != codexImageGenerationExplicitToolPolicyStrip &&
 		s.isCodexImageGenerationBridgeEnabled(ctx, account, apiKey)
@@ -1208,6 +1208,10 @@ func shouldForwardOpenAIResponsesViaRawChatCompletions(account *Account) bool {
 }
 
 func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Context, account *Account, body []byte, token string, isStream bool, promptCacheKey string, isCodexCLI bool) (*http.Request, error) {
+	var err error
+	if body, err = s.normalizeOpenAIParallelToolCallsForUpstream(ctx, c, body); err != nil {
+		return nil, err
+	}
 	// Determine target URL based on account type
 	var targetURL string
 	switch account.Type {
@@ -1348,6 +1352,24 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 
 	// 账号级请求头覆写（仅 openai api_key 账号启用时生效；OAuth 路径 no-op）
 	account.ApplyHeaderOverrides(req.Header)
+	// Header overrides are applied after the inbound-header normalization above.
+	// An account can therefore add the Responses Lite marker at this point;
+	// close the body/header pair here before the request leaves the gateway.
+	if isOpenAIResponsesLiteRequestHeader(req.Header) ||
+		(s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx)) {
+		normalized, changed, normalizeErr := rewriteOpenAIParallelToolCallsToFalse(body)
+		if normalizeErr != nil {
+			return nil, normalizeErr
+		}
+		if changed {
+			body = normalized
+			req.Body = io.NopCloser(bytes.NewReader(body))
+			req.ContentLength = int64(len(body))
+			req.GetBody = func() (io.ReadCloser, error) {
+				return io.NopCloser(bytes.NewReader(body)), nil
+			}
+		}
+	}
 	// x-codex-beta-features：按真实 Codex 的会话级行为补注（在账号级覆写之后，
 	// 保证不被覆盖丢失）。
 	applyOpenAICodexBetaFeatures(c, account, req.Header)

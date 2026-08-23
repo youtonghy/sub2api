@@ -1712,6 +1712,17 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 	if err != nil {
 		return nil, err
 	}
+	// Image Responses requests are built internally and therefore bypass the
+	// normal Forward request-body normalization. Responses Lite (and the
+	// opt-in compatibility setting) require serial tool execution upstream.
+	if c != nil && c.Request != nil && isOpenAIResponsesLiteRequestHeader(c.Request.Header) ||
+		(s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx)) {
+		if normalized, changed, normalizeErr := rewriteOpenAIParallelToolCallsToFalse(responsesBody); normalizeErr != nil {
+			return nil, normalizeErr
+		} else if changed {
+			responsesBody = normalized
+		}
+	}
 	upstreamReq, err := s.buildUpstreamRequest(upstreamCtx, c, account, responsesBody, token, true, parsed.StickySessionSeed(), false)
 	if err != nil {
 		return nil, err

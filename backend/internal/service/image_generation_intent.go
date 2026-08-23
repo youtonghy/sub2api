@@ -1,6 +1,7 @@
 package service
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/tidwall/gjson"
@@ -17,6 +18,29 @@ const (
 
 func isOpenAIResponsesLiteHeader(value string) bool {
 	return strings.EqualFold(strings.TrimSpace(value), "true")
+}
+
+// isOpenAIResponsesLiteRequestHeader also handles non-canonical header map
+// keys. Some reverse proxies preserve the client's lowercase HTTP/2 header
+// spelling instead of normalizing it before it reaches Gin.
+func isOpenAIResponsesLiteRequestHeader(headers http.Header) bool {
+	if headers == nil {
+		return false
+	}
+	if isOpenAIResponsesLiteHeader(headers.Get(responsesLiteHeader)) {
+		return true
+	}
+	for key, values := range headers {
+		if !strings.EqualFold(key, responsesLiteHeader) {
+			continue
+		}
+		for _, value := range values {
+			if isOpenAIResponsesLiteHeader(value) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func isOpenAIResponsesLiteWebSocketPayload(body []byte) bool {

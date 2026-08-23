@@ -389,6 +389,23 @@ func rewriteOpenAIParallelToolCallsToFalse(body []byte) ([]byte, bool, error) {
 	return normalized, true, nil
 }
 
+// normalizeOpenAIParallelToolCallsForUpstream is the final outbound guard for
+// Responses Lite and the opt-in compatibility setting. Keeping this check at
+// request construction protects paths that mutate/adapt the body after the
+// main Forward normalization stage.
+func (s *OpenAIGatewayService) normalizeOpenAIParallelToolCallsForUpstream(ctx context.Context, c *gin.Context, body []byte) ([]byte, error) {
+	lite := c != nil && c.Request != nil && isOpenAIResponsesLiteRequestHeader(c.Request.Header)
+	configured := s != nil && s.settingService != nil && s.settingService.IsParallelToolCallsRewriteEnabled(ctx)
+	if !lite && !configured {
+		return body, nil
+	}
+	normalized, _, err := rewriteOpenAIParallelToolCallsToFalse(body)
+	if err != nil {
+		return nil, err
+	}
+	return normalized, nil
+}
+
 func normalizeOpenAIAPIKeyStoreFalseReasoningReplay(body []byte, knownStoreFalse bool) ([]byte, bool, error) {
 	if !knownStoreFalse && gjson.GetBytes(body, "store").Type != gjson.False {
 		return body, false, nil

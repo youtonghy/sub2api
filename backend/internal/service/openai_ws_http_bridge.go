@@ -309,6 +309,16 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 	if err != nil {
 		return nil, fmt.Errorf("prepare http bridge body: %w", err)
 	}
+	// HTTP bridge requests can carry the Responses Lite marker in
+	// client_metadata. The bridge bypasses the normal Forward entrypoint, so
+	// normalize the Lite payload here before any upstream adaptation.
+	if isOpenAIResponsesLiteWebSocketPayload(payload) {
+		liteBody, _, liteErr := normalizeOpenAIResponsesLiteToolsPayload(body)
+		if liteErr != nil {
+			return nil, fmt.Errorf("normalize Responses Lite HTTP bridge body: %w", liteErr)
+		}
+		body = liteBody
+	}
 	grokIntentSourceBody := append([]byte(nil), body...)
 	_, grokExplicitToolsField := openAIWSHTTPBridgeRawField(grokIntentSourceBody, "tools")
 	grokExplicitToolIntent := account.Platform == PlatformGrok && hasGrokResponsesToolIntent(grokIntentSourceBody)
