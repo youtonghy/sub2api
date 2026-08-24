@@ -3,9 +3,19 @@ export default {
       title: 'Account Management',
       description: 'Manage AI platform accounts and credentials',
       accountList: 'Account List',
+      accountStatistics: 'Account Statistics',
       failureLog: 'Failure Log',
       accountTest: 'Account Test',
       viewMode: 'Account view',
+      statistics: {
+        account: 'Account',
+        tokens: 'Tokens Today',
+        standardCost: 'Standard Cost',
+        realCost: 'Actual Upstream Cost',
+        cacheHitRate: 'Cache Hit Rate',
+        onlineRate: 'Online Rate',
+        firstTokenWait: 'Time to First Token'
+      },
       modelTest: {
         selectProvider: 'Select a provider first',
         selectProviderHint: 'Choose a platform in the Provider filter above to view and test every model in the current results.',

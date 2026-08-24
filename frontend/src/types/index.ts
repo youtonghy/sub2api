@@ -1252,9 +1252,12 @@ export interface AccountSchedulerGroupScore {
 export interface WindowStats {
   requests: number
   tokens: number
+  input_tokens?: number
+  cache_read_tokens?: number
   cost: number // Account cost (account multiplier)
   standard_cost?: number
   user_cost?: number
+  average_first_token_ms?: number
 }
 
 export interface UsageProgress {

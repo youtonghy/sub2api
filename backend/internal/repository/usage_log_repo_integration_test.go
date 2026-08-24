@@ -903,6 +903,8 @@ func (s *UsageLogRepoSuite) TestGetAccountTodayStats() {
 	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-today"})
 
 	createdAt := timezone.Today().Add(1 * time.Hour)
+	firstToken1 := 800
+	firstToken2 := 1200
 
 	m1 := 1.5
 	m2 := 0.0
@@ -914,6 +916,8 @@ func (s *UsageLogRepoSuite) TestGetAccountTodayStats() {
 		Model:                 "claude-3",
 		InputTokens:           10,
 		OutputTokens:          20,
+		CacheReadTokens:       10,
+		FirstTokenMs:          &firstToken1,
 		TotalCost:             1.0,
 		ActualCost:            2.0,
 		AccountRateMultiplier: &m1,
@@ -928,6 +932,8 @@ func (s *UsageLogRepoSuite) TestGetAccountTodayStats() {
 		Model:                 "claude-3",
 		InputTokens:           5,
 		OutputTokens:          5,
+		CacheReadTokens:       5,
+		FirstTokenMs:          &firstToken2,
 		TotalCost:             0.5,
 		ActualCost:            1.0,
 		AccountRateMultiplier: &m2,
@@ -938,7 +944,10 @@ func (s *UsageLogRepoSuite) TestGetAccountTodayStats() {
 	stats, err := s.repo.GetAccountTodayStats(s.ctx, account.ID)
 	s.Require().NoError(err, "GetAccountTodayStats")
 	s.Require().Equal(int64(2), stats.Requests)
-	s.Require().Equal(int64(40), stats.Tokens)
+	s.Require().Equal(int64(55), stats.Tokens)
+	s.Require().Equal(int64(15), stats.InputTokens)
+	s.Require().Equal(int64(15), stats.CacheReadTokens)
+	s.Require().InEpsilon(1000, stats.AverageFirstTokenMs, 0.0001)
 	// account cost = SUM(total_cost * account_rate_multiplier)
 	s.Require().InEpsilon(1.5, stats.Cost, 0.0001)
 	// standard cost = SUM(total_cost)

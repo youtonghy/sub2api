@@ -3,9 +3,19 @@ export default {
       title: '账号管理',
       description: '管理 AI 平台账号和 Cookie',
       accountList: '账号列表',
+      accountStatistics: '账号统计',
       failureLog: '故障日志',
       accountTest: '账号测试',
       viewMode: '账号视图',
+      statistics: {
+        account: '账号',
+        tokens: '今日 Token 用量',
+        standardCost: '对应消费',
+        realCost: '真实消费',
+        cacheHitRate: '缓存命中率',
+        onlineRate: '在线率',
+        firstTokenWait: '首字响应等待'
+      },
       modelTest: {
         selectProvider: '请先筛选 Provider',
         selectProviderHint: '在上方 Provider 筛选器中选择一个平台后，可查看并测试当前结果中的全部模型。',

@@ -18,10 +18,10 @@
             @create="showCreate = true"
           >
             <template #after>
-              <div class="inline-flex h-9 items-center border border-gray-200 bg-gray-50 p-0.5 dark:border-dark-700 dark:bg-dark-800" role="group" :aria-label="t('admin.accounts.viewMode')">
+              <div class="inline-flex h-9 max-w-full items-center overflow-x-auto border border-gray-200 bg-gray-50 p-0.5 dark:border-dark-700 dark:bg-dark-800" role="group" :aria-label="t('admin.accounts.viewMode')">
                 <button
                   type="button"
-                  class="h-7 px-2.5 text-sm transition-colors"
+                  class="h-7 shrink-0 whitespace-nowrap px-2.5 text-sm transition-colors"
                   :class="accountView === 'list' ? 'bg-white font-medium text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'"
                   @click="setAccountView('list')"
                 >
@@ -29,7 +29,15 @@
                 </button>
                 <button
                   type="button"
-                  class="h-7 px-2.5 text-sm transition-colors"
+                  class="h-7 shrink-0 whitespace-nowrap px-2.5 text-sm transition-colors"
+                  :class="accountView === 'statistics' ? 'bg-white font-medium text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'"
+                  @click="setAccountView('statistics')"
+                >
+                  {{ t('admin.accounts.accountStatistics') }}
+                </button>
+                <button
+                  type="button"
+                  class="h-7 shrink-0 whitespace-nowrap px-2.5 text-sm transition-colors"
                   :class="accountView === 'failures' ? 'bg-white font-medium text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'"
                   @click="setAccountView('failures')"
                 >
@@ -37,7 +45,7 @@
                 </button>
                 <button
                   type="button"
-                  class="h-7 px-2.5 text-sm transition-colors"
+                  class="h-7 shrink-0 whitespace-nowrap px-2.5 text-sm transition-colors"
                   :class="accountView === 'test' ? 'bg-white font-medium text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'"
                   @click="setAccountView('test')"
                 >
@@ -485,6 +493,14 @@
           :loading="loading || hourlyFailureLoading"
           :error="hourlyFailureError"
         />
+        <AccountStatisticsTable
+          v-else-if="accountView === 'statistics'"
+          :accounts="accounts"
+          :stats-by-account="todayStatsByAccountId"
+          :failures-by-account="hourlyFailureData.by_account"
+          :loading="loading || todayStatsLoading || hourlyFailureLoading"
+          :error="todayStatsError || hourlyFailureError"
+        />
         <AccountModelTestPanel
           v-else
           :accounts="accounts"
@@ -563,6 +579,7 @@ import type { SelectOption } from '@/components/common/Select.vue'
 import AccountStatusIndicator from '@/components/account/AccountStatusIndicator.vue'
 import AccountUsageCell from '@/components/account/AccountUsageCell.vue'
 import AccountTodayStatsCell from '@/components/account/AccountTodayStatsCell.vue'
+import AccountStatisticsTable from '@/components/admin/account/AccountStatisticsTable.vue'
 import AccountGroupsCell from '@/components/account/AccountGroupsCell.vue'
 import AccountCapacityCell from '@/components/account/AccountCapacityCell.vue'
 import UpstreamBillingRateCell from '@/components/account/UpstreamBillingRateCell.vue'
@@ -745,14 +762,15 @@ const todayStatsError = ref<string | null>(null)
 const todayStatsReqSeq = ref(0)
 const pendingTodayStatsRefresh = ref(false)
 const usageManualRefreshToken = ref(0)
-const accountView = ref<'list' | 'failures' | 'test'>('list')
+type AccountView = 'list' | 'statistics' | 'failures' | 'test'
+const accountView = ref<AccountView>('list')
 const hourlyFailureLoading = ref(false)
 const hourlyFailureError = ref<string | null>(null)
 const hourlyFailureReqSeq = ref(0)
 const hourlyFailureData = ref<AccountHourlyFailureResponse>({ date: '', timezone: '', by_account: {} })
 
 const refreshHourlyFailures = async () => {
-  if (accountView.value !== 'failures') return
+  if (accountView.value !== 'failures' && accountView.value !== 'statistics') return
   const accountIDs = accounts.value.map(account => account.id)
   const reqSeq = ++hourlyFailureReqSeq.value
   if (accountIDs.length === 0) {
@@ -773,9 +791,11 @@ const refreshHourlyFailures = async () => {
   }
 }
 
-const setAccountView = (view: 'list' | 'failures' | 'test') => {
+const setAccountView = (view: AccountView) => {
   accountView.value = view
-  if (view === 'failures') void refreshHourlyFailures()
+  if (view === 'failures' || view === 'statistics') {
+    void Promise.all([refreshTodayStatsBatch(), refreshHourlyFailures()])
+  }
 }
 
 const desktopViewportQuery = '(min-width: 768px)'
@@ -799,9 +819,12 @@ let usageBatchRequestToken = 0
 const buildDefaultTodayStats = (): WindowStats => ({
   requests: 0,
   tokens: 0,
+  input_tokens: 0,
+  cache_read_tokens: 0,
   cost: 0,
   standard_cost: 0,
-  user_cost: 0
+  user_cost: 0,
+  average_first_token_ms: 0
 })
 
 const accountSupportsBatchUsage = (account: Account) => {
@@ -941,7 +964,7 @@ const refreshTodayStatsBatch = async () => {
   // - today_stats column shows dedicated today's metrics.
   // - usage column also embeds today's stats for Key/Bedrock rows.
   // So we only skip fetching when BOTH columns are hidden.
-  if (hiddenColumns.has('today_stats') && hiddenColumns.has('usage')) {
+  if (accountView.value !== 'statistics' && hiddenColumns.has('today_stats') && hiddenColumns.has('usage')) {
     todayStatsLoading.value = false
     todayStatsError.value = null
     return
