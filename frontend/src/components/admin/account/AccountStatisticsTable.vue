@@ -25,6 +25,19 @@ function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`
 }
 
+function upstreamDeclaredRate(account: Account): number {
+  const data = account.extra?.upstream_billing_probe?.data
+  const effective = data?.effective_rate_multiplier
+  if (typeof effective === 'number' && Number.isFinite(effective) && effective >= 0) return effective
+  const resolved = data?.resolved_rate_multiplier
+  if (typeof resolved === 'number' && Number.isFinite(resolved) && resolved >= 0) return resolved
+  return 1
+}
+
+function realCost(account: Account, stats?: WindowStats): number {
+  return (stats?.standard_cost ?? 0) * upstreamDeclaredRate(account)
+}
+
 function cacheHitRate(stats?: WindowStats): string {
   if (!stats) return '-'
   const inputTokens = stats.input_tokens ?? 0
@@ -86,7 +99,7 @@ function formatTTFT(stats?: WindowStats): string {
             </td>
             <td class="px-4 py-3 text-right font-mono text-sm tabular-nums text-gray-700 dark:text-gray-200">{{ formatNumber(statsFor(account.id)?.tokens ?? 0) }}</td>
             <td class="px-4 py-3 text-right font-mono text-sm tabular-nums text-gray-700 dark:text-gray-200">{{ formatCurrency(statsFor(account.id)?.standard_cost ?? 0) }}</td>
-            <td class="px-4 py-3 text-right font-mono text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{{ formatCurrency(statsFor(account.id)?.cost ?? 0) }}</td>
+            <td class="px-4 py-3 text-right font-mono text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{{ formatCurrency(realCost(account, statsFor(account.id))) }}</td>
             <td class="px-4 py-3 text-right font-mono text-sm tabular-nums text-gray-700 dark:text-gray-200">{{ cacheHitRate(statsFor(account.id)) }}</td>
             <td class="px-4 py-3 text-right font-mono text-sm tabular-nums text-gray-700 dark:text-gray-200">{{ onlineRate(account.id) }}</td>
             <td class="px-4 py-3 text-right font-mono text-sm tabular-nums text-gray-700 dark:text-gray-200">{{ formatTTFT(statsFor(account.id)) }}</td>

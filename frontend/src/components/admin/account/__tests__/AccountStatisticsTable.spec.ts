@@ -21,7 +21,24 @@ const account = {
   concurrency: 1,
   priority: 0,
   created_at: '2026-08-24T00:00:00Z',
-  updated_at: '2026-08-24T00:00:00Z'
+  updated_at: '2026-08-24T00:00:00Z',
+  extra: {
+    upstream_billing_probe: {
+      status: 'ok',
+      data: {
+        object: 'sub2api.key_billing',
+        schema_version: 1,
+        billing_scope: 'token',
+        group_rate_multiplier: 1.5,
+        resolved_rate_multiplier: 1.5,
+        effective_rate_multiplier: 2,
+        peak_rate_enabled: false,
+        observed_at: '2026-08-24T00:00:00Z'
+      },
+      last_attempt_at: '2026-08-24T00:00:00Z',
+      next_probe_at: '2026-08-25T00:00:00Z'
+    }
+  }
 } as Account
 
 describe('AccountStatisticsTable', () => {
@@ -53,7 +70,7 @@ describe('AccountStatisticsTable', () => {
     expect(row.text()).toContain('Primary OpenAI')
     expect(row.text()).toContain('2,400')
     expect(row.text()).toContain('$1.25')
-    expect(row.text()).toContain('$0.75')
+    expect(row.text()).toContain('$2.50')
     expect(row.text()).toContain('40.0%')
     expect(row.text()).toContain('80.0%')
     expect(row.text()).toContain('1.25s')
