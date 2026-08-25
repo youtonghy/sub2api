@@ -259,13 +259,13 @@ func TestNormalizeOpenAIAPIKeyStoreFalseReasoningReplayRejectsEmptyEncryptedCont
 
 func TestNormalizeOpenAIParallelToolCallsWithoutTools(t *testing.T) {
 	withTools := []byte(`{"tools":[{"type":"function","name":"lookup"}],"parallel_tool_calls":false}`)
-	normalized, changed, err := normalizeOpenAIParallelToolCallsWithoutTools(withTools)
+	normalized, changed, err := normalizeOpenAIParallelToolCallsWithoutTools(withTools, false)
 	require.NoError(t, err)
 	require.False(t, changed)
 	require.Equal(t, string(withTools), string(normalized))
 
 	withoutTools := []byte(`{"input":"hi","parallel_tool_calls":true}`)
-	normalized, changed, err = normalizeOpenAIParallelToolCallsWithoutTools(withoutTools)
+	normalized, changed, err = normalizeOpenAIParallelToolCallsWithoutTools(withoutTools, false)
 	require.NoError(t, err)
 	require.True(t, changed)
 	require.False(t, gjson.GetBytes(normalized, "parallel_tool_calls").Exists())
@@ -279,16 +279,22 @@ func TestNormalizeOpenAIParallelToolCallsWithoutToolsKeepsLiteAdditionalTools(t 
 			{"type":"additional_tools","role":"developer","tools":[{"type":"namespace","name":"collaboration"}]}
 		]
 	}`)
-	normalized, changed, err := normalizeOpenAIParallelToolCallsWithoutTools(withAdditionalTools)
+	normalized, changed, err := normalizeOpenAIParallelToolCallsWithoutTools(withAdditionalTools, false)
 	require.NoError(t, err)
 	require.False(t, changed)
 	require.Equal(t, gjson.False, gjson.GetBytes(normalized, "parallel_tool_calls").Type)
 
 	emptyAdditionalTools := []byte(`{"parallel_tool_calls":true,"input":[{"type":"additional_tools","role":"developer","tools":[]}]}`)
-	normalized, changed, err = normalizeOpenAIParallelToolCallsWithoutTools(emptyAdditionalTools)
+	normalized, changed, err = normalizeOpenAIParallelToolCallsWithoutTools(emptyAdditionalTools, false)
 	require.NoError(t, err)
 	require.True(t, changed)
 	require.False(t, gjson.GetBytes(normalized, "parallel_tool_calls").Exists())
+
+	toolLessLite := []byte(`{"parallel_tool_calls":false,"input":"hi"}`)
+	normalized, changed, err = normalizeOpenAIParallelToolCallsWithoutTools(toolLessLite, true)
+	require.NoError(t, err)
+	require.False(t, changed)
+	require.Equal(t, gjson.False, gjson.GetBytes(normalized, "parallel_tool_calls").Type)
 }
 
 func TestForceOpenAIParallelToolCallsFalse(t *testing.T) {
