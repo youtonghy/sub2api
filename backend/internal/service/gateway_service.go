@@ -769,6 +769,27 @@ func (s *GatewayService) TempUnscheduleStrictPriorityFailure(
 	}
 }
 
+// TempUnscheduleCommittedStreamFailure applies strict-priority cooldown after
+// an upstream failure that arrived too late to switch accounts in the current
+// SSE response. It only penalizes account-attributed capacity/server failures.
+func (s *GatewayService) TempUnscheduleCommittedStreamFailure(
+	ctx context.Context,
+	accountID int64,
+	failoverErr *UpstreamFailoverError,
+) {
+	if s == nil || !s.strictPriorityFallback() || failoverErr == nil || !failoverErr.ShouldReportAccountScheduleFailure() {
+		return
+	}
+	if failoverErr.StatusCode != http.StatusTooManyRequests && failoverErr.StatusCode < http.StatusInternalServerError {
+		return
+	}
+	cooldownMinutes := s.cfg.Gateway.Scheduling.StrictPriorityCooldownMinutes
+	if cooldownMinutes <= 0 {
+		return
+	}
+	s.TempUnscheduleStrictPriorityFailure(ctx, accountID, time.Duration(cooldownMinutes)*time.Minute, failoverErr)
+}
+
 // GatewayService handles API gateway operations
 type GatewayService struct {
 	accountRepo           AccountRepository

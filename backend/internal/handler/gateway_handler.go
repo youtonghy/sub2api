@@ -989,6 +989,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				if errors.As(err, &failoverErr) {
 					// 流式内容已写入客户端，无法撤销，禁止 failover 以防止流拼接腐化
 					if c.Writer.Size() != writerSizeBeforeForward {
+						h.gatewayService.TempUnscheduleCommittedStreamFailure(c.Request.Context(), account.ID, failoverErr)
 						h.handleFailoverExhausted(c, failoverErr, account.Platform, true)
 						return
 					}

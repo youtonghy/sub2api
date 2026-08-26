@@ -19,6 +19,7 @@ type gatewayForwardErrorPolicyRepoStub struct {
 	AccountRepository
 	tempCalls           int
 	overloadCalls       int
+	rateLimitCalls      int
 	modelRateLimitCalls []gatewayForwardModelRateLimitCall
 }
 
@@ -42,6 +43,11 @@ func (r *gatewayForwardErrorPolicyRepoStub) SetModelRateLimit(_ context.Context,
 
 func (r *gatewayForwardErrorPolicyRepoStub) SetOverloaded(context.Context, int64, time.Time) error {
 	r.overloadCalls++
+	return nil
+}
+
+func (r *gatewayForwardErrorPolicyRepoStub) SetRateLimited(context.Context, int64, time.Time) error {
+	r.rateLimitCalls++
 	return nil
 }
 
@@ -261,7 +267,7 @@ func TestGatewayService_Forward_PreOutputSSEOverloadedErrorUsesSemantic529(t *te
 	require.Empty(t, rec.Body.String(), "pre-output overload must remain eligible for account failover")
 }
 
-func TestGatewayService_Forward_PostOutputSSEOverloadedErrorKeepsExistingStatus(t *testing.T) {
+func TestGatewayService_Forward_PostOutputSSEOverloadedErrorUpdatesAccountHealth(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	rec := httptest.NewRecorder()
@@ -296,10 +302,65 @@ func TestGatewayService_Forward_PostOutputSSEOverloadedErrorKeepsExistingStatus(
 
 	var failoverErr *UpstreamFailoverError
 	require.ErrorAs(t, err, &failoverErr)
-	require.Equal(t, http.StatusForbidden, failoverErr.StatusCode)
+	require.Equal(t, 529, failoverErr.StatusCode)
 	require.JSONEq(t, errorJSON, string(failoverErr.ResponseBody))
 	require.Zero(t, repo.tempCalls)
+	require.Equal(t, 1, repo.overloadCalls)
 	require.Contains(t, rec.Body.String(), "message_start")
+}
+
+func TestGatewayService_Forward_PostOutputWrappedRateLimitUpdatesAccountHealth(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+
+	body := []byte(`{"model":"claude-opus-5","stream":true,"messages":[{"role":"user","content":"hello"}]}`)
+	parsed, err := ParseGatewayRequest(NewRequestBodyRef(body), PlatformAnthropic)
+	require.NoError(t, err)
+
+	const errorJSON = `{"type":"error","error":{"type":"api_error","message":"Upstream API request failed: upstream rate limited"}}`
+	fixture := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":1}}}\n\n" +
+		"event: error\ndata: " + errorJSON + "\n\n"
+	upstream := &anthropicHTTPUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body:       io.NopCloser(strings.NewReader(fixture)),
+	}}
+	repo := &gatewayForwardErrorPolicyRepoStub{}
+	cfg := &config.Config{Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize}}
+	svc := &GatewayService{
+		cfg:                  cfg,
+		responseHeaderFilter: compileResponseHeaderFilter(cfg),
+		httpUpstream:         upstream,
+		rateLimitService:     NewRateLimitService(repo, nil, cfg, nil, nil),
+		deferredService:      &DeferredService{},
+	}
+
+	result, err := svc.Forward(context.Background(), c, newAnthropicOAuthAccountForPartialUsageTest(), parsed)
+	require.Error(t, err)
+	require.Nil(t, result)
+
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusTooManyRequests, failoverErr.StatusCode)
+	require.Equal(t, 1, repo.rateLimitCalls, "wrapped stream 429 must cool the account for the next request")
+	require.Contains(t, rec.Body.String(), "message_start")
+}
+
+func TestGatewayService_TempUnscheduleCommittedStreamFailure_StrictPriorityCooldown(t *testing.T) {
+	repo := &gatewayForwardErrorPolicyRepoStub{}
+	cfg := &config.Config{}
+	cfg.Gateway.Scheduling.StrictPriorityFallback = true
+	cfg.Gateway.Scheduling.StrictPriorityCooldownMinutes = 5
+	svc := &GatewayService{cfg: cfg, accountRepo: repo}
+
+	svc.TempUnscheduleCommittedStreamFailure(context.Background(), 60, &UpstreamFailoverError{
+		StatusCode: http.StatusTooManyRequests,
+	})
+
+	require.Equal(t, 1, repo.tempCalls, "committed stream failure must cool the strict-priority source for the next request")
 }
 
 func TestGatewayService_AnthropicAPIKeyPassthrough_ForwardStreamMissingTerminalPreservesPartialUsage(t *testing.T) {

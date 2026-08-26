@@ -870,23 +870,23 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	var firstTokenMs *int
 	var clientDisconnect bool
 	if reqStream {
-		writerSizeBeforeStream := c.Writer.Size()
 		streamResult, err := s.handleStreamingResponse(ctx, resp, c, account, startTime, originalModel, reqModel, shouldMimicClaudeCode)
 		if err != nil {
 			var sseErr *sseStreamErrorEventError
 			if errors.As(err, &sseErr) {
 				// 上游 HTTP 200 + SSE 流体内出现 event:error 帧。
 				body := []byte(sseErr.RawData)
-				semanticStatus := http.StatusForbidden
-				if c.Writer.Size() == writerSizeBeforeStream && gjson.GetBytes(body, "error.type").String() == "overloaded_error" {
-					semanticStatus = 529
-					syntheticResp := &http.Response{
-						StatusCode: semanticStatus,
-						Header:     resp.Header.Clone(),
-						Body:       io.NopCloser(bytes.NewReader(body)),
-					}
-					s.handleFailoverSideEffects(ctx, syntheticResp, account, reqModel)
+				semanticStatus := anthropicSSEErrorStatus(body)
+				// event:error can arrive after response bytes have already been committed,
+				// which makes an in-request account switch unsafe. Account health still
+				// has to observe the real status so the next request avoids the same
+				// rate-limited or overloaded source.
+				syntheticResp := &http.Response{
+					StatusCode: semanticStatus,
+					Header:     resp.Header.Clone(),
+					Body:       io.NopCloser(bytes.NewReader(body)),
 				}
+				s.handleFailoverSideEffects(ctx, syntheticResp, account, reqModel)
 
 				upstreamMsg := sanitizeUpstreamErrorMessage(
 					strings.TrimSpace(extractUpstreamErrorMessage(body)),
@@ -952,6 +952,40 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		FirstTokenMs:                  firstTokenMs,
 		ClientDisconnect:              clientDisconnect,
 	}, nil
+}
+
+func anthropicSSEErrorStatus(body []byte) int {
+	errType := strings.ToLower(strings.TrimSpace(gjson.GetBytes(body, "error.type").String()))
+	message := strings.ToLower(strings.TrimSpace(gjson.GetBytes(body, "error.message").String()))
+
+	// Aggregators commonly collapse an upstream 429 into api_error while keeping
+	// the actual failure class only in the message.
+	if strings.Contains(message, "rate limited") || strings.Contains(message, "rate limit") {
+		return http.StatusTooManyRequests
+	}
+
+	switch errType {
+	case "invalid_request_error":
+		return http.StatusBadRequest
+	case "authentication_error":
+		return http.StatusUnauthorized
+	case "billing_error":
+		return http.StatusPaymentRequired
+	case "permission_error":
+		return http.StatusForbidden
+	case "not_found_error":
+		return http.StatusNotFound
+	case "request_too_large":
+		return http.StatusRequestEntityTooLarge
+	case "rate_limit_error":
+		return http.StatusTooManyRequests
+	case "overloaded_error":
+		return 529
+	case "api_error":
+		return http.StatusInternalServerError
+	default:
+		return http.StatusBadGateway
+	}
 }
 
 func anthropicSpeedModel(parsed *ParsedRequest, result *ForwardResult) string {
