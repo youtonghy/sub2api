@@ -14,7 +14,8 @@ export default {
         realCost: 'Actual Upstream Cost',
         cacheHitRate: 'Cache Hit Rate',
         onlineRate: 'Online Rate',
-        firstTokenWait: 'Time to First Token'
+        firstTokenWait: 'Time to First Token',
+        noConsumption: 'No accounts with consumption'
       },
       modelTest: {
         selectProvider: 'Select a provider first',
@@ -30,7 +31,10 @@ export default {
         loadFailed: 'Failed to load models',
         noResponse: 'The test endpoint returned no response body',
         incompleteResponse: 'The test connection ended before completing',
-        testing: 'Testing...'
+        testing: 'Testing...',
+        scope: 'Account scope',
+        allAccounts: 'All accounts',
+        models: 'Selected models (none means all)'
       },
       failureHeatmap: {
         title: "Today's account failure rate",

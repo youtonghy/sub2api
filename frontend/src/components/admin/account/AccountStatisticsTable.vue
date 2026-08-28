@@ -21,6 +21,11 @@ function statsFor(accountID: number): WindowStats | undefined {
   return props.statsByAccount[String(accountID)]
 }
 
+function hasConsumption(account: Account): boolean {
+  const stats = statsFor(account.id)
+  return (stats?.standard_cost ?? 0) > 0 || (stats?.cost ?? 0) > 0
+}
+
 function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`
 }
@@ -92,7 +97,7 @@ function formatTTFT(stats?: WindowStats): string {
           <td colspan="7" class="px-4 py-14 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('common.noData') }}</td>
         </tr>
         <template v-else>
-          <tr v-for="account in accounts" :key="account.id" :data-statistics-account-id="account.id" class="hover:bg-gray-50/70 dark:hover:bg-dark-700/40">
+          <tr v-for="account in accounts.filter(hasConsumption)" :key="account.id" :data-statistics-account-id="account.id" class="hover:bg-gray-50/70 dark:hover:bg-dark-700/40">
             <td class="px-4 py-3">
               <div class="max-w-[280px] truncate text-sm font-medium text-gray-900 dark:text-white" :title="account.name">{{ account.name }}</div>
               <div class="mt-0.5 text-xs text-gray-400">{{ account.platform }} · #{{ account.id }}</div>
@@ -103,6 +108,9 @@ function formatTTFT(stats?: WindowStats): string {
             <td class="px-4 py-3 text-right font-mono text-sm tabular-nums text-gray-700 dark:text-gray-200">{{ cacheHitRate(statsFor(account.id)) }}</td>
             <td class="px-4 py-3 text-right font-mono text-sm tabular-nums text-gray-700 dark:text-gray-200">{{ onlineRate(account.id) }}</td>
             <td class="px-4 py-3 text-right font-mono text-sm tabular-nums text-gray-700 dark:text-gray-200">{{ formatTTFT(statsFor(account.id)) }}</td>
+          </tr>
+          <tr v-if="!loading && accounts.every(account => !hasConsumption(account))">
+            <td colspan="7" class="px-4 py-14 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('admin.accounts.statistics.noConsumption') }}</td>
           </tr>
         </template>
       </tbody>

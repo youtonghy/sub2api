@@ -33,6 +33,23 @@
         </button>
       </div>
 
+      <div class="flex flex-wrap items-end gap-4 border-b border-gray-200 px-5 py-3 dark:border-dark-700">
+        <div class="min-w-[220px]">
+          <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.accounts.modelTest.scope') }}</label>
+          <Select v-model="selectedAccountId" :options="accountOptions" value-key="value" label-key="label" />
+        </div>
+        <div class="min-w-[260px] flex-1">
+          <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.accounts.modelTest.models') }}</label>
+          <div class="flex max-h-24 flex-wrap gap-x-3 gap-y-1 overflow-y-auto rounded border border-gray-200 px-3 py-2 dark:border-dark-600">
+            <label v-for="model in allModels" :key="model.id" class="inline-flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300">
+              <input v-model="selectedModelIds" type="checkbox" :value="model.id" class="rounded border-gray-300 text-primary-600" />
+              <span>{{ model.display_name || model.id }}</span>
+            </label>
+            <span v-if="allModels.length === 0" class="text-xs text-gray-400">{{ t('admin.accounts.modelTest.noModels') }}</span>
+          </div>
+        </div>
+      </div>
+
       <div v-if="loadingModels" class="flex flex-1 items-center justify-center gap-2 py-12 text-sm text-gray-500 dark:text-gray-400">
         <Icon name="refresh" size="sm" class="animate-spin" />
         {{ t('admin.accounts.modelTest.loadingModels') }}
@@ -98,6 +115,7 @@ import { adminAPI } from '@/api/admin'
 import { buildApiUrl } from '@/api/client'
 import { ADMIN_UI_REQUEST_HEADER } from '@/api/adminUIRequest'
 import Icon from '@/components/icons/Icon.vue'
+import Select from '@/components/common/Select.vue'
 import type { Account, ClaudeModel } from '@/types'
 
 type TestStatus = 'idle' | 'running' | 'success' | 'error'
@@ -117,6 +135,8 @@ const testStates = ref<Record<string, TestState>>({})
 const loadingModels = ref(false)
 const batchRunning = ref(false)
 const completedTests = ref(0)
+const selectedAccountId = ref<string>('all')
+const selectedModelIds = ref<string[]>([])
 const loadSequence = ref(0)
 const controllers = new Set<AbortController>()
 
@@ -135,9 +155,20 @@ const providerLabel = computed(() => {
 })
 
 const testTargets = computed<TestTarget[]>(() => props.accounts.flatMap(account =>
-  (modelsByAccount.value[account.id] || []).map(model => ({ account, model }))
+  (selectedAccountId.value !== 'all' && String(account.id) !== selectedAccountId.value ? [] : (modelsByAccount.value[account.id] || []))
+    .filter(model => selectedModelIds.value.length === 0 || selectedModelIds.value.includes(model.id))
+    .map(model => ({ account, model }))
 ))
 const totalModels = computed(() => testTargets.value.length)
+const accountOptions = computed(() => [
+  { value: 'all', label: t('admin.accounts.modelTest.allAccounts') },
+  ...props.accounts.map(account => ({ value: String(account.id), label: account.name }))
+])
+const allModels = computed(() => {
+  const map = new Map<string, ClaudeModel>()
+  Object.values(modelsByAccount.value).flat().forEach(model => map.set(model.id, model))
+  return Array.from(map.values())
+})
 
 const testKey = (accountId: number, modelId: string) => `${accountId}:${modelId}`
 
@@ -195,6 +226,7 @@ const loadModels = async () => {
   modelsByAccount.value = Object.fromEntries(entries.map(entry => [entry.accountId, entry.models]))
   modelErrors.value = Object.fromEntries(entries.filter(entry => entry.error).map(entry => [entry.accountId, entry.error]))
   loadingModels.value = false
+  selectedModelIds.value = []
 }
 
 const consumeTestStream = async (response: Response): Promise<{ success: boolean; message: string }> => {

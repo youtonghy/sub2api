@@ -18,6 +18,10 @@ type TempUnscheduler interface {
 	TempUnscheduleRetryableError(ctx context.Context, accountID int64, failoverErr *service.UpstreamFailoverError)
 }
 
+type UpstreamFailureUnscheduler interface {
+	TempUnscheduleUpstreamFailure(ctx context.Context, accountID int64, platform string, failoverErr *service.UpstreamFailoverError)
+}
+
 // FailoverAction 表示 failover 错误处理后的下一步动作
 type FailoverAction int
 
@@ -240,6 +244,9 @@ func (s *FailoverState) HandleFailoverError(
 
 	// 加入失败列表
 	s.FailedAccountIDs[accountID] = struct{}{}
+	if unscheduler, ok := gatewayService.(UpstreamFailureUnscheduler); ok {
+		unscheduler.TempUnscheduleUpstreamFailure(ctx, accountID, platform, failoverErr)
+	}
 
 	// 检查是否耗尽
 	if s.SwitchCount >= s.MaxSwitches {

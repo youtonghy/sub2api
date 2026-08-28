@@ -145,8 +145,7 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 	resp, err := s.httpUpstream.DoWithTLS(upstreamReq, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
 	if err != nil {
 		setOpsUpstreamError(c, 0, sanitizeUpstreamErrorMessage(err.Error()), "")
-		s.countTokensError(c, http.StatusBadGateway, "upstream_error", "Request failed")
-		return fmt.Errorf("upstream request failed: %w", err)
+		return &UpstreamFailoverError{StatusCode: http.StatusBadGateway, RetryableOnSameAccount: false, NextAccountAction: NextAccountRetry, Reason: "count_tokens_transport"}
 	}
 
 	// 读取响应体
@@ -211,6 +210,19 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 			upstreamDetail = truncateString(string(respBody), maxBytes)
 		}
 		setOpsUpstreamError(c, resp.StatusCode, upstreamMsg, upstreamDetail)
+		// Keep the response unwritten so the handler can try another account.
+		// count_tokens is a preflight request; retrying it is safe because it has
+		// no billing or upstream side effects.
+		if s.shouldFailoverUpstreamError(resp.StatusCode) || resp.StatusCode == http.StatusNotFound {
+			return &UpstreamFailoverError{
+				StatusCode:             resp.StatusCode,
+				ResponseBody:           respBody,
+				ResponseHeaders:        resp.Header.Clone(),
+				RetryableOnSameAccount: false,
+				NextAccountAction:      NextAccountRetry,
+				Reason:                 "count_tokens_upstream",
+			}
+		}
 
 		// 记录上游错误摘要便于排障（不回显请求内容）
 		if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {

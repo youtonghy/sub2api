@@ -1391,6 +1391,18 @@ func TestClassifyOpsOtherErrorsStillCountForSLA(t *testing.T) {
 	require.Equal(t, "gateway", errorSource)
 }
 
+func TestClassifyOpsClientDisconnectWithUpstreamContextExcludedFromSLA(t *testing.T) {
+	c, _ := gin.CreateTestContext(nil)
+	service.SetOpsUpstreamError(c, http.StatusBadGateway, "upstream failed", "")
+
+	phase, limited, owner, source := classifyOpsErrorLog(c, "api_error", "context canceled", "", statusClientClosedRequest)
+
+	require.Equal(t, "request", phase)
+	require.True(t, limited)
+	require.Equal(t, "client", owner)
+	require.Equal(t, "client_request", source)
+}
+
 func TestClassifyOpsUnsupportedModelExcludedFromSLA(t *testing.T) {
 	tests := []string{
 		"No available accounts: no available accounts supporting model: made-up-model",

@@ -31,6 +31,7 @@ const account = {
   type: 'apikey',
   status: 'active'
 }
+const secondaryAccount = { ...account, id: 8, name: 'Secondary OpenAI' }
 
 function streamResponse(success: boolean) {
   const encoder = new TextEncoder()
@@ -52,6 +53,13 @@ function mountPanel() {
   return mount(AccountModelTestPanel, {
     props: { accounts: [account] as any, platform: 'openai', active: true },
     global: { stubs: { Icon: true } }
+  })
+}
+
+function mountMultiAccountPanel() {
+  return mount(AccountModelTestPanel, {
+    props: { accounts: [account, secondaryAccount] as any, platform: 'openai', active: true },
+    global: { stubs: { Icon: true, Select: { template: '<select v-bind="$attrs" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>', props: ['options'] } } }
   })
 }
 
@@ -102,5 +110,24 @@ describe('AccountModelTestPanel', () => {
     const modelButtons = wrapper.findAll('button').filter(button => button.text().includes('GPT-5'))
     expect(modelButtons).toHaveLength(2)
     expect(modelButtons.every(button => button.classes().includes('border-red-300'))).toBe(true)
+  })
+
+  it('limits batch tests to the chosen account and models', async () => {
+    global.fetch = vi.fn().mockResolvedValue(streamResponse(true)) as any
+    const wrapper = mountMultiAccountPanel()
+    await flushPromises()
+
+    const select = wrapper.get('select')
+    await select.setValue('7')
+    const modelCheckbox = wrapper.findAll('input[type="checkbox"]').find(input => (input.element as HTMLInputElement).value === 'gpt-5-mini')
+    await modelCheckbox!.setValue(true)
+    const batchButton = wrapper.findAll('button').find(button => button.text().includes('admin.accounts.modelTest.testAll'))
+    await batchButton!.trigger('click')
+    await flushPromises()
+
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    expect(global.fetch).toHaveBeenCalledWith('/api/v1/admin/accounts/7/test', expect.objectContaining({
+      body: expect.stringContaining('gpt-5-mini')
+    }))
   })
 })

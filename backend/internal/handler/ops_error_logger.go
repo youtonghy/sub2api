@@ -2186,6 +2186,12 @@ func classifyOpsSeverity(errType string, status int) string {
 
 func classifyOpsErrorLog(c *gin.Context, errType, message, code string, status int) (phase string, isBusinessLimited bool, errorOwner string, errorSource string) {
 	phase = classifyOpsPhase(errType, message, code)
+	// 499 is the gateway's explicit client-disconnect status. A request may
+	// have accumulated upstream attempt telemetry before the client vanished,
+	// but that must not turn a client cancellation into a provider SLA failure.
+	if status == statusClientClosedRequest || strings.Contains(strings.ToLower(message), "context canceled") {
+		return "request", true, "client", "client_request"
+	}
 	routingCapacityLimited := isOpsRoutingCapacityLimited(c)
 	clientBusinessLimited := service.HasOpsClientBusinessLimited(c)
 	localModelConfiguration := clientBusinessLimited && service.OpsClientBusinessLimitedReason(c) == service.OpsClientBusinessLimitedReasonLocalModelConfiguration

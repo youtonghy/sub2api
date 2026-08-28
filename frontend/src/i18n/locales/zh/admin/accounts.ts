@@ -14,7 +14,8 @@ export default {
         realCost: '真实消费',
         cacheHitRate: '缓存命中率',
         onlineRate: '在线率',
-        firstTokenWait: '首字响应等待'
+        firstTokenWait: '首字响应等待',
+        noConsumption: '当前没有产生消费的账号'
       },
       modelTest: {
         selectProvider: '请先筛选 Provider',
@@ -30,7 +31,10 @@ export default {
         loadFailed: '加载模型失败',
         noResponse: '测试接口没有返回响应内容',
         incompleteResponse: '测试连接提前结束',
-        testing: '测试中...'
+        testing: '测试中...',
+        scope: '测试账号范围',
+        allAccounts: '全部账号',
+        models: '指定模型（不选择则测试全部）'
       },
       failureHeatmap: {
         title: '今日账号故障率',

@@ -112,6 +112,14 @@ func TestOpenAIHTTPAccessStateDoesNotTrustBadRequestMessage(t *testing.T) {
 	require.False(t, err.IsCredentialFailure())
 }
 
+func TestOpenAIAnyBadRequestTriggersFailover(t *testing.T) {
+	body := []byte(`{"error":{"type":"upstream_error","message":"Upstream request failed"}}`)
+	svc := &OpenAIGatewayService{}
+
+	require.True(t, svc.shouldFailoverOpenAIUpstreamResponse(http.StatusBadRequest, "Upstream request failed", body))
+	require.True(t, svc.shouldFailoverOpenAIUpstreamResponse(http.StatusBadRequest, "Invalid request", []byte(`{"error":{"type":"invalid_request_error","message":"Invalid request"}}`)))
+}
+
 func TestOpenAIHTTPAccessStateBadRequestDoesNotDisableAccount(t *testing.T) {
 	repo := &openAIStream403AccountRepo{}
 	svc := &OpenAIGatewayService{rateLimitService: &RateLimitService{accountRepo: repo}}

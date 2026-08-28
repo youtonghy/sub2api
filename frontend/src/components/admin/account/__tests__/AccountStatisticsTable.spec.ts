@@ -76,7 +76,7 @@ describe('AccountStatisticsTable', () => {
     expect(row.text()).toContain('1.25s')
   })
 
-  it('shows unknown rates and latency as a dash when the account has no calls', () => {
+  it('does not show accounts that have not produced consumption', () => {
     const wrapper = mount(AccountStatisticsTable, {
       props: {
         accounts: [account],
@@ -87,6 +87,7 @@ describe('AccountStatisticsTable', () => {
       }
     })
 
-    expect(wrapper.get('[data-statistics-account-id="7"]').text()).toContain('-')
+    expect(wrapper.find('[data-statistics-account-id="7"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('admin.accounts.statistics.noConsumption')
   })
 })

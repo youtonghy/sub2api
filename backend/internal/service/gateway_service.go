@@ -745,6 +745,20 @@ func (s *GatewayService) TempUnscheduleRetryableError(ctx context.Context, accou
 	}
 }
 
+// TempUnscheduleUpstreamFailure applies a short account cooldown for
+// account-attributed failures that immediately switch accounts (including
+// strict-priority mode where same-account retry is disabled).
+func (s *GatewayService) TempUnscheduleUpstreamFailure(ctx context.Context, accountID int64, platform string, failoverErr *UpstreamFailoverError) {
+	if s == nil || s.accountRepo == nil || failoverErr == nil || failoverErr.RequestScopedTransient || !failoverErr.ShouldReportAccountScheduleFailure() {
+		return
+	}
+	if platform != PlatformAnthropic || failoverErr.StatusCode < http.StatusInternalServerError {
+		return
+	}
+	const cooldown = 20 * time.Second
+	s.TempUnscheduleStrictPriorityFailure(ctx, accountID, cooldown, failoverErr)
+}
+
 // TempUnscheduleStrictPriorityFailure removes a failed account for the
 // operator-configured strict-priority cooldown period.
 func (s *GatewayService) TempUnscheduleStrictPriorityFailure(
