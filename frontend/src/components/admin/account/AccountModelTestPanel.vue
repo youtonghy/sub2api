@@ -23,6 +23,7 @@
           <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.modelTest.hint') }}</p>
         </div>
         <button
+          v-if="!verificationOnly"
           type="button"
           class="btn btn-primary btn-sm"
           :disabled="loadingModels || batchRunning || testTargets.length === 0"
@@ -32,6 +33,7 @@
           <span>{{ batchRunning ? t('admin.accounts.modelTest.testingProgress', { done: completedTests, total: testTargets.length }) : t('admin.accounts.modelTest.testAll') }}</span>
         </button>
         <button
+          v-if="verificationOnly"
           type="button"
           class="btn btn-secondary btn-sm"
           :disabled="loadingModels || verificationRunning || testTargets.length === 0"
@@ -57,14 +59,14 @@
             <span v-if="allModels.length === 0" class="text-xs text-gray-400">{{ t('admin.accounts.modelTest.noModels') }}</span>
           </div>
         </div>
-        <div class="min-w-[150px]">
+        <div v-if="verificationOnly" class="min-w-[150px]">
           <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.accounts.modelTest.verificationLevel') }}</label>
           <Select v-model="verificationLevel" :options="verificationLevels" value-key="value" label-key="label" :disabled="verificationRunning" />
         </div>
       </div>
 
-      <div v-if="verificationError" class="mx-5 mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">{{ verificationError }}</div>
-      <section v-if="verificationReport" class="mx-5 my-4 rounded border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-900/50 dark:bg-primary-900/10">
+      <div v-if="verificationOnly && verificationError" class="mx-5 mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">{{ verificationError }}</div>
+      <section v-if="verificationOnly && verificationReport" class="mx-5 my-4 rounded border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-900/50 dark:bg-primary-900/10">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 class="font-semibold text-gray-900 dark:text-white">{{ t('admin.accounts.modelTest.verificationReport') }}</h3>
@@ -124,6 +126,7 @@
           </p>
           <div v-else class="flex flex-wrap gap-2">
             <button
+              v-if="!verificationOnly"
               v-for="model in modelsByAccount[account.id]"
               :key="model.id"
               type="button"
@@ -166,6 +169,7 @@ const props = defineProps<{
   accounts: Account[]
   platform: string
   active: boolean
+  verificationOnly?: boolean
 }>()
 
 const { t } = useI18n()

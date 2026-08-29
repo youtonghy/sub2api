@@ -6,6 +6,7 @@ export default {
       accountStatistics: 'Account Statistics',
       failureLog: 'Failure Log',
       accountTest: 'Account Test',
+      modelVerification: { title: 'Model Verification', description: 'Select accounts and a model to run behavioral authenticity checks and inspect the report.', provider: 'Provider', selectProvider: 'Select a provider' },
       viewMode: 'Account view',
       statistics: {
         account: 'Account',
@@ -34,7 +35,7 @@ export default {
         testing: 'Testing...',
         scope: 'Account scope',
         allAccounts: 'All accounts',
-        models: 'Selected models (none means all)'
+        models: 'Selected models (none means all)',
         verificationLevel: 'Verification level', levelLow: 'Quick (3 probes)', levelMedium: 'Standard (6 probes)', levelHigh: 'Strict (10 probes)', verifyAuthenticity: 'Verify authenticity', verifying: 'Verifying...', verificationReport: 'Model authenticity report', accountsChecked: 'accounts checked', probesMatched: 'probes matched', viewEvidence: 'View evidence', verificationFailed: 'Verification failed',
       },
       failureHeatmap: {

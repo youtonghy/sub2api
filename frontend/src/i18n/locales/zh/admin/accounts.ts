@@ -6,6 +6,7 @@ export default {
       accountStatistics: '账号统计',
       failureLog: '故障日志',
       accountTest: '账号测试',
+      modelVerification: { title: '模型验证', description: '选择账号和模型，执行真实性行为验证并查看报告。', provider: 'Provider', selectProvider: '请选择 Provider' },
       viewMode: '账号视图',
       statistics: {
         account: '账号',
@@ -34,7 +35,7 @@ export default {
         testing: '测试中...',
         scope: '测试账号范围',
         allAccounts: '全部账号',
-        models: '指定模型（不选择则测试全部）'
+        models: '指定模型（不选择则测试全部）',
         verificationLevel: '验证强度', levelLow: '快速（3轮）', levelMedium: '标准（6轮）', levelHigh: '严格（10轮）', verifyAuthenticity: '验证真实性', verifying: '验证中...', verificationReport: '模型真实性报告', accountsChecked: '个账号', probesMatched: '轮匹配', viewEvidence: '查看证据', verificationFailed: '真实性验证失败',
       },
       failureHeatmap: {

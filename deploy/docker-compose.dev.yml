@@ -17,6 +17,10 @@ services:
         NPM_CONFIG_REGISTRY: ${NPM_CONFIG_REGISTRY:-https://registry.npmmirror.com}
     container_name: sub2api-dev
     restart: unless-stopped
+    mem_limit: ${SUB2API_MEMORY_LIMIT:-1g}
+    memswap_limit: ${SUB2API_MEMORY_LIMIT:-1g}
+    mem_reservation: ${SUB2API_MEMORY_RESERVATION:-512m}
+    cpus: ${SUB2API_CPU_LIMIT:-2}
     security_opt:
       - no-new-privileges:true
     ports:

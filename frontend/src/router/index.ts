@@ -525,6 +525,12 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/accounts/model-verification',
+    name: 'AdminModelVerification',
+    component: () => import('@/views/admin/ModelVerificationView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, title: 'Model Verification', titleKey: 'admin.accounts.modelVerification.title', descriptionKey: 'admin.accounts.modelVerification.description' }
+  },
+  {
     path: '/admin/announcements',
     name: 'AdminAnnouncements',
     component: () => import('@/views/admin/AnnouncementsView.vue'),

@@ -24,6 +24,7 @@ FROM --platform=${BUILDPLATFORM} ${NODE_IMAGE} AS frontend-builder
 ARG NPM_CONFIG_REGISTRY
 
 WORKDIR /app/frontend
+ENV NODE_OPTIONS=--max-old-space-size=2560
 
 # Install pnpm (pinned to v9 to match CI and keep builds reproducible)
 RUN corepack enable && corepack prepare pnpm@9 --activate
@@ -64,11 +65,17 @@ ARG TARGETARCH
 
 ENV GOPROXY=${GOPROXY}
 ENV GOSUMDB=${GOSUMDB}
+ENV GOMEMLIMIT=700MiB
+ENV GOMAXPROCS=2
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /app/backend
+
+# Keep the memory-heavy frontend typecheck and Go dependency/compiler work
+# sequential inside the 2 GiB resource-limited BuildKit worker.
+COPY --from=frontend-builder /app/frontend/package.json /tmp/frontend-build-complete
 
 # Copy go mod files first (better caching)
 COPY backend/go.mod backend/go.sum ./
@@ -90,7 +97,7 @@ RUN --mount=type=cache,id=sub2api-gomod,target=/go/pkg/mod \
     VERSION_VALUE="${VERSION}" && \
     if [ -z "${VERSION_VALUE}" ]; then VERSION_VALUE="$(./scripts/resolve-version.sh)"; fi && \
     DATE_VALUE="${DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
-    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build \
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -p=2 \
     -tags embed \
     -ldflags="-s -w -X main.Version=${VERSION_VALUE} -X main.Commit=${COMMIT} -X main.Date=${DATE_VALUE} -X main.BuildType=release" \
     -trimpath \

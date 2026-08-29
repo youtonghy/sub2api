@@ -13,3 +13,9 @@ When replacing or restarting the running Sub2API container:
 - Keep the previous container/image until the replacement has passed both its container health check and an HTTP health check.
 
 This requirement is mandatory even when a brief outage would otherwise be acceptable. Its purpose is to prevent an interrupted provider connection from leaving the deployment stopped with no agent available to recover it.
+
+## Build Resource Limits
+
+- All future Docker/BuildKit image builds must be constrained to a maximum of 4 GiB memory.
+- Keep compiler parallelism bounded so the build cannot exhaust host memory and impact PostgreSQL.
+- Do not use an unbounded host Docker builder for production image builds; configure the builder cgroup with the 4 GiB limit.
