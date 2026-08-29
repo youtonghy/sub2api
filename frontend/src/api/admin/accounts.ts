@@ -160,16 +160,18 @@ export interface ModelVerificationAccountReport {
 }
 
 export interface ModelVerificationReport {
-  model_id: string
+  model_id?: string
   level: string
   started_at: string
   finished_at: string
-  accounts: ModelVerificationAccountReport[]
+  accounts?: ModelVerificationAccountReport[]
+  models: Array<{ model_id: string; accounts: ModelVerificationAccountReport[] }>
 }
 
 export async function verifyModels(payload: {
   account_ids: number[]
-  model_id: string
+  model_id?: string
+  model_ids?: string[]
   level: 'low' | 'medium' | 'high'
 }): Promise<ModelVerificationReport> {
   const { data } = await apiClient.post<ModelVerificationReport>('/admin/accounts/model-verification', payload)

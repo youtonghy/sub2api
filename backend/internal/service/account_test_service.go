@@ -3151,21 +3151,30 @@ type ModelVerificationAccountReport struct {
 }
 
 type ModelVerificationReport struct {
-	ModelID    string                          `json:"model_id"`
+	ModelID    string                          `json:"model_id,omitempty"`
 	Level      string                          `json:"level"`
 	StartedAt  time.Time                       `json:"started_at"`
 	FinishedAt time.Time                       `json:"finished_at"`
-	Accounts   []ModelVerificationAccountReport `json:"accounts"`
+	Accounts   []ModelVerificationAccountReport `json:"accounts,omitempty"`
+	Models     []ModelVerificationModelReport  `json:"models"`
+}
+
+type ModelVerificationModelReport struct {
+	ModelID string `json:"model_id"`
+	Accounts []ModelVerificationAccountReport `json:"accounts"`
 }
 
 // VerifyModels runs a bounded set of fixed probes against each selected
 // account. The percentage is the fraction of successful, non-empty probes;
 // it is a behavioral match score, not a routing probability.
-func (s *AccountTestService) VerifyModels(ctx context.Context, accountIDs []int64, modelID, level string) (*ModelVerificationReport, error) {
-	modelID = strings.TrimSpace(modelID)
-	if modelID == "" {
-		modelID = claude.DefaultTestModel
+func (s *AccountTestService) VerifyModels(ctx context.Context, accountIDs []int64, modelIDs []string, level string) (*ModelVerificationReport, error) {
+	cleanModels := make([]string, 0, len(modelIDs))
+	seenModels := make(map[string]struct{})
+	for _, modelID := range modelIDs {
+		modelID = strings.TrimSpace(modelID)
+		if modelID != "" { if _, ok := seenModels[modelID]; !ok { cleanModels = append(cleanModels, modelID); seenModels[modelID] = struct{}{} } }
 	}
+	if len(cleanModels) == 0 { cleanModels = []string{claude.DefaultTestModel} }
 	switch strings.ToLower(strings.TrimSpace(level)) {
 	case "low", "":
 		level = "low"
@@ -3191,7 +3200,10 @@ func (s *AccountTestService) VerifyModels(ctx context.Context, accountIDs []int6
 	}
 	expected := []string{"verification-alpha", "4", "verification-omega", "1, 2, 3", "ready", "model-check", "consistency", "probe-eight", "a", "final-check"}
 	started := time.Now()
-	report := &ModelVerificationReport{ModelID: modelID, Level: level, StartedAt: started, Accounts: make([]ModelVerificationAccountReport, 0, len(accountIDs))}
+	report := &ModelVerificationReport{Level: level, StartedAt: started, Models: make([]ModelVerificationModelReport, 0, len(cleanModels))}
+	if len(cleanModels) == 1 { report.ModelID = cleanModels[0] }
+	for _, modelID := range cleanModels {
+	modelReport := ModelVerificationModelReport{ModelID: modelID, Accounts: make([]ModelVerificationAccountReport, 0, len(accountIDs))}
 	for _, accountID := range accountIDs {
 		ar := ModelVerificationAccountReport{AccountID: accountID, ModelID: modelID, TotalProbes: probeCount, Probes: make([]ModelVerificationProbe, 0, probeCount)}
 		for i := 0; i < probeCount; i++ {
@@ -3224,7 +3236,9 @@ func (s *AccountTestService) VerifyModels(ctx context.Context, accountIDs []int6
 		} else {
 			ar.Status = "inconclusive"
 		}
-		report.Accounts = append(report.Accounts, ar)
+		modelReport.Accounts = append(modelReport.Accounts, ar)
+	}
+	report.Models = append(report.Models, modelReport)
 	}
 	report.FinishedAt = time.Now()
 	return report, nil

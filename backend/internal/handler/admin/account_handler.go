@@ -1132,6 +1132,7 @@ type TestAccountRequest struct {
 type ModelVerificationRequest struct {
 	AccountIDs []int64 `json:"account_ids" binding:"required,min=1"`
 	ModelID string `json:"model_id"`
+	ModelIDs []string `json:"model_ids"`
 	Level string `json:"level"`
 }
 
@@ -1147,7 +1148,9 @@ func (h *AccountHandler) VerifyModels(c *gin.Context) {
 		response.InternalError(c, "account test service unavailable")
 		return
 	}
-	report, err := h.accountTestService.VerifyModels(c.Request.Context(), req.AccountIDs, req.ModelID, req.Level)
+	modelIDs := req.ModelIDs
+	if len(modelIDs) == 0 && req.ModelID != "" { modelIDs = []string{req.ModelID} }
+	report, err := h.accountTestService.VerifyModels(c.Request.Context(), req.AccountIDs, modelIDs, req.Level)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return

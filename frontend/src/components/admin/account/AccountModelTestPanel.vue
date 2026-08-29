@@ -70,12 +70,14 @@
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 class="font-semibold text-gray-900 dark:text-white">{{ t('admin.accounts.modelTest.verificationReport') }}</h3>
-            <p class="text-xs text-gray-500 dark:text-gray-400">{{ verificationReport.model_id }} · {{ verificationReport.level }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">{{ verificationReport.level }}</p>
           </div>
-          <span class="text-xs text-gray-500 dark:text-gray-400">{{ verificationReport.accounts.length }} {{ t('admin.accounts.modelTest.accountsChecked') }}</span>
+          <span class="text-xs text-gray-500 dark:text-gray-400">{{ verificationReport.models.reduce((total, model) => total + model.accounts.length, 0) }} {{ t('admin.accounts.modelTest.accountsChecked') }}</span>
         </div>
-        <div class="grid gap-2 md:grid-cols-2">
-          <div v-for="result in verificationReport.accounts" :key="result.account_id" class="border border-gray-200 bg-white p-3 dark:border-dark-600 dark:bg-dark-800">
+        <div v-for="modelReport in verificationReport.models" :key="modelReport.model_id" class="mb-4 last:mb-0">
+          <h4 class="mb-2 font-medium text-gray-800 dark:text-gray-100">{{ modelReport.model_id }}</h4>
+          <div class="grid gap-2 md:grid-cols-2">
+          <div v-for="result in modelReport.accounts" :key="`${modelReport.model_id}:${result.account_id}`" class="border border-gray-200 bg-white p-3 dark:border-dark-600 dark:bg-dark-800">
             <div class="flex items-center justify-between gap-2">
               <span class="font-medium text-gray-800 dark:text-gray-100">#{{ result.account_id }}</span>
               <span class="text-lg font-bold" :class="result.authenticity_percent >= 80 ? 'text-green-600' : result.authenticity_percent > 0 ? 'text-amber-600' : 'text-red-600'">{{ result.authenticity_percent.toFixed(0) }}%</span>
@@ -87,6 +89,7 @@
                 <div v-for="probe in result.probes" :key="probe.index" :class="probe.matched ? 'text-green-600' : 'text-red-600'">{{ probe.index }}. {{ probe.matched ? 'PASS' : 'FAIL' }} · {{ probe.response || probe.error || probe.status }}</div>
               </div>
             </details>
+          </div>
           </div>
         </div>
       </section>
@@ -370,7 +373,7 @@ const runVerification = async () => {
   try {
     const accountIds = Array.from(new Set(testTargets.value.map(target => target.account.id)))
     const models = Array.from(new Set(testTargets.value.map(target => target.model.id)))
-    verificationReport.value = await adminAPI.accounts.verifyModels({ account_ids: accountIds, model_id: models[0] || '', level: verificationLevel.value })
+    verificationReport.value = await adminAPI.accounts.verifyModels({ account_ids: accountIds, model_ids: models, level: verificationLevel.value })
   } catch (error) {
     verificationError.value = error instanceof Error ? error.message : t('admin.accounts.modelTest.verificationFailed')
   } finally {
