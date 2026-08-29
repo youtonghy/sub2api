@@ -147,6 +147,8 @@ export interface ModelVerificationProbe {
   response?: string
   error?: string
   latency_ms: number
+  profile?: string
+  effort?: string
 }
 
 export interface ModelVerificationAccountReport {
@@ -154,9 +156,20 @@ export interface ModelVerificationAccountReport {
   model_id: string
   authenticity_percent: number
   matched_probes: number
+  completed_probes?: number
   total_probes: number
   status: string
   probes: ModelVerificationProbe[]
+  model_scores?: Record<string, number>
+  scoring_mode?: string
+  evidence_quality?: number
+  hard_anomalies?: string[]
+  juice_evidence?: string[]
+  juice_classifications?: string[]
+  juice_state?: string
+  verdict?: string
+  fingerprint_model?: string
+  fingerprint_claim_mismatch?: boolean
 }
 
 export interface ModelVerificationReport {
@@ -174,7 +187,19 @@ export async function verifyModels(payload: {
   model_ids?: string[]
   level: 'low' | 'medium' | 'high'
 }): Promise<ModelVerificationReport> {
-  const { data } = await apiClient.post<ModelVerificationReport>('/admin/accounts/model-verification', payload)
+	const { data } = await apiClient.post<{ job_id?: string; status?: string; report?: ModelVerificationReport }>('/admin/accounts/model-verification', payload)
+	if (!data.job_id) return data as unknown as ModelVerificationReport
+	for (let attempt = 0; attempt < 1800; attempt++) {
+		await new Promise(resolve => setTimeout(resolve, 2000))
+		const job = await apiClient.get<{ job_id: string; status: string; report?: ModelVerificationReport; error?: string }>(`/admin/accounts/model-verification/jobs/${data.job_id}`)
+		if (job.data.status === 'completed' && job.data.report) return job.data.report
+		if (job.data.status === 'failed') throw new Error(job.data.error || 'model verification failed')
+	}
+	throw new Error('model verification timed out')
+}
+
+export async function getModelVerificationHistory(accountIds: number[]): Promise<{ accounts: Record<string, Array<Record<string, unknown>>> }> {
+  const { data } = await apiClient.get<{ accounts: Record<string, Array<Record<string, unknown>>> }>('/admin/accounts/model-verification/history', { params: { account_ids: accountIds.join(',') } })
   return data
 }
 
@@ -1039,6 +1064,7 @@ export const accountsAPI = {
   getById,
   getModelOptions,
   verifyModels,
+  getModelVerificationHistory,
   create,
   duplicate,
   update,

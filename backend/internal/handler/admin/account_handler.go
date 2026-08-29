@@ -30,6 +30,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -64,6 +65,7 @@ type AccountHandler struct {
 	grokImportProber        grokImportProber
 	upstreamBillingProbe    *service.UpstreamBillingProbeService
 	ollamaCloudUsage        *service.OllamaCloudUsageService
+	modelVerificationJobs   sync.Map
 }
 
 // SetUpstreamBillingProbeService attaches the optional remote billing probe service.
@@ -1130,13 +1132,22 @@ type TestAccountRequest struct {
 }
 
 type ModelVerificationRequest struct {
-	AccountIDs []int64 `json:"account_ids" binding:"required,min=1"`
-	ModelID string `json:"model_id"`
-	ModelIDs []string `json:"model_ids"`
-	Level string `json:"level"`
+	AccountIDs []int64  `json:"account_ids" binding:"required,min=1"`
+	ModelID    string   `json:"model_id"`
+	ModelIDs   []string `json:"model_ids"`
+	Level      string   `json:"level"`
 }
 
-// VerifyModels runs behavioral probes for selected accounts.
+type modelVerificationJob struct {
+	ID        string                           `json:"job_id"`
+	Status    string                           `json:"status"`
+	Report    *service.ModelVerificationReport `json:"report,omitempty"`
+	Error     string                           `json:"error,omitempty"`
+	CreatedAt time.Time                        `json:"created_at"`
+	UpdatedAt time.Time                        `json:"updated_at"`
+}
+
+// VerifyModels queues behavioral probes for selected accounts.
 // POST /api/v1/admin/accounts/model-verification
 func (h *AccountHandler) VerifyModels(c *gin.Context) {
 	var req ModelVerificationRequest
@@ -1149,13 +1160,65 @@ func (h *AccountHandler) VerifyModels(c *gin.Context) {
 		return
 	}
 	modelIDs := req.ModelIDs
-	if len(modelIDs) == 0 && req.ModelID != "" { modelIDs = []string{req.ModelID} }
-	report, err := h.accountTestService.VerifyModels(c.Request.Context(), req.AccountIDs, modelIDs, req.Level)
-	if err != nil {
-		response.BadRequest(c, err.Error())
+	if len(modelIDs) == 0 && req.ModelID != "" {
+		modelIDs = []string{req.ModelID}
+	}
+	job := &modelVerificationJob{ID: uuid.NewString(), Status: "running", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	h.modelVerificationJobs.Store(job.ID, job)
+	accountIDs := append([]int64(nil), req.AccountIDs...)
+	models := append([]string(nil), modelIDs...)
+	level := req.Level
+	go func() {
+		report, err := h.accountTestService.VerifyModels(context.Background(), accountIDs, models, level)
+		completed := &modelVerificationJob{ID: job.ID, Status: "completed", Report: report, CreatedAt: job.CreatedAt, UpdatedAt: time.Now().UTC()}
+		if err != nil {
+			completed.Status, completed.Error = "failed", err.Error()
+		}
+		h.modelVerificationJobs.Store(job.ID, completed)
+	}()
+	response.Success(c, job)
+}
+
+// GetModelVerificationJob returns the current background verification state.
+func (h *AccountHandler) GetModelVerificationJob(c *gin.Context) {
+	jobID := strings.TrimSpace(c.Param("job_id"))
+	value, ok := h.modelVerificationJobs.Load(jobID)
+	if !ok {
+		response.NotFound(c, "model verification job not found")
 		return
 	}
-	response.Success(c, report)
+	response.Success(c, value)
+}
+
+// GetModelVerificationHistory returns persisted verification summaries.
+func (h *AccountHandler) GetModelVerificationHistory(c *gin.Context) {
+	ids := make([]int64, 0)
+	for _, raw := range strings.Split(c.Query("account_ids"), ",") {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || id <= 0 {
+			response.BadRequest(c, "invalid account_ids")
+			return
+		}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		response.BadRequest(c, "account_ids is required")
+		return
+	}
+	if h.accountTestService == nil {
+		response.InternalError(c, "account test service unavailable")
+		return
+	}
+	history, err := h.accountTestService.GetModelVerificationHistory(c.Request.Context(), ids)
+	if err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"accounts": history})
 }
 
 type SyncFromCRSRequest struct {

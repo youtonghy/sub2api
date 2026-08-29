@@ -20,7 +20,7 @@
               {{ t('admin.accounts.modelTest.summary', { accounts: accounts.length, models: totalModels }) }}
             </span>
           </div>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.modelTest.hint') }}</p>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ verificationOnly ? t('admin.accounts.modelTest.verificationHint') : t('admin.accounts.modelTest.hint') }}</p>
         </div>
         <button
           v-if="!verificationOnly"
@@ -51,7 +51,8 @@
         </div>
         <div class="min-w-[260px] flex-1">
           <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.accounts.modelTest.models') }}</label>
-          <div class="flex max-h-24 flex-wrap gap-x-3 gap-y-1 overflow-y-auto rounded border border-gray-200 px-3 py-2 dark:border-dark-600">
+          <Select v-if="verificationOnly" v-model="selectedVerificationModel" :options="verificationModelOptions" value-key="value" label-key="label" :disabled="verificationRunning" />
+          <div v-else class="flex max-h-24 flex-wrap gap-x-3 gap-y-1 overflow-y-auto rounded border border-gray-200 px-3 py-2 dark:border-dark-600">
             <label v-for="model in allModels" :key="model.id" class="inline-flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300">
               <input v-model="selectedModelIds" type="checkbox" :value="model.id" class="rounded border-gray-300 text-primary-600" />
               <span>{{ model.display_name || model.id }}</span>
@@ -66,15 +67,16 @@
       </div>
 
       <div v-if="verificationOnly && verificationError" class="mx-5 mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">{{ verificationError }}</div>
-      <section v-if="verificationOnly && verificationReport" class="mx-5 my-4 rounded border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-900/50 dark:bg-primary-900/10">
+      <section v-if="verificationOnly && savedVerificationReports.length" class="mx-5 my-4 rounded border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-900/50 dark:bg-primary-900/10">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 class="font-semibold text-gray-900 dark:text-white">{{ t('admin.accounts.modelTest.verificationReport') }}</h3>
-            <p class="text-xs text-gray-500 dark:text-gray-400">{{ verificationReport.level }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.modelTest.previousReports') }}</p>
           </div>
-          <span class="text-xs text-gray-500 dark:text-gray-400">{{ verificationReport.models.reduce((total, model) => total + model.accounts.length, 0) }} {{ t('admin.accounts.modelTest.accountsChecked') }}</span>
+          <span class="text-xs text-gray-500 dark:text-gray-400">{{ savedVerificationReports.length }} {{ t('admin.accounts.modelTest.modelsReported') }}</span>
         </div>
-        <div v-for="modelReport in verificationReport.models" :key="modelReport.model_id" class="mb-4 last:mb-0">
+        <div v-for="report in savedVerificationReports" :key="report.model_id || report.models[0]?.model_id" class="mb-4 last:mb-0">
+          <template v-for="modelReport in report.models" :key="modelReport.model_id">
           <h4 class="mb-2 font-medium text-gray-800 dark:text-gray-100">{{ modelReport.model_id }}</h4>
           <div class="grid gap-2 md:grid-cols-2">
           <div v-for="result in modelReport.accounts" :key="`${modelReport.model_id}:${result.account_id}`" class="border border-gray-200 bg-white p-3 dark:border-dark-600 dark:bg-dark-800">
@@ -83,6 +85,17 @@
               <span class="text-lg font-bold" :class="result.authenticity_percent >= 80 ? 'text-green-600' : result.authenticity_percent > 0 ? 'text-amber-600' : 'text-red-600'">{{ result.authenticity_percent.toFixed(0) }}%</span>
             </div>
             <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ result.matched_probes }}/{{ result.total_probes }} {{ t('admin.accounts.modelTest.probesMatched') }} · {{ result.status }}</div>
+            <div v-if="result.verdict" class="mt-1 text-xs font-medium" :class="result.fingerprint_claim_mismatch || result.juice_state === 'mismatch' ? 'text-red-600' : 'text-gray-600 dark:text-gray-300'">{{ verificationVerdictLabel(result.verdict) }}<span v-if="result.fingerprint_claim_mismatch"> · {{ t('admin.accounts.modelTest.claimMismatch') }}</span></div>
+            <div v-if="result.hard_anomalies?.length" class="mt-2 border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">
+              {{ result.hard_anomalies.join(' · ') }}
+            </div>
+            <div v-if="result.juice_evidence?.length" class="mt-2 text-[11px] text-gray-500 dark:text-gray-400">Juice: {{ result.juice_evidence.join(', ') }}</div>
+            <div v-if="result.model_scores" class="mt-2 grid grid-cols-3 gap-1 text-[11px]">
+              <div v-for="model in verificationModels" :key="model.id" class="border border-gray-200 px-1.5 py-1 text-center dark:border-dark-600">
+                <div class="truncate text-gray-500 dark:text-gray-400">{{ model.display_name.replace('GPT-5.6 ', '') }}</div>
+                <div class="font-semibold text-gray-800 dark:text-gray-100">{{ (result.model_scores[model.id] ?? 0).toFixed(1) }}%</div>
+              </div>
+            </div>
             <details class="mt-2 text-xs">
               <summary class="cursor-pointer text-primary-600 dark:text-primary-400">{{ t('admin.accounts.modelTest.viewEvidence') }}</summary>
               <div class="mt-2 max-h-32 space-y-1 overflow-y-auto font-mono text-gray-600 dark:text-gray-300">
@@ -91,6 +104,7 @@
             </details>
           </div>
           </div>
+          </template>
         </div>
       </section>
 
@@ -101,7 +115,7 @@
       <div v-else-if="accounts.length === 0" class="flex flex-1 items-center justify-center py-12 text-sm text-gray-500 dark:text-gray-400">
         {{ t('admin.accounts.modelTest.noAccounts') }}
       </div>
-      <div v-else class="min-h-0 flex-1 overflow-y-auto">
+      <div v-else-if="!verificationOnly" class="min-h-0 flex-1 overflow-y-auto">
         <section
           v-for="account in accounts"
           :key="account.id"
@@ -157,7 +171,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
-import type { ModelVerificationReport } from '@/api/admin/accounts'
+import type { ModelVerificationAccountReport, ModelVerificationReport } from '@/api/admin/accounts'
 import { buildApiUrl } from '@/api/client'
 import { ADMIN_UI_REQUEST_HEADER } from '@/api/adminUIRequest'
 import Icon from '@/components/icons/Icon.vue'
@@ -186,15 +200,25 @@ const selectedAccountId = ref<string>('all')
 const selectedModelIds = ref<string[]>([])
 const loadSequence = ref(0)
 const controllers = new Set<AbortController>()
+const verificationModels: ClaudeModel[] = [
+  { id: 'gpt-5.6-sol', display_name: 'GPT-5.6 Sol', type: 'model', created_at: '' },
+  { id: 'gpt-5.6-terra', display_name: 'GPT-5.6 Terra', type: 'model', created_at: '' },
+  { id: 'gpt-5.6-luna', display_name: 'GPT-5.6 Luna', type: 'model', created_at: '' }
+]
 const verificationLevel = ref<'low' | 'medium' | 'high'>('low')
+const selectedVerificationModel = ref('gpt-5.6-sol')
 const verificationRunning = ref(false)
 const verificationError = ref('')
 const verificationReport = ref<ModelVerificationReport | null>(null)
+const verificationHistory = ref<Record<string, ModelVerificationReport>>({})
+const savedVerificationReports = computed(() => Object.values(verificationHistory.value))
 const verificationLevels = computed(() => [
   { value: 'low', label: t('admin.accounts.modelTest.levelLow') },
   { value: 'medium', label: t('admin.accounts.modelTest.levelMedium') },
   { value: 'high', label: t('admin.accounts.modelTest.levelHigh') }
 ])
+const verificationModelOptions = verificationModels.map(model => ({ value: model.id, label: model.display_name }))
+const verificationVerdictLabel = (code: string) => t(`admin.accounts.modelTest.verdicts.${code}`)
 
 const providerLabel = computed(() => {
   const labels: Record<string, string> = {
@@ -221,6 +245,7 @@ const accountOptions = computed(() => [
   ...props.accounts.map(account => ({ value: String(account.id), label: account.name }))
 ])
 const allModels = computed(() => {
+  if (props.verificationOnly) return verificationModels
   const map = new Map<string, ClaudeModel>()
   Object.values(modelsByAccount.value).flat().forEach(model => map.set(model.id, model))
   return Array.from(map.values())
@@ -268,6 +293,10 @@ const loadModels = async () => {
       const account = queue.shift()
       if (!account) break
       try {
+        if (props.verificationOnly) {
+          entries.push({ accountId: account.id, models: verificationModels, error: '' })
+          continue
+        }
         const models = await adminAPI.accounts.getAvailableModels(account.id)
         entries.push({ accountId: account.id, models, error: '' })
       } catch (error) {
@@ -283,6 +312,58 @@ const loadModels = async () => {
   modelErrors.value = Object.fromEntries(entries.filter(entry => entry.error).map(entry => [entry.accountId, entry.error]))
   loadingModels.value = false
   selectedModelIds.value = []
+  if (props.verificationOnly) {
+    try {
+      const history: Record<string, ModelVerificationReport> = {}
+      verificationModels.forEach(model => {
+        const saved = localStorage.getItem(`sub2api:model-verification:${props.platform}:${model.id}`)
+        if (saved) history[model.id] = JSON.parse(saved) as ModelVerificationReport
+      })
+      if (Object.keys(history).length === 0) {
+        const legacy = localStorage.getItem(`sub2api:model-verification:${props.platform}`)
+        if (legacy) {
+          const report = JSON.parse(legacy) as ModelVerificationReport
+          const modelID = report.model_id || report.models?.[0]?.model_id
+          if (modelID) history[modelID] = report
+        }
+      }
+      try {
+        const persisted = await adminAPI.accounts.getModelVerificationHistory(props.accounts.map(account => account.id))
+        const grouped: Record<string, ModelVerificationAccountReport[]> = {}
+        ;(Object.values(persisted.accounts).flat() as Array<Record<string, unknown>>).forEach((entry) => {
+          const modelID = String(entry.model_id || '')
+          if (!modelID) return
+          const accountID = Number(entry.account_id || 0)
+          if (!accountID) return
+          ;(grouped[modelID] ||= []).push({
+            account_id: accountID,
+            model_id: modelID,
+            authenticity_percent: Number(entry.authenticity_percent || 0),
+            matched_probes: Number(entry.matched_probes || 0),
+            completed_probes: Number(entry.completed_probes || 0),
+            total_probes: Number(entry.total_probes || 0),
+            status: String(entry.status || 'inconclusive'),
+            probes: [],
+            scoring_mode: String(entry.scoring_mode || 'baseline_softmax'),
+            model_scores: entry.model_scores && typeof entry.model_scores === 'object' ? entry.model_scores as Record<string, number> : undefined,
+            evidence_quality: Number(entry.evidence_quality || 0),
+            hard_anomalies: Array.isArray(entry.hard_anomalies) ? entry.hard_anomalies as string[] : [],
+            juice_evidence: Array.isArray(entry.juice_evidence) ? entry.juice_evidence as string[] : [],
+            juice_classifications: Array.isArray(entry.juice_classifications) ? entry.juice_classifications as string[] : [],
+            juice_state: entry.juice_state ? String(entry.juice_state) : undefined,
+            verdict: entry.verdict ? String(entry.verdict) : undefined,
+            fingerprint_model: entry.fingerprint_model ? String(entry.fingerprint_model) : undefined,
+            fingerprint_claim_mismatch: Boolean(entry.fingerprint_claim_mismatch)
+          })
+        })
+        Object.entries(grouped).forEach(([modelID, accounts]) => {
+          if (!history[modelID]) history[modelID] = { model_id: modelID, level: 'persisted', started_at: '', finished_at: '', models: [{ model_id: modelID, accounts }] }
+        })
+      } catch { /* local history remains available when the server is offline */ }
+      verificationHistory.value = history
+      verificationReport.value = history[selectedVerificationModel.value] || null
+    } catch { verificationHistory.value = {}; verificationReport.value = null }
+  }
 }
 
 const consumeTestStream = async (response: Response): Promise<{ success: boolean; message: string }> => {
@@ -371,9 +452,13 @@ const runVerification = async () => {
   verificationError.value = ''
   verificationReport.value = null
   try {
-    const accountIds = Array.from(new Set(testTargets.value.map(target => target.account.id)))
-    const models = Array.from(new Set(testTargets.value.map(target => target.model.id)))
-    verificationReport.value = await adminAPI.accounts.verifyModels({ account_ids: accountIds, model_ids: models, level: verificationLevel.value })
+    const modelID = selectedVerificationModel.value
+    const accountIds = selectedAccountId.value === 'all'
+      ? props.accounts.map(account => account.id)
+      : props.accounts.filter(account => String(account.id) === selectedAccountId.value).map(account => account.id)
+    verificationReport.value = await adminAPI.accounts.verifyModels({ account_ids: accountIds, model_ids: [modelID], level: verificationLevel.value })
+    verificationHistory.value = { ...verificationHistory.value, [modelID]: verificationReport.value }
+    localStorage.setItem(`sub2api:model-verification:${props.platform}:${modelID}`, JSON.stringify(verificationReport.value))
   } catch (error) {
     verificationError.value = error instanceof Error ? error.message : t('admin.accounts.modelTest.verificationFailed')
   } finally {
