@@ -35,6 +35,7 @@ export default {
         scope: '测试账号范围',
         allAccounts: '全部账号',
         models: '指定模型（不选择则测试全部）'
+        verificationLevel: '验证强度', levelLow: '快速（3轮）', levelMedium: '标准（6轮）', levelHigh: '严格（10轮）', verifyAuthenticity: '验证真实性', verifying: '验证中...', verificationReport: '模型真实性报告', accountsChecked: '个账号', probesMatched: '轮匹配', viewEvidence: '查看证据', verificationFailed: '真实性验证失败',
       },
       failureHeatmap: {
         title: '今日账号故障率',

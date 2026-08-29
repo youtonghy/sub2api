@@ -3127,6 +3127,109 @@ func (s *AccountTestService) RunTestBackground(ctx context.Context, accountID in
 	}, nil
 }
 
+// ModelVerificationProbe is one fixed behavioral probe used by the admin
+// model verification page. It intentionally stores only normalized output
+// metadata and never credentials or authorization headers.
+type ModelVerificationProbe struct {
+	Index       int    `json:"index"`
+	Prompt      string `json:"prompt"`
+	Status      string `json:"status"`
+	Matched     bool   `json:"matched"`
+	Response    string `json:"response,omitempty"`
+	Error       string `json:"error,omitempty"`
+	LatencyMs   int64  `json:"latency_ms"`
+}
+
+type ModelVerificationAccountReport struct {
+	AccountID       int64                    `json:"account_id"`
+	ModelID         string                   `json:"model_id"`
+	AuthenticityPct float64                  `json:"authenticity_percent"`
+	MatchedProbes   int                      `json:"matched_probes"`
+	TotalProbes     int                      `json:"total_probes"`
+	Status          string                   `json:"status"`
+	Probes          []ModelVerificationProbe `json:"probes"`
+}
+
+type ModelVerificationReport struct {
+	ModelID    string                          `json:"model_id"`
+	Level      string                          `json:"level"`
+	StartedAt  time.Time                       `json:"started_at"`
+	FinishedAt time.Time                       `json:"finished_at"`
+	Accounts   []ModelVerificationAccountReport `json:"accounts"`
+}
+
+// VerifyModels runs a bounded set of fixed probes against each selected
+// account. The percentage is the fraction of successful, non-empty probes;
+// it is a behavioral match score, not a routing probability.
+func (s *AccountTestService) VerifyModels(ctx context.Context, accountIDs []int64, modelID, level string) (*ModelVerificationReport, error) {
+	modelID = strings.TrimSpace(modelID)
+	if modelID == "" {
+		modelID = claude.DefaultTestModel
+	}
+	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "low", "":
+		level = "low"
+	case "medium":
+		level = "medium"
+	case "high":
+		level = "high"
+	default:
+		return nil, fmt.Errorf("invalid verification level: %s", level)
+	}
+	probeCount := map[string]int{"low": 3, "medium": 6, "high": 10}[level]
+	prompts := []string{
+		"Reply with exactly: verification-alpha",
+		"What is 2 + 2? Reply with only the number.",
+		"Reply with exactly: verification-omega",
+		"List the numbers 1, 2, 3 separated by commas.",
+		"Reply with exactly one word: ready",
+		"Reply with exactly: model-check",
+		"Return the lowercase word: consistency",
+		"Reply with exactly: probe-eight",
+		"What is the first letter of alphabet? Reply with one character.",
+		"Reply with exactly: final-check",
+	}
+	expected := []string{"verification-alpha", "4", "verification-omega", "1, 2, 3", "ready", "model-check", "consistency", "probe-eight", "a", "final-check"}
+	started := time.Now()
+	report := &ModelVerificationReport{ModelID: modelID, Level: level, StartedAt: started, Accounts: make([]ModelVerificationAccountReport, 0, len(accountIDs))}
+	for _, accountID := range accountIDs {
+		ar := ModelVerificationAccountReport{AccountID: accountID, ModelID: modelID, TotalProbes: probeCount, Probes: make([]ModelVerificationProbe, 0, probeCount)}
+		for i := 0; i < probeCount; i++ {
+			probeStarted := time.Now()
+			w := httptest.NewRecorder()
+			gc, _ := gin.CreateTestContext(w)
+			gc.Request = (&http.Request{}).WithContext(ctx)
+			err := s.TestAccountConnection(gc, accountID, modelID, prompts[i], AccountTestModeDefault)
+			responseText, errMsg := parseTestSSEOutput(w.Body.String())
+			normalized := strings.ToLower(strings.TrimSpace(responseText))
+			probe := ModelVerificationProbe{Index: i + 1, Prompt: prompts[i], Matched: err == nil && errMsg == "" && strings.Contains(normalized, expected[i])}
+			result := &ScheduledTestResult{Status: "success", ResponseText: responseText, ErrorMessage: errMsg, LatencyMs: time.Since(probeStarted).Milliseconds()}
+			if err != nil || errMsg != "" {
+				result.Status = "failed"
+			}
+			if result != nil {
+				probe.Status, probe.Response, probe.Error, probe.LatencyMs = result.Status, result.ResponseText, result.ErrorMessage, result.LatencyMs
+			}
+			if err != nil && probe.Error == "" {
+				probe.Error = err.Error()
+			}
+			if probe.Matched { ar.MatchedProbes++ }
+			ar.Probes = append(ar.Probes, probe)
+		}
+		ar.AuthenticityPct = float64(ar.MatchedProbes) * 100 / float64(ar.TotalProbes)
+		if ar.MatchedProbes == ar.TotalProbes {
+			ar.Status = "passed"
+		} else if ar.MatchedProbes == 0 {
+			ar.Status = "failed"
+		} else {
+			ar.Status = "inconclusive"
+		}
+		report.Accounts = append(report.Accounts, ar)
+	}
+	report.FinishedAt = time.Now()
+	return report, nil
+}
+
 // parseTestSSEOutput extracts response text and error message from captured SSE output.
 func parseTestSSEOutput(body string) (responseText, errMsg string) {
 	var texts []string

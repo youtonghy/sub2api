@@ -1129,6 +1129,32 @@ type TestAccountRequest struct {
 	AudioDataURL string `json:"audio_data_url"`
 }
 
+type ModelVerificationRequest struct {
+	AccountIDs []int64 `json:"account_ids" binding:"required,min=1"`
+	ModelID string `json:"model_id"`
+	Level string `json:"level"`
+}
+
+// VerifyModels runs behavioral probes for selected accounts.
+// POST /api/v1/admin/accounts/model-verification
+func (h *AccountHandler) VerifyModels(c *gin.Context) {
+	var req ModelVerificationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if h.accountTestService == nil {
+		response.InternalError(c, "account test service unavailable")
+		return
+	}
+	report, err := h.accountTestService.VerifyModels(c.Request.Context(), req.AccountIDs, req.ModelID, req.Level)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, report)
+}
+
 type SyncFromCRSRequest struct {
 	BaseURL            string   `json:"base_url" binding:"required"`
 	Username           string   `json:"username" binding:"required"`

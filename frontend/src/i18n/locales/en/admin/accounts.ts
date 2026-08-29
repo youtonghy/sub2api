@@ -35,6 +35,7 @@ export default {
         scope: 'Account scope',
         allAccounts: 'All accounts',
         models: 'Selected models (none means all)'
+        verificationLevel: 'Verification level', levelLow: 'Quick (3 probes)', levelMedium: 'Standard (6 probes)', levelHigh: 'Strict (10 probes)', verifyAuthenticity: 'Verify authenticity', verifying: 'Verifying...', verificationReport: 'Model authenticity report', accountsChecked: 'accounts checked', probesMatched: 'probes matched', viewEvidence: 'View evidence', verificationFailed: 'Verification failed',
       },
       failureHeatmap: {
         title: "Today's account failure rate",

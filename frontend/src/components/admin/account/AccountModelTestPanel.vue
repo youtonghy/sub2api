@@ -31,6 +31,15 @@
           <Icon name="play" size="sm" />
           <span>{{ batchRunning ? t('admin.accounts.modelTest.testingProgress', { done: completedTests, total: testTargets.length }) : t('admin.accounts.modelTest.testAll') }}</span>
         </button>
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          :disabled="loadingModels || verificationRunning || testTargets.length === 0"
+          @click="runVerification"
+        >
+          <Icon name="shield" size="sm" />
+          <span>{{ verificationRunning ? t('admin.accounts.modelTest.verifying') : t('admin.accounts.modelTest.verifyAuthenticity') }}</span>
+        </button>
       </div>
 
       <div class="flex flex-wrap items-end gap-4 border-b border-gray-200 px-5 py-3 dark:border-dark-700">
@@ -48,7 +57,37 @@
             <span v-if="allModels.length === 0" class="text-xs text-gray-400">{{ t('admin.accounts.modelTest.noModels') }}</span>
           </div>
         </div>
+        <div class="min-w-[150px]">
+          <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.accounts.modelTest.verificationLevel') }}</label>
+          <Select v-model="verificationLevel" :options="verificationLevels" value-key="value" label-key="label" :disabled="verificationRunning" />
+        </div>
       </div>
+
+      <div v-if="verificationError" class="mx-5 mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">{{ verificationError }}</div>
+      <section v-if="verificationReport" class="mx-5 my-4 rounded border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-900/50 dark:bg-primary-900/10">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 class="font-semibold text-gray-900 dark:text-white">{{ t('admin.accounts.modelTest.verificationReport') }}</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">{{ verificationReport.model_id }} · {{ verificationReport.level }}</p>
+          </div>
+          <span class="text-xs text-gray-500 dark:text-gray-400">{{ verificationReport.accounts.length }} {{ t('admin.accounts.modelTest.accountsChecked') }}</span>
+        </div>
+        <div class="grid gap-2 md:grid-cols-2">
+          <div v-for="result in verificationReport.accounts" :key="result.account_id" class="border border-gray-200 bg-white p-3 dark:border-dark-600 dark:bg-dark-800">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-medium text-gray-800 dark:text-gray-100">#{{ result.account_id }}</span>
+              <span class="text-lg font-bold" :class="result.authenticity_percent >= 80 ? 'text-green-600' : result.authenticity_percent > 0 ? 'text-amber-600' : 'text-red-600'">{{ result.authenticity_percent.toFixed(0) }}%</span>
+            </div>
+            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ result.matched_probes }}/{{ result.total_probes }} {{ t('admin.accounts.modelTest.probesMatched') }} · {{ result.status }}</div>
+            <details class="mt-2 text-xs">
+              <summary class="cursor-pointer text-primary-600 dark:text-primary-400">{{ t('admin.accounts.modelTest.viewEvidence') }}</summary>
+              <div class="mt-2 max-h-32 space-y-1 overflow-y-auto font-mono text-gray-600 dark:text-gray-300">
+                <div v-for="probe in result.probes" :key="probe.index" :class="probe.matched ? 'text-green-600' : 'text-red-600'">{{ probe.index }}. {{ probe.matched ? 'PASS' : 'FAIL' }} · {{ probe.response || probe.error || probe.status }}</div>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
 
       <div v-if="loadingModels" class="flex flex-1 items-center justify-center gap-2 py-12 text-sm text-gray-500 dark:text-gray-400">
         <Icon name="refresh" size="sm" class="animate-spin" />
@@ -112,6 +151,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
+import type { ModelVerificationReport } from '@/api/admin/accounts'
 import { buildApiUrl } from '@/api/client'
 import { ADMIN_UI_REQUEST_HEADER } from '@/api/adminUIRequest'
 import Icon from '@/components/icons/Icon.vue'
@@ -139,6 +179,15 @@ const selectedAccountId = ref<string>('all')
 const selectedModelIds = ref<string[]>([])
 const loadSequence = ref(0)
 const controllers = new Set<AbortController>()
+const verificationLevel = ref<'low' | 'medium' | 'high'>('low')
+const verificationRunning = ref(false)
+const verificationError = ref('')
+const verificationReport = ref<ModelVerificationReport | null>(null)
+const verificationLevels = computed(() => [
+  { value: 'low', label: t('admin.accounts.modelTest.levelLow') },
+  { value: 'medium', label: t('admin.accounts.modelTest.levelMedium') },
+  { value: 'high', label: t('admin.accounts.modelTest.levelHigh') }
+])
 
 const providerLabel = computed(() => {
   const labels: Record<string, string> = {
@@ -307,6 +356,22 @@ const runAllTests = async () => {
   }
   await Promise.all(Array.from({ length: Math.min(3, queue.length) }, worker))
   batchRunning.value = false
+}
+
+const runVerification = async () => {
+  if (verificationRunning.value) return
+  verificationRunning.value = true
+  verificationError.value = ''
+  verificationReport.value = null
+  try {
+    const accountIds = Array.from(new Set(testTargets.value.map(target => target.account.id)))
+    const models = Array.from(new Set(testTargets.value.map(target => target.model.id)))
+    verificationReport.value = await adminAPI.accounts.verifyModels({ account_ids: accountIds, model_id: models[0] || '', level: verificationLevel.value })
+  } catch (error) {
+    verificationError.value = error instanceof Error ? error.message : t('admin.accounts.modelTest.verificationFailed')
+  } finally {
+    verificationRunning.value = false
+  }
 }
 
 watch(

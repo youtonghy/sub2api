@@ -139,6 +139,43 @@ export async function getModelOptions(): Promise<string[]> {
   return data.models ?? []
 }
 
+export interface ModelVerificationProbe {
+  index: number
+  prompt: string
+  status: string
+  matched: boolean
+  response?: string
+  error?: string
+  latency_ms: number
+}
+
+export interface ModelVerificationAccountReport {
+  account_id: number
+  model_id: string
+  authenticity_percent: number
+  matched_probes: number
+  total_probes: number
+  status: string
+  probes: ModelVerificationProbe[]
+}
+
+export interface ModelVerificationReport {
+  model_id: string
+  level: string
+  started_at: string
+  finished_at: string
+  accounts: ModelVerificationAccountReport[]
+}
+
+export async function verifyModels(payload: {
+  account_ids: number[]
+  model_id: string
+  level: 'low' | 'medium' | 'high'
+}): Promise<ModelVerificationReport> {
+  const { data } = await apiClient.post<ModelVerificationReport>('/admin/accounts/model-verification', payload)
+  return data
+}
+
 /**
  * Create new account
  * @param accountData - Account data
@@ -999,6 +1036,7 @@ export const accountsAPI = {
   listWithEtag,
   getById,
   getModelOptions,
+  verifyModels,
   create,
   duplicate,
   update,
