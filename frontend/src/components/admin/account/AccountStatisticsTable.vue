@@ -23,7 +23,13 @@ function statsFor(accountID: number): WindowStats | undefined {
 
 function hasConsumption(account: Account): boolean {
   const stats = statsFor(account.id)
-  return (stats?.standard_cost ?? 0) > 0 || (stats?.cost ?? 0) > 0
+  if (!stats) return false
+  return (
+    (stats.requests ?? 0) > 0 ||
+    (stats.tokens ?? 0) > 0 ||
+    (stats.standard_cost ?? 0) > 0 ||
+    (stats.cost ?? 0) > 0
+  )
 }
 
 function formatPercent(value: number): string {
