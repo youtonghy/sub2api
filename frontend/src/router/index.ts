@@ -543,7 +543,6 @@ const routes: RouteRecordRaw[] = [
       descriptionKey: 'admin.plugins.description'
     }
   },
-  },
   {
     path: '/admin/announcements',
     name: 'AdminAnnouncements',
