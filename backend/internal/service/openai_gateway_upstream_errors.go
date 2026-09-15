@@ -266,10 +266,17 @@ func (s *OpenAIGatewayService) shouldFailoverOpenAIUpstreamResponse(account *Acc
 	if isOpenAIRequestBodyTooLargeError(statusCode, upstreamMsg, upstreamBody) {
 		return true
 	}
-	// OpenAI-compatible providers frequently misclassify upstream capacity,
-	// transport, and gateway failures as HTTP 400. Try every eligible account
-	// before surfacing the 400; exhaustion is handled by the request loop.
-	if statusCode == http.StatusBadRequest {
+	// A missing model is account/provider availability, not a malformed client
+	// request. Keep this unconditional exception inside the OpenAI-compatible
+	// gateway and require an eligible account so Anthropic/Gemini paths retain
+	// their existing opt-in 400 behavior.
+	// A bare forwarding service has no account-selection owner to consume a
+	// failover sentinel. In that mode (used by direct/single-account callers),
+	// preserve the deterministic upstream 400 instead of returning an unwritten
+	// retry signal. Managed gateway instances always have an account repository;
+	// their handler can exclude this account and actually select another one.
+	if s != nil && s.accountRepo != nil && account != nil && account.IsOpenAICompatible() && statusCode == http.StatusBadRequest &&
+		isOpenAICompatibleModelNotFound400(upstreamBody) {
 		return true
 	}
 	if s.shouldFailoverUpstreamError(statusCode) {
@@ -674,12 +681,6 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		reqModel = canonicalOpenAIAccountSchedulingModel(account, reqModel)
 	}
 	shouldDisable := s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, reqModel)
-	// Keep the account out of the remainder of this request when the upstream
-	// explicitly classified an otherwise-400 response as a transient upstream
-	// failure (see shouldFailoverOpenAIUpstreamResponse above).
-	if !shouldDisable && s.shouldFailoverOpenAIUpstreamResponse(account, resp.StatusCode, upstreamMsg, body) {
-		shouldDisable = true
-	}
 	kind := "http_error"
 	if shouldDisable {
 		kind = "failover"

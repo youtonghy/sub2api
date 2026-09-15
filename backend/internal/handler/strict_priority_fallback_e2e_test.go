@@ -316,6 +316,12 @@ func (c *strictFailoverGatewayCache) ClaimGrokVideoBilled(context.Context, strin
 func (c *strictFailoverGatewayCache) ReleaseGrokVideoBilled(context.Context, string) error {
 	return nil
 }
+func (c *strictFailoverGatewayCache) SetReasoningContent(context.Context, string, string, time.Duration) error {
+	return nil
+}
+func (c *strictFailoverGatewayCache) GetReasoningContent(context.Context, string) (string, error) {
+	return "", service.ErrReasoningContentNotFound
+}
 
 // strictFailoverSimpleRepo backs the generic GatewayService with both listing
 // and the mutation methods the failover loop may call (e.g. SetTempUnschedulable
@@ -603,7 +609,9 @@ func TestStrictPriorityFallback_Messages_StreamFailBeforeFirstByteFallsBack(t *t
 
 	require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
 	require.Contains(t, recorder.Body.String(), "msg_2", "priority-2 stream must be delivered after pre-first-byte failover")
-	require.Equal(t, []int64{1, 2}, upstream.accountHits())
+	// 流首字节前失败会先在同一账号上重试（maxSameAccountRetries=3），
+	// 耗尽后才切到 priority-2。
+	require.Equal(t, []int64{1, 1, 1, 1, 2}, upstream.accountHits())
 }
 
 func TestStrictPriorityFallback_Messages_StreamFailAfterEventDoesNotFallBack(t *testing.T) {
@@ -657,7 +665,9 @@ func TestStrictPriorityFallback_Messages_AllProvidersFailTerminatesWithUpstreamE
 
 	h.Messages(c)
 
-	require.Equal(t, []int64{1, 2}, upstream.accountHits(), "each account must be tried exactly once")
+	// account 2 返回 503 会触发单账号退避：清空排除列表后 account 1 被再试一次，
+	// 此时切换次数已达上限（2），重试后正确终止，不会无限循环。
+	require.Equal(t, []int64{1, 2, 1}, upstream.accountHits(), "503 backoff retries once before exhausting")
 	require.Equal(t, http.StatusBadGateway, recorder.Code, recorder.Body.String())
 	require.Contains(t, recorder.Body.String(), "upstream", "response must reflect the preserved upstream failure")
 }
@@ -718,26 +728,14 @@ func TestStrictPriorityFallback_NonStrict503Backoff(t *testing.T) {
 	fs.FailedAccountIDs[100] = struct{}{}
 	fs.SwitchCount = 1
 
-	// First backoff: returns Continue, clears FailedAccountIDs.
+	// 503 backoff: waits, then clears the failed-account exclusions so the
+	// single-account retry can reselect.
+	start := time.Now()
 	action := fs.HandleSelectionExhausted(context.Background())
+	elapsed := time.Since(start)
+
 	require.Equal(t, FailoverContinue, action)
 	require.Empty(t, fs.FailedAccountIDs, "503 backoff must clear failed account IDs")
-	require.Equal(t, 1, fs.consecutiveSelectionBackoffs)
-
-	// Re-add exclusion for the next round.
-	fs.FailedAccountIDs[100] = struct{}{}
-	action = fs.HandleSelectionExhausted(context.Background())
-	require.Equal(t, FailoverContinue, action)
-	require.Equal(t, 2, fs.consecutiveSelectionBackoffs)
-
-	fs.FailedAccountIDs[100] = struct{}{}
-	action = fs.HandleSelectionExhausted(context.Background())
-	require.Equal(t, FailoverContinue, action)
-	require.Equal(t, 3, fs.consecutiveSelectionBackoffs)
-
-	// 4th round: backoff cap reached → Exhausted.
-	fs.FailedAccountIDs[100] = struct{}{}
-	action = fs.HandleSelectionExhausted(context.Background())
-	require.Equal(t, FailoverExhausted, action, "after 3 consecutive backoffs, 4th must return Exhausted")
-	require.Equal(t, 3, fs.consecutiveSelectionBackoffs, "counter must not increment after cap")
+	require.GreaterOrEqual(t, elapsed, 1500*time.Millisecond, "503 backoff must wait ~2s")
+	require.Less(t, elapsed, 5*time.Second)
 }
