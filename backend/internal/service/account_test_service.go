@@ -3340,6 +3340,7 @@ type ModelVerificationAccountReport struct {
 	Verdict                  string                   `json:"verdict,omitempty"`
 	FingerprintModel         string                   `json:"fingerprint_model,omitempty"`
 	FingerprintClaimMismatch bool                     `json:"fingerprint_claim_mismatch,omitempty"`
+	TestedAt                 time.Time                `json:"tested_at,omitempty"`
 }
 
 type ModelVerificationReport struct {
@@ -3769,7 +3770,7 @@ func (s *AccountTestService) persistModelVerificationReport(ctx context.Context,
 		"verdict":                    report.Verdict,
 		"fingerprint_model":          report.FingerprintModel,
 		"fingerprint_claim_mismatch": report.FingerprintClaimMismatch,
-		"tested_at":                  time.Now().UTC(),
+		"tested_at":                  report.TestedAt,
 	}
 	history = append(history, entry)
 	if len(history) > 20 {
@@ -3964,6 +3965,7 @@ func (s *AccountTestService) VerifyModels(ctx context.Context, accountIDs []int6
 			}
 			thresholds := map[string]map[string]float64{"low": {"gpt-5.6-sol": 54, "gpt-5.6-terra": 58, "gpt-5.6-luna": 77}, "medium": {"gpt-5.6-sol": 82, "gpt-5.6-terra": 84, "gpt-5.6-luna": 97}, "high": {"gpt-5.6-sol": 98, "gpt-5.6-terra": 97, "gpt-5.6-luna": 99}}
 			fingerprintStrong := false
+			ar.TestedAt = time.Now().UTC()
 			if values := thresholds[level]; len(ar.ModelScores) == 3 && fingerprintComplete {
 				winner, winners := "", 0
 				for candidate, score := range ar.ModelScores {

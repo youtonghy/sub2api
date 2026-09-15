@@ -170,6 +170,7 @@ export interface ModelVerificationAccountReport {
   verdict?: string
   fingerprint_model?: string
   fingerprint_claim_mismatch?: boolean
+  tested_at?: string
 }
 
 export interface ModelVerificationReport {

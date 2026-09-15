@@ -67,7 +67,7 @@
       </div>
 
       <div v-if="verificationOnly && verificationError" class="mx-5 mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">{{ verificationError }}</div>
-      <section v-if="verificationOnly && savedVerificationReports.length" class="mx-5 my-4 rounded border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-900/50 dark:bg-primary-900/10">
+      <section v-if="verificationOnly && selectedAccountId !== 'all' && savedVerificationReports.length" class="mx-5 my-4 rounded border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-900/50 dark:bg-primary-900/10">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 class="font-semibold text-gray-900 dark:text-white">{{ t('admin.accounts.modelTest.verificationReport') }}</h3>
@@ -81,7 +81,10 @@
           <div class="grid gap-2 md:grid-cols-2">
           <div v-for="result in modelReport.accounts" :key="`${modelReport.model_id}:${result.account_id}`" class="border border-gray-200 bg-white p-3 dark:border-dark-600 dark:bg-dark-800">
             <div class="flex items-center justify-between gap-2">
-              <span class="font-medium text-gray-800 dark:text-gray-100">#{{ result.account_id }}</span>
+              <div>
+                <span class="font-medium text-gray-800 dark:text-gray-100">#{{ result.account_id }}</span>
+                <div v-if="result.tested_at" class="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">{{ t('admin.accounts.modelTest.testedAt') }}: {{ formatVerificationTime(result.tested_at) }}</div>
+              </div>
               <span class="text-lg font-bold" :class="result.authenticity_percent >= 80 ? 'text-green-600' : result.authenticity_percent > 0 ? 'text-amber-600' : 'text-red-600'">{{ result.authenticity_percent.toFixed(0) }}%</span>
             </div>
             <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ result.matched_probes }}/{{ result.total_probes }} {{ t('admin.accounts.modelTest.probesMatched') }} · {{ result.status }}</div>
@@ -211,7 +214,24 @@ const verificationRunning = ref(false)
 const verificationError = ref('')
 const verificationReport = ref<ModelVerificationReport | null>(null)
 const verificationHistory = ref<Record<string, ModelVerificationReport>>({})
-const savedVerificationReports = computed(() => Object.values(verificationHistory.value))
+const savedVerificationReports = computed(() => {
+  if (selectedAccountId.value === 'all') return []
+  const accountID = Number(selectedAccountId.value)
+  return Object.values(verificationHistory.value)
+    .map(report => ({
+      ...report,
+      models: report.models
+        .map(model => ({ ...model, accounts: model.accounts.filter(account => account.account_id === accountID) }))
+        .filter(model => model.accounts.length > 0)
+    }))
+    .filter(report => report.models.length > 0)
+})
+const formatVerificationTime = (value?: string) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString()
+}
 const verificationLevels = computed(() => [
   { value: 'low', label: t('admin.accounts.modelTest.levelLow') },
   { value: 'medium', label: t('admin.accounts.modelTest.levelMedium') },
@@ -353,7 +373,8 @@ const loadModels = async () => {
             juice_state: entry.juice_state ? String(entry.juice_state) : undefined,
             verdict: entry.verdict ? String(entry.verdict) : undefined,
             fingerprint_model: entry.fingerprint_model ? String(entry.fingerprint_model) : undefined,
-            fingerprint_claim_mismatch: Boolean(entry.fingerprint_claim_mismatch)
+            fingerprint_claim_mismatch: Boolean(entry.fingerprint_claim_mismatch),
+            tested_at: entry.tested_at ? String(entry.tested_at) : undefined
           })
         })
         Object.entries(grouped).forEach(([modelID, accounts]) => {

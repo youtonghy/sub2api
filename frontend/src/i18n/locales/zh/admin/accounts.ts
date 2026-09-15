@@ -37,7 +37,7 @@ export default {
         scope: '测试账号范围',
         allAccounts: '全部账号',
         models: '指定模型（不选择则测试全部）',
-        verificationLevel: '验证强度', levelLow: '快速（19次请求）', levelMedium: '标准（49次请求）', levelHigh: '严格（158次请求）', verifyAuthenticity: '验证真实性', verifying: '验证中...', verificationReport: '模型真实性报告', accountsChecked: '个账号', probesMatched: '项有效', viewEvidence: '查看证据', verificationFailed: '真实性验证失败', claimMismatch: '与申报模型不一致',
+        verificationLevel: '验证强度', levelLow: '快速（19次请求）', levelMedium: '标准（49次请求）', levelHigh: '严格（158次请求）', verifyAuthenticity: '验证真实性', verifying: '验证中...', verificationReport: '模型真实性报告', accountsChecked: '个账号', probesMatched: '项有效', testedAt: '测试时间', viewEvidence: '查看证据', verificationFailed: '真实性验证失败', claimMismatch: '与申报模型不一致',
         verdicts: {
           juice_pass_fingerprint_strong: 'Juice 通过；行为指纹强烈匹配',
           juice_pass_fingerprint_unclear: 'Juice 通过；行为指纹证据不明确',

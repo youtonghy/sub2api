@@ -37,7 +37,7 @@ export default {
         scope: 'Account scope',
         allAccounts: 'All accounts',
         models: 'Selected models (none means all)',
-        verificationLevel: 'Verification level', levelLow: 'Quick (19 requests)', levelMedium: 'Standard (49 requests)', levelHigh: 'Strict (158 requests)', verifyAuthenticity: 'Verify authenticity', verifying: 'Verifying...', verificationReport: 'Model authenticity report', accountsChecked: 'accounts checked', probesMatched: 'valid checks', viewEvidence: 'View evidence', verificationFailed: 'Verification failed', claimMismatch: 'claimed model mismatch',
+        verificationLevel: 'Verification level', levelLow: 'Quick (19 requests)', levelMedium: 'Standard (49 requests)', levelHigh: 'Strict (158 requests)', verifyAuthenticity: 'Verify authenticity', verifying: 'Verifying...', verificationReport: 'Model authenticity report', accountsChecked: 'accounts checked', probesMatched: 'valid checks', testedAt: 'Tested at', viewEvidence: 'View evidence', verificationFailed: 'Verification failed', claimMismatch: 'claimed model mismatch',
         verdicts: {
           juice_pass_fingerprint_strong: 'Juice passed; behavioral fingerprint strongly matched',
           juice_pass_fingerprint_unclear: 'Juice passed; behavioral fingerprint unclear',
