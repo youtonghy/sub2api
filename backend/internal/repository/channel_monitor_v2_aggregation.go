@@ -267,6 +267,8 @@ WITH dedup AS (
       OR current_error.error_owner = 'provider' OR current_error.upstream_status_code IS NOT NULL) AS upstream_affected,
     CASE WHEN jsonb_typeof(current_error.upstream_errors) = 'array' THEN jsonb_array_length(current_error.upstream_errors) ELSE 0 END AS upstream_attempts
   FROM ops_error_logs current_error
+  LEFT JOIN groups g ON g.id = current_error.group_id
+  LEFT JOIN accounts a ON a.id = current_error.account_id
   WHERE (
       (NULLIF(current_error.request_id, '') IS NULL AND current_error.created_at >= $1 AND current_error.created_at < $2)
       OR (
@@ -277,7 +279,7 @@ WITH dedup AS (
     )
     AND NOT current_error.is_count_tokens
     AND (COALESCE(current_error.status_code, 0) >= 400 OR current_error.error_type = 'cyber_policy')
-  ORDER BY COALESCE(NULLIF(request_id, ''), 'error:' || id::text), created_at DESC, id DESC
+  ORDER BY COALESCE(NULLIF(current_error.request_id, ''), 'error:' || current_error.id::text), current_error.created_at DESC, current_error.id DESC
 ), classified AS (
   SELECT *, CASE
     -- Keep in lockstep with service.ClassifyChannelMonitorV2Error needles.
@@ -393,11 +395,21 @@ func sameFixedRollupBucket(start, end time.Time, seconds int) bool {
 	return start.Truncate(interval).Equal(end.Add(-time.Nanosecond).Truncate(interval))
 }
 
+// PostgreSQL interprets a TIMESTAMPTZ literal without an explicit offset in
+// the current session timezone. Keep date_bin's origin fixed in UTC so bucket
+// boundaries do not shift when the database session runs in Asia/Shanghai (or
+// any other non-UTC timezone).
+const channelMonitorV2DateBinOrigin = "TIMESTAMPTZ '1970-01-01 00:00:00+00'"
+
+func channelMonitorV2DateBinExpr(column string) string {
+	return "date_bin($1::interval," + column + "," + channelMonitorV2DateBinOrigin + ")"
+}
+
 const channelMonitorV2FixedRollupBoundsSQL = `
 WITH bounds AS (
   SELECT
-    date_bin($1::interval, $3::timestamptz, TIMESTAMPTZ '1970-01-01') AS start_at,
-    date_bin($1::interval, $4::timestamptz - INTERVAL '1 microsecond', TIMESTAMPTZ '1970-01-01') + $1::interval AS end_at
+    date_bin($1::interval, $3::timestamptz, ` + channelMonitorV2DateBinOrigin + `) AS start_at,
+    date_bin($1::interval, $4::timestamptz - INTERVAL '1 microsecond', ` + channelMonitorV2DateBinOrigin + `) + $1::interval AS end_at
 )`
 
 const channelMonitorV2FixedRollupDeleteSQL = channelMonitorV2FixedRollupBoundsSQL + `
@@ -415,7 +427,7 @@ INSERT INTO channel_monitor_v2_metrics_rollup (
   duration_count, computed_at
 )
 ` + channelMonitorV2FixedRollupBoundsSQL + `
-SELECT date_bin($1::interval, m.bucket_start, TIMESTAMPTZ '1970-01-01'), $2::integer,
+SELECT date_bin($1::interval, m.bucket_start, ` + channelMonitorV2DateBinOrigin + `), $2::integer,
        platform, group_id, model, SUM(success_requests), SUM(error_requests),
        SUM(upstream_affected_requests), SUM(upstream_attempt_count), SUM(input_tokens),
        SUM(output_tokens), SUM(cache_creation_tokens), SUM(cache_read_tokens),
@@ -431,7 +443,7 @@ INSERT INTO channel_monitor_v2_user_metrics_rollup (
   ttft_sum_ms, ttft_count, duration_sum_ms, duration_count, computed_at
 )
 ` + channelMonitorV2FixedRollupBoundsSQL + `
-SELECT date_bin($1::interval, m.bucket_start, TIMESTAMPTZ '1970-01-01'), $2::integer,
+SELECT date_bin($1::interval, m.bucket_start, ` + channelMonitorV2DateBinOrigin + `), $2::integer,
        platform, group_id, model, user_id, SUM(success_requests), SUM(error_requests),
        SUM(input_tokens), SUM(output_tokens), SUM(cache_creation_tokens), SUM(cache_read_tokens),
        SUM(ttft_sum_ms), SUM(ttft_count), SUM(duration_sum_ms), SUM(duration_count), NOW()
@@ -444,7 +456,7 @@ INSERT INTO channel_monitor_v2_latency_histograms_rollup (
   bucket_start, bucket_seconds, platform, group_id, model, user_id, metric, upper_bound_ms, sample_count
 )
 ` + channelMonitorV2FixedRollupBoundsSQL + `
-SELECT date_bin($1::interval, h.bucket_start, TIMESTAMPTZ '1970-01-01'), $2::integer,
+SELECT date_bin($1::interval, h.bucket_start, ` + channelMonitorV2DateBinOrigin + `), $2::integer,
        platform, group_id, model, user_id, metric, upper_bound_ms, SUM(sample_count)
 FROM channel_monitor_v2_latency_histograms_1m h, bounds
 WHERE h.bucket_start >= bounds.start_at AND h.bucket_start < bounds.end_at
@@ -455,7 +467,7 @@ INSERT INTO channel_monitor_v2_error_metrics_rollup (
   bucket_start, bucket_seconds, platform, group_id, model, error_category, taxonomy_version, error_requests
 )
 ` + channelMonitorV2FixedRollupBoundsSQL + `
-SELECT date_bin($1::interval, e.bucket_start, TIMESTAMPTZ '1970-01-01'), $2::integer,
+SELECT date_bin($1::interval, e.bucket_start, ` + channelMonitorV2DateBinOrigin + `), $2::integer,
        platform, group_id, model, error_category, taxonomy_version, SUM(error_requests)
 FROM channel_monitor_v2_error_metrics_1m e, bounds
 WHERE e.bucket_start >= bounds.start_at AND e.bucket_start < bounds.end_at
