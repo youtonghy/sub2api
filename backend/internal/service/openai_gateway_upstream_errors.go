@@ -266,17 +266,16 @@ func (s *OpenAIGatewayService) shouldFailoverOpenAIUpstreamResponse(account *Acc
 	if isOpenAIRequestBodyTooLargeError(statusCode, upstreamMsg, upstreamBody) {
 		return true
 	}
-	// A missing model is account/provider availability, not a malformed client
-	// request. Keep this unconditional exception inside the OpenAI-compatible
-	// gateway and require an eligible account so Anthropic/Gemini paths retain
-	// their existing opt-in 400 behavior.
-	// A bare forwarding service has no account-selection owner to consume a
-	// failover sentinel. In that mode (used by direct/single-account callers),
-	// preserve the deterministic upstream 400 instead of returning an unwritten
-	// retry signal. Managed gateway instances always have an account repository;
-	// their handler can exclude this account and actually select another one.
+	// A missing model, or a field the upstream provider's request schema does
+	// not understand, is account/provider availability rather than a malformed
+	// client request: another account behind a different compatible provider
+	// usually accepts the very same body (e.g. Responses reasoning.summary).
+	// Require an eligible account so Anthropic/Gemini paths keep their existing
+	// opt-in 400 behavior, and so a bare forwarding service (no account-selection
+	// owner) still surfaces the deterministic upstream 400 instead of an
+	// unwritten retry signal.
 	if s != nil && s.accountRepo != nil && account != nil && account.IsOpenAICompatible() && statusCode == http.StatusBadRequest &&
-		isOpenAICompatibleModelNotFound400(upstreamBody) {
+		(isOpenAICompatibleModelNotFound400(upstreamBody) || isOpenAICompatibleUnsupportedField400(upstreamBody)) {
 		return true
 	}
 	if s.shouldFailoverUpstreamError(statusCode) {
@@ -304,6 +303,42 @@ func isOpenAICompatibleModelNotFound400(respBody []byte) bool {
 // is an account-specific missing-model response eligible for failover.
 func IsOpenAICompatibleModelNotFound400(respBody []byte) bool {
 	return isOpenAICompatibleModelNotFound400(respBody)
+}
+
+// isOpenAICompatibleUnsupportedField400 reports a 400 caused by the upstream
+// provider's request schema rejecting a field the client/gateway legitimately
+// sent (Go's `json: unknown field "…"`, Pydantic's extra_forbidden, etc.).
+//
+// This is a provider capability gap, not a malformed client request: two
+// OpenAI-compatible providers behind the same group frequently disagree about
+// optional fields (for example Responses reasoning.summary), and the same body
+// succeeds on the next account. Failover is therefore the correct recovery,
+// while a genuine client-schema error (a bad function parameter, an invalid
+// input type) matches none of these markers and is still surfaced verbatim.
+func isOpenAICompatibleUnsupportedField400(respBody []byte) bool {
+	msg := strings.ToLower(strings.TrimSpace(extractUpstreamErrorMessage(respBody)))
+	if msg == "" && !gjson.ValidBytes(respBody) {
+		msg = strings.ToLower(strings.TrimSpace(string(respBody)))
+	}
+	if msg == "" {
+		return false
+	}
+	for _, marker := range []string{
+		"unknown field",
+		"unsupported field",
+		"unrecognized field",
+		"unexpected field",
+		"unknown parameter",
+		"unsupported parameter",
+		"unrecognized parameter",
+		"extra inputs are not permitted",
+		"extra_forbidden",
+	} {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // OpenAIRequestBodyTooLargeClientMessage is the fixed downstream message used
@@ -681,6 +716,15 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		reqModel = canonicalOpenAIAccountSchedulingModel(account, reqModel)
 	}
 	shouldDisable := s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, reqModel)
+	// Keep the account out of the remainder of this request when the upstream
+	// rejected an otherwise-400 request for a provider-capability reason (a
+	// missing model, or a field this provider's schema does not understand)
+	// that another compatible account may accept. Scoped to 400 so 401/402/403/
+	// 429 keep their existing mapping, and handled without blocking the account:
+	// the account is healthy, only this provider's request schema differs.
+	if !shouldDisable && resp.StatusCode == http.StatusBadRequest && s.shouldFailoverOpenAIUpstreamResponse(account, resp.StatusCode, upstreamMsg, body) {
+		shouldDisable = true
+	}
 	kind := "http_error"
 	if shouldDisable {
 		kind = "failover"

@@ -88,6 +88,31 @@ func TestOpenAICompatibleModelNotFound400WithoutManagedCandidatesRemainsTerminal
 	))
 }
 
+// 兼容供应商之间的请求 schema 松紧不一致：同一个 body 在一个账号上因为多带了
+// 一个可选字段（如 Responses reasoning.summary）被 400 拒绝，在另一个账号上却能
+// 正常成功。这类「供应商能力缺口」必须换号重试；而真正的客户端 schema 错误
+// （函数参数非法等）仍要原样回给客户端。
+func TestOpenAICompatibleUnsupportedField400FailsOver(t *testing.T) {
+	svc := &OpenAIGatewayService{accountRepo: &modelNotFoundManagedAccountRepo{}}
+	compatible := &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+	nonCompatible := &Account{Platform: PlatformAnthropic, Type: AccountTypeAPIKey}
+
+	unsupported := []byte(`{"error":{"message":"json: unknown field \"summary\" Request id: 021789499163251b71a54db2718758900f1b5b7cc45ea65618ca9 (request id: 01M2K7CGF8HAC4PKGD6M1F42TE)","type":"packy_BadRequest","param":"","code":"InvalidParameter"}}`)
+	deterministic := []byte(`{"error":{"type":"invalid_request_error","code":"invalid_function_parameters","param":"input[8].tools[1].tools[2].parameters","message":"Invalid schema for function 'automation_update': schema must be a JSON Schema of 'type: \"object\"', got 'type: \"None\"'."}}`)
+
+	require.True(t, svc.shouldFailoverOpenAIUpstreamResponse(compatible, http.StatusBadRequest, `json: unknown field "summary"`, unsupported),
+		"a provider capability gap must fail over to another account")
+	require.False(t, svc.shouldFailoverOpenAIUpstreamResponse(nonCompatible, http.StatusBadRequest, `json: unknown field "summary"`, unsupported),
+		"non-OpenAI-compatible paths keep their existing opt-in 400 behavior")
+	require.False(t, svc.shouldFailoverOpenAIUpstreamResponse(nil, http.StatusBadRequest, `json: unknown field "summary"`, unsupported),
+		"a missing account cannot be failed over")
+	require.False(t, svc.shouldFailoverOpenAIUpstreamResponse(compatible, http.StatusBadRequest, "Invalid schema for function", deterministic),
+		"a deterministic client-schema error must not fail over")
+
+	// 没有账号选择权的裸转发 service 必须保持确定性 400，而不是返回未写入的重试信号。
+	require.False(t, (&OpenAIGatewayService{}).shouldFailoverOpenAIUpstreamResponse(compatible, http.StatusBadRequest, `json: unknown field "summary"`, unsupported))
+}
+
 func TestFailoverOpenAIUpstreamHTTPError_ModelNotFoundIsNextAccountEligible(t *testing.T) {
 	c, _ := newOpenAIUpstreamErrorTestContext(t)
 	svc := &OpenAIGatewayService{cfg: &config.Config{}, accountRepo: &modelNotFoundManagedAccountRepo{}}
