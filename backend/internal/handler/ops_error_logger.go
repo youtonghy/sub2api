@@ -1146,6 +1146,9 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 		if shouldSkipOpsErrorLog(c.Request.Context(), ops, parsed.Message, string(body), c.Request.URL.Path) {
 			return
 		}
+		if shouldSkipOpsClientClosed(c, ops, status) {
+			return
+		}
 
 		apiKey := getOpsAPIKey(c)
 
@@ -2211,12 +2214,6 @@ func classifyOpsSeverity(errType string, status int) string {
 
 func classifyOpsErrorLog(c *gin.Context, errType, message, code string, status int) (phase string, isBusinessLimited bool, errorOwner string, errorSource string) {
 	phase = classifyOpsPhase(errType, message, code)
-	// 499 is the gateway's explicit client-disconnect status. A request may
-	// have accumulated upstream attempt telemetry before the client vanished,
-	// but that must not turn a client cancellation into a provider SLA failure.
-	if status == statusClientClosedRequest || strings.Contains(strings.ToLower(message), "context canceled") {
-		return "request", true, "client", "client_request"
-	}
 	routingCapacityLimited := isOpsRoutingCapacityLimited(c)
 	clientBusinessLimited := service.HasOpsClientBusinessLimited(c)
 	localModelConfiguration := clientBusinessLimited && service.OpsClientBusinessLimitedReason(c) == service.OpsClientBusinessLimitedReasonLocalModelConfiguration
@@ -2495,6 +2492,21 @@ func shouldSkipOpsErrorLog(ctx context.Context, ops *service.OpsService, message
 	}
 
 	return false
+}
+
+// shouldSkipOpsClientClosed 按 IgnoreContextCanceled 过滤纯客户端取消的 499。
+// 499 表示客户端在响应提交前断开（见 failoverClientGone），通常不带
+// "context canceled" 文案，shouldSkipOpsErrorLog 的文本过滤命中不了。
+// 本次请求未观察到上游错误时是纯客户端取消；已有上游错误的 499 表示上游失败后
+// 客户端没等到换号结果就离开，仍按上游失败落库。
+func shouldSkipOpsClientClosed(c *gin.Context, ops *service.OpsService, status int) bool {
+	if status != statusClientClosedRequest || ops == nil {
+		return false
+	}
+	if !ops.OpsAdvancedSettingsSnapshot().IgnoreContextCanceled {
+		return false
+	}
+	return !hasOpsUpstreamErrorContext(c)
 }
 
 // shouldSkipOpsErrorLogForCyber：cyber_policy 命中的请求由 recordCyberPolicyIfMarked

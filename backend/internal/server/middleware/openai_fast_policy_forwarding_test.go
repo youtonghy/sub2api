@@ -176,6 +176,10 @@ func (r *openAIFastPolicyForwardingSettingRepo) GetValue(context.Context, string
 	return r.value, nil
 }
 
+func (r *openAIFastPolicyForwardingSettingRepo) GetMultiple(_ context.Context, _ []string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 type openAIFastPolicyForwardingHTTPUpstream struct {
 	client *http.Client
 }

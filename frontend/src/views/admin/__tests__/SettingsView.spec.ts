@@ -202,8 +202,9 @@ vi.mock("vue-i18n", async () => {
     "admin.settings.openaiExperimentalScheduler.lowRatePriorityTitle": "低倍率优先",
     "admin.settings.openaiExperimentalScheduler.lowRatePriorityDescription": "开启后仍先比较账号优先级；同等优先级内严格按已探测计费倍率从低到高尝试，低倍率不可用时才回退到更高倍率。该严格顺序优先于实验调度评分。",
     "admin.settings.openaiExperimentalScheduler.oauthRateTitle": "OAuth 调度参考倍率",
-    "admin.settings.openaiExperimentalScheduler.oauthRatePriorityDescription": "同一分组同时包含 API Key 和 OAuth 账号时，OAuth 账号按此倍率与已探测的 API Key 计费倍率一起排序。",
-    "admin.settings.openaiExperimentalScheduler.oauthRateWeightedDescription": "同一分组同时包含 API Key 和 OAuth 账号时，计算“计费倍率”得分时，OAuth 账号按此倍率参与计算。",
+    "admin.settings.openaiExperimentalScheduler.oauthRatePriorityDescription": "OAuth 账号按此参考倍率参与低倍率优先排序；留空时使用各自的账号倍率。API Key 账号优先使用有效探测倍率，无有效探测时使用账号倍率。",
+    "admin.settings.openaiExperimentalScheduler.oauthRateWeightedDescription": "计算“计费倍率”得分时，OAuth 账号使用此参考倍率；留空时使用各自的账号倍率。API Key 账号优先使用有效探测倍率，无有效探测时使用账号倍率。",
+    "admin.settings.openaiExperimentalScheduler.oauthRateInvalid": "OAuth 调度参考倍率必须是非负数字，或留空以使用账号倍率。",
     "admin.settings.openaiExperimentalScheduler.stickyWeightedTitle": "粘性加权",
     "admin.settings.openaiExperimentalScheduler.stickyWeightedDescription": "开启后 previous_response_id 和 session_hash 粘性进入高级调度打分；关闭时仍按旧逻辑硬命中粘性账号。",
     "admin.settings.openaiExperimentalScheduler.subscriptionPriorityTitle": "订阅优先",
@@ -1461,6 +1462,54 @@ describe("admin SettingsView payment visible method controls", () => {
     });
   });
 
+  it.each([false, true])("clears the OAuth rate without losing zero (weighted=%s)", async (weighted) => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      openai_low_upstream_rate_priority_enabled: !weighted,
+      openai_advanced_scheduler_enabled: weighted,
+      openai_oauth_scheduling_rate_multiplier: 0.7,
+    });
+    const wrapper = mountView();
+    await flushPromises();
+    const input = wrapper.get('[data-testid="openai-oauth-scheduling-rate-multiplier"]');
+    expect(input.attributes("required")).toBeUndefined();
+    await input.setValue("");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenLastCalledWith(expect.objectContaining({
+      openai_oauth_scheduling_rate_multiplier: null,
+    }));
+    await input.setValue("0");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenLastCalledWith(expect.objectContaining({
+      openai_oauth_scheduling_rate_multiplier: 0,
+    }));
+    updateSettings.mockClear();
+    await input.setValue("-1");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).not.toHaveBeenCalled();
+    expect(showError).toHaveBeenCalledWith("OAuth 调度参考倍率必须是非负数字，或留空以使用账号倍率。");
+  });
+
+  it("loads and preserves an explicitly cleared OAuth rate", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      openai_advanced_scheduler_enabled: true,
+      openai_oauth_scheduling_rate_multiplier: null,
+    });
+    const wrapper = mountView();
+    await flushPromises();
+    const input = wrapper.get<HTMLInputElement>('[data-testid="openai-oauth-scheduling-rate-multiplier"]');
+    expect(input.element.value).toBe("");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({
+      openai_oauth_scheduling_rate_multiplier: null,
+    }));
+  });
+
   it("places and explains rate controls for both scheduling modes", async () => {
     const wrapper = mountView();
 
@@ -1473,7 +1522,7 @@ describe("admin SettingsView payment visible method controls", () => {
     await lowRateToggle.setValue(true);
     const priorityModeText = wrapper.text();
     expect(priorityModeText).toContain(
-      "同一分组同时包含 API Key 和 OAuth 账号时，OAuth 账号按此倍率与已探测的 API Key 计费倍率一起排序。",
+      "OAuth 账号按此参考倍率参与低倍率优先排序；留空时使用各自的账号倍率。",
     );
     expect(priorityModeText.indexOf("低倍率优先")).toBeLessThan(
       priorityModeText.indexOf("OAuth 调度参考倍率"),
@@ -1501,21 +1550,21 @@ describe("admin SettingsView payment visible method controls", () => {
       .setValue(true);
     expect(
       wrapper.find('[data-testid="openai-low-rate-priority-toggle"]').exists(),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       wrapper.find('[data-testid="openai-oauth-scheduling-rate-multiplier"]').exists(),
     ).toBe(true);
     const weightedModeText = wrapper.text();
     expect(weightedModeText).toContain(
-      "同一分组同时包含 API Key 和 OAuth 账号时，OAuth 账号按此倍率与已探测的 API Key 计费倍率一起排序。",
+      "计算“计费倍率”得分时，OAuth 账号使用此参考倍率；留空时使用各自的账号倍率。",
     );
     expect(weightedModeText).not.toContain(
-      "计算“计费倍率”得分时，OAuth 账号按此倍率参与计算。",
-    );
-    expect(weightedModeText.indexOf("OAuth 调度参考倍率")).toBeLessThan(
-      weightedModeText.indexOf("OpenAI 实验调度策略"),
+      "OAuth 账号按此参考倍率参与低倍率优先排序；",
     );
     expect(weightedModeText.indexOf("订阅优先")).toBeLessThan(
+      weightedModeText.indexOf("OAuth 调度参考倍率"),
+    );
+    expect(weightedModeText.indexOf("OAuth 调度参考倍率")).toBeLessThan(
       weightedModeText.indexOf("调度权值覆盖"),
     );
     expect(weightedModeText).toContain("计费倍率");

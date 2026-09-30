@@ -643,6 +643,9 @@ export interface SystemSettings {
   openai_codex_client_version: string;
   openai_codex_client_version_synced: string;
   openai_codex_version_auto_sync_enabled: boolean;
+  claude_code_client_version: string;
+  claude_code_client_version_synced: string;
+  claude_code_version_auto_sync_enabled: boolean;
   // codex_cli_only 加固
   min_codex_version: string;
   max_codex_version: string;
@@ -657,6 +660,7 @@ export interface SystemSettings {
   risk_control_enabled: boolean;
 
   // Cyber session block
+  cyber_policy_user_allowlist: string;
   cyber_session_block_enabled: boolean;
   cyber_session_block_ttl_seconds: number;
 
@@ -687,7 +691,8 @@ export interface SystemSettings {
   payment_visible_method_alipay_enabled?: boolean;
   payment_visible_method_wxpay_enabled?: boolean;
   openai_low_upstream_rate_priority_enabled?: boolean;
-  openai_oauth_scheduling_rate_multiplier?: number;
+  /** null means OAuth accounts use their individual account rates. */
+  openai_oauth_scheduling_rate_multiplier?: number | null;
   openai_advanced_scheduler_enabled?: boolean;
   openai_advanced_scheduler_sticky_weighted_enabled?: boolean;
   openai_advanced_scheduler_subscription_priority_enabled?: boolean;
@@ -966,6 +971,8 @@ export interface UpdateSettingsRequest {
   openai_codex_user_agent?: string;
   openai_codex_client_version?: string;
   openai_codex_version_auto_sync_enabled?: boolean;
+  claude_code_client_version?: string;
+  claude_code_version_auto_sync_enabled?: boolean;
   // codex_cli_only 加固
   min_codex_version?: string;
   max_codex_version?: string;
@@ -978,6 +985,7 @@ export interface UpdateSettingsRequest {
   risk_control_enabled?: boolean;
 
   // Cyber session block
+  cyber_policy_user_allowlist?: string;
   cyber_session_block_enabled?: boolean;
   cyber_session_block_ttl_seconds?: number;
 
@@ -1008,7 +1016,8 @@ export interface UpdateSettingsRequest {
   payment_visible_method_alipay_enabled?: boolean;
   payment_visible_method_wxpay_enabled?: boolean;
   openai_low_upstream_rate_priority_enabled?: boolean;
-  openai_oauth_scheduling_rate_multiplier?: number;
+  /** Omit to preserve the override; null clears it; zero is an explicit rate. */
+  openai_oauth_scheduling_rate_multiplier?: number | null;
   openai_advanced_scheduler_enabled?: boolean;
   openai_advanced_scheduler_sticky_weighted_enabled?: boolean;
   openai_advanced_scheduler_subscription_priority_enabled?: boolean;
