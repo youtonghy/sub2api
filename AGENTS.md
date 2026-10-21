@@ -16,6 +16,6 @@ This requirement is mandatory even when a brief outage would otherwise be accept
 
 ## Build Resource Limits
 
-- All future Docker/BuildKit image builds must be constrained to a maximum of 4 GiB memory.
-- Keep compiler parallelism bounded so the build cannot exhaust host memory and impact PostgreSQL.
-- Do not use an unbounded host Docker builder for production image builds; configure the builder cgroup with the 4 GiB limit.
+- All future Docker/BuildKit image builds must be constrained to a maximum of 8 GiB memory and 3 CPUs.
+- Keep compiler parallelism bounded (≤ 3 CPUs) so the build cannot exhaust host memory and impact PostgreSQL.
+- Do not use an unbounded host Docker builder for production image builds; configure the builder cgroup with the 8 GiB / 3 CPU limit.
