@@ -609,9 +609,9 @@ func TestStrictPriorityFallback_Messages_StreamFailBeforeFirstByteFallsBack(t *t
 
 	require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
 	require.Contains(t, recorder.Body.String(), "msg_2", "priority-2 stream must be delivered after pre-first-byte failover")
-	// 流首字节前失败会先在同一账号上重试（maxSameAccountRetries=3），
-	// 耗尽后才切到 priority-2。
-	require.Equal(t, []int64{1, 1, 1, 1, 2}, upstream.accountHits())
+	// 严格优先级默认不在原账号上重试（strict_priority_retry_count=0）：
+	// 首次可恢复错误即按 Priority 升序回退到 priority-2。
+	require.Equal(t, []int64{1, 2}, upstream.accountHits())
 }
 
 func TestStrictPriorityFallback_Messages_StreamFailAfterEventDoesNotFallBack(t *testing.T) {

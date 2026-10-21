@@ -363,6 +363,35 @@ func TestGatewayService_TempUnscheduleCommittedStreamFailure_StrictPriorityCoold
 	require.Equal(t, 1, repo.tempCalls, "committed stream failure must cool the strict-priority source for the next request")
 }
 
+// TestGatewayService_TempUnscheduleStrictPriorityFailure_IgnoresRequestScopedErrors
+// 校验严格优先级冷却不会把请求级瞬时故障算到账号头上：这类错误就算配置了冷却
+// 时长也不能把账号整段摘掉，否则一次客户端问题会连带停掉健康的 provider。
+func TestGatewayService_TempUnscheduleStrictPriorityFailure_IgnoresRequestScopedErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  *UpstreamFailoverError
+	}{
+		{name: "request scoped transient", err: &UpstreamFailoverError{StatusCode: http.StatusInternalServerError, RequestScopedTransient: true}},
+		{name: "credential failure not account scoped", err: &UpstreamFailoverError{StatusCode: http.StatusUnauthorized, Stage: GatewayFailureStageAccountAuth, Scope: GatewayFailureScopeProvider}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &gatewayForwardErrorPolicyRepoStub{}
+			svc := &GatewayService{accountRepo: repo}
+			svc.TempUnscheduleStrictPriorityFailure(context.Background(), 60, 5*time.Minute, tc.err)
+			require.Zero(t, repo.tempCalls, "non account-attributed failures must not be cooled down")
+		})
+	}
+}
+
+func TestGatewayService_TempUnscheduleStrictPriorityFailure_AppliesConfiguredCooldown(t *testing.T) {
+	repo := &gatewayForwardErrorPolicyRepoStub{}
+	svc := &GatewayService{accountRepo: repo}
+	svc.TempUnscheduleStrictPriorityFailure(context.Background(), 60, 5*time.Minute, &UpstreamFailoverError{
+		StatusCode: http.StatusServiceUnavailable,
+	})
+	require.Equal(t, 1, repo.tempCalls, "account-attributed 5xx must be cooled down for the configured window")
+}
+
 func TestGatewayService_AnthropicAPIKeyPassthrough_ForwardStreamMissingTerminalPreservesPartialUsage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

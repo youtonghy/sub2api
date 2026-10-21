@@ -1493,9 +1493,11 @@ type TLSProfileConfig struct {
 
 // GatewaySchedulingConfig accounts scheduling configuration.
 type GatewaySchedulingConfig struct {
-	// StrictPriorityRetryCount retries a failed pool-mode account before switching.
+	// StrictPriorityRetryCount 严格优先级回退时在原账号上的重试次数上限（0 表示不重试，
+	// 首次可恢复错误立即回退到下一个优先级账号）。
 	StrictPriorityRetryCount int `mapstructure:"strict_priority_retry_count"`
-	// StrictPriorityCooldownMinutes temporarily removes a failed account after switching.
+	// StrictPriorityCooldownMinutes 换号后对失败账号的冷却时长（分钟）。
+	// 0 表示不覆盖默认短冷却（Anthropic 5xx 且归因于账号时暂摘 20 秒）。
 	StrictPriorityCooldownMinutes int `mapstructure:"strict_priority_cooldown_minutes"`
 	// 粘性会话排队配置
 	StickySessionMaxWaiting  int           `mapstructure:"sticky_session_max_waiting"`

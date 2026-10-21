@@ -783,6 +783,9 @@ func (s *GatewayService) TempUnscheduleUpstreamFailure(ctx context.Context, acco
 
 // TempUnscheduleStrictPriorityFailure removes a failed account for the
 // operator-configured strict-priority cooldown period.
+//
+// 请求级瞬时故障与账号健康无关，不能因为配置了冷却时长就把无辜账号整段摘掉，
+// 所以这里统一再做一次归因过滤（已有调用方也各自过滤过，重复判定是幂等的）。
 func (s *GatewayService) TempUnscheduleStrictPriorityFailure(
 	ctx context.Context,
 	accountID int64,
@@ -790,6 +793,9 @@ func (s *GatewayService) TempUnscheduleStrictPriorityFailure(
 	failoverErr *UpstreamFailoverError,
 ) {
 	if s == nil || s.accountRepo == nil || cooldown <= 0 {
+		return
+	}
+	if failoverErr != nil && (failoverErr.RequestScopedTransient || !failoverErr.ShouldReportAccountScheduleFailure()) {
 		return
 	}
 	statusCode := 0

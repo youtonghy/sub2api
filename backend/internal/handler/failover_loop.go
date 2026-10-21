@@ -135,6 +135,17 @@ type FailoverState struct {
 	ForceCacheBilling     bool
 	hasBoundSession       bool
 
+	// StrictPriorityFallback 开启后，可恢复错误直接按 Priority 升序换到下一个账号，
+	// 默认不在原账号上重试（重试次数由 strictPriorityRetryCount 显式开启）。
+	StrictPriorityFallback bool
+	// strictPriorityRetryCount 是运营商配置的池模式重试次数；0 表示不重试。
+	// 与账号级 pool_mode_retry_count 无关：严格优先级回退以运营商配置为准。
+	strictPriorityRetryCount int
+	// strictPriorityCooldown 是换号后对失败账号的冷却时长；<=0 表示沿用默认短冷却。
+	strictPriorityCooldown time.Duration
+	// strictPriorityUnscheduler 按配置时长临时封禁失败账号（GatewayService 隐式实现）。
+	strictPriorityUnscheduler func(ctx context.Context, accountID int64, cooldown time.Duration, failoverErr *service.UpstreamFailoverError)
+
 	// profitVetoedAccountIDs 记录被分组利润门终检否决的账号，是 FailedAccountIDs
 	// 的子集。之所以单独维护：HandleSelectionExhausted 的 503 退避分支会清空
 	// FailedAccountIDs，而利润否决在同一请求内的判定不会改变（下游倍率 D 已在
@@ -145,15 +156,61 @@ type FailoverState struct {
 	profitVetoCount int
 }
 
-// NewFailoverState 创建 failover 状态
-func NewFailoverState(maxSwitches int, hasBoundSession bool) *FailoverState {
+// NewFailoverStateWithStrictPriority 创建 failover 状态，并显式携带严格优先级回退标记。
+func NewFailoverStateWithStrictPriority(maxSwitches int, hasBoundSession bool, strictPriorityFallback bool) *FailoverState {
 	return &FailoverState{
 		MaxSwitches:            maxSwitches,
 		FailedAccountIDs:       make(map[int64]struct{}),
 		SameAccountRetryCount:  make(map[int64]int),
 		hasBoundSession:        hasBoundSession,
+		StrictPriorityFallback: strictPriorityFallback,
 		profitVetoedAccountIDs: make(map[int64]struct{}),
 	}
+}
+
+// NewFailoverState 创建 failover 状态（默认不启用严格优先级回退）。
+func NewFailoverState(maxSwitches int, hasBoundSession bool) *FailoverState {
+	return NewFailoverStateWithStrictPriority(maxSwitches, hasBoundSession, false)
+}
+
+// SetStrictPriorityPolicy 挂载严格优先级回退的重试次数与换号冷却策略。
+//
+// retryCount 为 0 表示严格模式下不在原账号上重试（保持「立即回退到下一优先级」）；
+// cooldown 为 0 表示不覆盖默认的短冷却，避免失败账号在同一时刻被反复命中。
+func (s *FailoverState) SetStrictPriorityPolicy(
+	retryCount int,
+	cooldown time.Duration,
+	unschedule func(ctx context.Context, accountID int64, cooldown time.Duration, failoverErr *service.UpstreamFailoverError),
+) {
+	if s == nil {
+		return
+	}
+	if retryCount < 0 {
+		retryCount = 0
+	}
+	if cooldown < 0 {
+		cooldown = 0
+	}
+	s.strictPriorityRetryCount = retryCount
+	s.strictPriorityCooldown = cooldown
+	s.strictPriorityUnscheduler = unschedule
+}
+
+// strictPrioritySameAccountRetry 判定严格优先级模式下是否仍在原账号上重试。
+// 运营商未配置重试次数时直接回退到下一个优先级账号。
+func (s *FailoverState) strictPrioritySameAccountRetry(failoverErr *service.UpstreamFailoverError, retryCount int) bool {
+	if failoverErr == nil || !failoverErr.RetryableOnSameAccount || s.strictPriorityRetryCount <= 0 {
+		return false
+	}
+	if !sameAccountRetryDeadlineAllows(failoverErr) {
+		return false
+	}
+	// 错误自带的硬上限（Grok 容量/流空闲）仍然优先于运营商配置。
+	limit := s.strictPriorityRetryCount
+	if failoverErr.SameAccountRetryMax > 0 && failoverErr.SameAccountRetryMax < limit {
+		limit = failoverErr.SameAccountRetryMax
+	}
+	return retryCount < limit
 }
 
 // RecordProfitVeto 记录一次分组利润门终检否决：把账号加入排除列表（同时登记到
@@ -214,21 +271,32 @@ func (s *FailoverState) HandleFailoverError(
 
 	// 同账号重试不算切换账号，粘性会话仅在实际切换时强制缓存计费。
 	retryCount := s.SameAccountRetryCount[accountID]
-	sameAccountRetry := sameAccountRetryAllowed(failoverErr, retryCount, retryLimit)
+	var sameAccountRetry bool
+	if s.StrictPriorityFallback {
+		sameAccountRetry = s.strictPrioritySameAccountRetry(failoverErr, retryCount)
+	} else {
+		sameAccountRetry = sameAccountRetryAllowed(failoverErr, retryCount, retryLimit)
+	}
 	if needForceCacheBilling(s.hasBoundSession, failoverErr, sameAccountRetry) {
 		s.ForceCacheBilling = true
 	}
 
 	// 同账号重试：对 RetryableOnSameAccount 的临时性错误，先在同一账号上重试。
-	// 重试次数上限 retryLimit 由调用方传入（账号级 pool_mode_retry_count 配置）。
+	// 非严格模式下重试上限 retryLimit 由调用方传入（账号级 pool_mode_retry_count）；
+	// 严格优先级模式使用运营商配置的 strict_priority_retry_count。
 	if sameAccountRetry {
 		s.SameAccountRetryCount[accountID]++
 		retryDelay := sameAccountRetryDelayFor(failoverErr, s.SameAccountRetryCount[accountID])
+		sameAccountRetryMax := retryLimit
+		if s.StrictPriorityFallback {
+			sameAccountRetryMax = s.strictPriorityRetryCount
+		}
 		logger.FromContext(ctx).Warn("gateway.failover_same_account_retry",
 			zap.Int64("account_id", accountID),
 			zap.Int("upstream_status", failoverErr.StatusCode),
 			zap.Int("same_account_retry_count", s.SameAccountRetryCount[accountID]),
-			zap.Int("same_account_retry_max", retryLimit),
+			zap.Int("same_account_retry_max", sameAccountRetryMax),
+			zap.Bool("strict_priority_fallback", s.StrictPriorityFallback),
 			zap.Duration("retry_delay", retryDelay),
 		)
 		if !sleepWithContext(ctx, retryDelay) {
@@ -244,7 +312,11 @@ func (s *FailoverState) HandleFailoverError(
 
 	// 加入失败列表
 	s.FailedAccountIDs[accountID] = struct{}{}
-	if unscheduler, ok := gatewayService.(UpstreamFailureUnscheduler); ok {
+	// 严格优先级模式下换号即冷却：配置了冷却分钟数时按配置封禁，
+	// 否则沿用默认的短冷却（Anthropic 5xx），避免失败账号被立刻重新命中。
+	if s.StrictPriorityFallback && s.strictPriorityCooldown > 0 && s.strictPriorityUnscheduler != nil {
+		s.strictPriorityUnscheduler(ctx, accountID, s.strictPriorityCooldown, failoverErr)
+	} else if unscheduler, ok := gatewayService.(UpstreamFailureUnscheduler); ok {
 		unscheduler.TempUnscheduleUpstreamFailure(ctx, accountID, platform, failoverErr)
 	}
 

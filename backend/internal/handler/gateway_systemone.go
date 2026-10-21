@@ -121,7 +121,7 @@ func (h *GatewayHandler) SystemOne(c *gin.Context) {
 	}
 	defer inflightRelease()
 
-	fs := NewFailoverState(h.maxAccountSwitches, false)
+	fs := h.newFailoverState(h.maxAccountSwitches, false)
 	for {
 		if failoverClientGone(c) {
 			return

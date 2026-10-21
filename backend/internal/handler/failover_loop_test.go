@@ -1040,3 +1040,95 @@ func TestFailoverClientGone(t *testing.T) {
 		require.False(t, failoverClientGone(nil))
 	})
 }
+
+// ---------------------------------------------------------------------------
+// Strict priority: configured retry count + switch cooldown
+// ---------------------------------------------------------------------------
+
+// recordingCooldown 记录 TempUnscheduleStrictPriorityFailure 风格的冷却调用。
+type recordingCooldown struct {
+	calls     int
+	accountID int64
+	cooldown  time.Duration
+	status    int
+}
+
+func (r *recordingCooldown) unschedule(_ context.Context, accountID int64, cooldown time.Duration, failoverErr *service.UpstreamFailoverError) {
+	r.calls++
+	r.accountID = accountID
+	r.cooldown = cooldown
+	if failoverErr != nil {
+		r.status = failoverErr.StatusCode
+	}
+}
+
+// strictPriorityState 构造挂载了严格优先级策略的状态。
+func strictPriorityState(retryCount int, cooldown time.Duration, recorder *recordingCooldown) *FailoverState {
+	state := NewFailoverStateWithStrictPriority(3, false, true)
+	state.SetStrictPriorityPolicy(retryCount, cooldown, recorder.unschedule)
+	return state
+}
+
+// TestStrictPriority_RetryCountZeroSkipsSameAccountRetry 校验 0（默认）表示
+// 立即按优先级回退，与「严格优先级」语义一致。
+func TestStrictPriority_RetryCountZeroSkipsSameAccountRetry(t *testing.T) {
+	recorder := &recordingCooldown{}
+	state := strictPriorityState(0, 0, recorder)
+	err := &service.UpstreamFailoverError{StatusCode: http.StatusBadGateway, RetryableOnSameAccount: true}
+
+	require.Equal(t, FailoverContinue, state.HandleFailoverError(context.Background(), &mockTempUnscheduler{}, 7, service.PlatformOpenAI, 3, err))
+	require.Zero(t, state.SameAccountRetryCount[7], "strict priority must not retry the same account by default")
+	require.Contains(t, state.FailedAccountIDs, int64(7))
+	require.Equal(t, 1, state.SwitchCount)
+}
+
+// TestStrictPriority_RetryCountRetriesThenSwitches 校验
+// strict_priority_retry_count 作为同账号重试上限：先重试 N 次，耗尽后换号。
+func TestStrictPriority_RetryCountRetriesThenSwitches(t *testing.T) {
+	recorder := &recordingCooldown{}
+	state := strictPriorityState(2, 15*time.Minute, recorder)
+	err := &service.UpstreamFailoverError{StatusCode: http.StatusServiceUnavailable, RetryableOnSameAccount: true}
+
+	for i := 0; i < 2; i++ {
+		require.Equal(t, FailoverContinue, state.HandleFailoverError(context.Background(), &mockTempUnscheduler{}, 7, service.PlatformOpenAI, 10, err))
+		require.NotContains(t, state.FailedAccountIDs, int64(7))
+		require.Equal(t, i+1, state.SameAccountRetryCount[7])
+	}
+
+	// 第 3 次：重试次数用尽 → 换号并触发配置的冷却时长。
+	require.Equal(t, FailoverContinue, state.HandleFailoverError(context.Background(), &mockTempUnscheduler{}, 7, service.PlatformOpenAI, 10, err))
+	require.Contains(t, state.FailedAccountIDs, int64(7))
+	require.Equal(t, 1, recorder.calls)
+	require.Equal(t, int64(7), recorder.accountID)
+	require.Equal(t, 15*time.Minute, recorder.cooldown)
+	require.Equal(t, http.StatusServiceUnavailable, recorder.status)
+}
+
+// TestStrictPriority_CooldownAppliesOnEveryPlatform 校验运营商配置的冷却时长
+// 不再局限于 Anthropic 或 5xx：显式配置后按换号即冷却执行。
+func TestStrictPriority_CooldownAppliesOnEveryPlatform(t *testing.T) {
+	recorder := &recordingCooldown{}
+	state := strictPriorityState(0, 5*time.Minute, recorder)
+	err := &service.UpstreamFailoverError{StatusCode: http.StatusTooManyRequests, RetryableOnSameAccount: false}
+
+	require.Equal(t, FailoverContinue, state.HandleFailoverError(context.Background(), &mockTempUnscheduler{}, 9, service.PlatformOpenAI, 3, err))
+	require.Equal(t, 1, recorder.calls)
+	require.Equal(t, 5*time.Minute, recorder.cooldown)
+	require.Equal(t, http.StatusTooManyRequests, recorder.status)
+}
+
+// TestNonStrictModeHonorsAccountPoolRetryCount 校验非严格模式完全沿用原行为：
+// 账号级 pool_mode_retry_count 决定同账号重试次数，且不触发严格优先级冷却。
+func TestNonStrictModeHonorsAccountPoolRetryCount(t *testing.T) {
+	state := NewFailoverState(3, false)
+	state.StrictPriorityFallback = false
+	state.SetStrictPriorityPolicy(0, 15*time.Minute, (&recordingCooldown{}).unschedule)
+	err := &service.UpstreamFailoverError{StatusCode: http.StatusServiceUnavailable, RetryableOnSameAccount: true}
+
+	for i := 0; i < 2; i++ {
+		require.Equal(t, FailoverContinue, state.HandleFailoverError(context.Background(), &mockTempUnscheduler{}, 7, service.PlatformOpenAI, 2, err))
+	}
+	// 达到账号级上限后换号，走默认短冷却路径而非严格优先级冷却。
+	require.Equal(t, FailoverContinue, state.HandleFailoverError(context.Background(), &mockTempUnscheduler{}, 7, service.PlatformOpenAI, 2, err))
+	require.Contains(t, state.FailedAccountIDs, int64(7))
+}
