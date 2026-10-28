@@ -14,6 +14,21 @@ export default {
     errorDescription: 'The page failed to load. Reload to try again.',
     theme: 'Theme',
     themeSystem: 'System',
+    dateRange: {
+      noDates: 'No dates',
+      dayCount: '{n} day | {n} days',
+      presets: 'Presets',
+      previousMonth: 'Previous month',
+      nextMonth: 'Next month',
+      pickEndDate: 'Pick an end date',
+    },
+    notFound: {
+      description: 'The page you are looking for doesn\'t exist or has been moved.',
+      goBack: 'Go back',
+      goToDashboard: 'Go to dashboard',
+      needHelp: 'Need help?',
+      contactSupport: 'Contact support',
+    },
     reload: 'Reload',
   },
 }

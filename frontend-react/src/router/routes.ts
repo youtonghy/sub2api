@@ -31,7 +31,7 @@ export const appRoutes: AppRouteDef[] = [
     name: 'Setup',
     layout: 'none',
     meta: { requiresAuth: false, title: 'Setup' },
-    view: pending('views/setup/SetupWizardView.vue'),
+    view: () => import('@/views/setup/SetupWizardView'),
   },
   {
     path: '/home',
@@ -453,6 +453,6 @@ export const appRoutes: AppRouteDef[] = [
     name: 'NotFound',
     layout: 'none',
     meta: { title: '404 Not Found' },
-    view: pending('views/NotFoundView.vue'),
+    view: () => import('@/views/NotFoundView'),
   },
 ]

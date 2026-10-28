@@ -1,0 +1,25 @@
+.layout { display: flex; flex-direction: column; gap: var(--space-6); }
+.fixed { flex-shrink: 0; min-width: 0; }
+.scrollable { display: flex; min-width: 0; flex-direction: column; }
+.container {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+.pagination { flex-shrink: 0; }
+
+/* 宽屏：整体高度固定，表格区域内部滚动（表头固定） */
+@media (min-width: 1024px) {
+  .layout { height: calc(100dvh - var(--table-page-offset, 8rem)); }
+  .scrollable { flex: 1; min-height: 0; }
+  .container { height: 100%; }
+}
+
+/* 窄屏：恢复自然滚动，卡片布局自带边框 */
+@media (max-width: 767px) {
+  .container { overflow: visible; border: 0; border-radius: 0; background: transparent; }
+}

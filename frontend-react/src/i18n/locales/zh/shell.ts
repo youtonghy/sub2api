@@ -14,6 +14,21 @@ export default {
     errorDescription: '页面加载失败，请刷新重试。',
     theme: '主题',
     themeSystem: '跟随系统',
+    dateRange: {
+      noDates: '未选择日期',
+      dayCount: '{n} 天',
+      presets: '快捷范围',
+      previousMonth: '上个月',
+      nextMonth: '下个月',
+      pickEndDate: '请选择结束日期',
+    },
+    notFound: {
+      description: '你访问的页面不存在或已被移动。',
+      goBack: '返回上一页',
+      goToDashboard: '前往仪表盘',
+      needHelp: '需要帮助？',
+      contactSupport: '联系客服',
+    },
     reload: '刷新',
   },
 }

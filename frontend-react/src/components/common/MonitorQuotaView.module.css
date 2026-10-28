@@ -1,0 +1,124 @@
+.root,
+.tiers {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.planRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.plan {
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.tier {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.tierLabel {
+  max-width: 72px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 4px;
+  padding: 0 var(--space-1);
+  font-size: 10px;
+  font-weight: 500;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--accent-subtle);
+  color: var(--accent-strong);
+}
+
+.tierLabel[data-color='emerald'] {
+  background: color-mix(in oklab, var(--success) 12%, var(--surface));
+  color: var(--success);
+}
+
+.tierLabel[data-color='purple'] {
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface-muted));
+  color: var(--text-secondary);
+}
+
+.tierLabel[data-color='amber'] {
+  background: color-mix(in oklab, var(--warning) 12%, var(--surface));
+  color: var(--warning);
+}
+
+.track {
+  width: 32px;
+  height: 6px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+}
+
+.fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width var(--duration-standard) var(--ease-standard);
+}
+
+.fill[data-level='success'] { background: var(--success); }
+.fill[data-level='warning'] { background: var(--warning); }
+.fill[data-level='danger'] { background: var(--danger); }
+
+.percent {
+  width: 32px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.percent[data-level='warning'] { color: var(--warning); }
+.percent[data-level='danger'] { color: var(--danger); }
+
+.reset {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.balances {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--space-2);
+  font-size: 10px;
+}
+
+.balance {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.balance[data-empty] {
+  color: var(--danger);
+}
+
+.error {
+  overflow: hidden;
+  color: var(--danger);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill { transition: none; }
+}

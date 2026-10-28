@@ -1,0 +1,29 @@
+/* 宽度档位覆盖 Arc dialog 默认的 440px；双类选择器保证优先级高于 Arc 的 .content */
+.dialog.narrow { width: min(calc(100vw - var(--space-8)), 28rem); }
+.dialog.normal { width: min(calc(100vw - var(--space-8)), 32rem); }
+.dialog.wide { width: min(calc(100vw - var(--space-8)), 56rem); }
+.dialog.extraWide { width: min(calc(100vw - var(--space-8)), 72rem); }
+.dialog.full { width: min(calc(100vw - var(--space-8)), 80rem); }
+
+/* showCloseButton=false 时隐藏 Arc 标题栏的关闭按钮 */
+.hideClose [aria-label="Close dialog"] { display: none; }
+
+/* 内容区单独滚动，标题与底部操作区保持可见 */
+.body {
+  max-height: calc(100dvh - 15rem);
+  margin: calc(var(--space-6) * -1);
+  padding: var(--space-6);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin: var(--space-6) calc(var(--space-6) * -1) calc(var(--space-6) * -1);
+  border-top: 1px solid var(--border);
+  padding: var(--space-4) var(--space-6);
+}

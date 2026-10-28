@@ -1,0 +1,50 @@
+.trigger { position: relative; display: inline-flex; align-items: center; margin-left: var(--space-1); vertical-align: middle; }
+.icon { color: var(--text-muted); cursor: help; transition: color var(--duration-fast) var(--ease-standard); }
+@media (hover: hover) and (pointer: fine) { .icon:hover { color: var(--foreground); } }
+
+/* 与 Arc tooltip 相同的配色与圆角；向上偏移到触发图标上方并水平居中 */
+.tooltip {
+  position: fixed;
+  z-index: 99999;
+  max-width: calc(100vw - var(--space-6));
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in oklab, var(--background) 14%, var(--foreground));
+  border-radius: var(--radius-control);
+  background: var(--foreground);
+  color: var(--background);
+  box-shadow: var(--shadow-raised);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  line-height: var(--leading-body);
+  white-space: normal;
+  /* 模态对话框会禁用 body 的指针事件，提示框挂在 body 上仍需可交互 */
+  pointer-events: auto;
+  transform: translate(-50%, -100%);
+  animation: tooltip-in var(--duration-fast) var(--ease-enter) both;
+}
+.tooltip[data-trigger="click"] { padding-right: var(--space-8); }
+/* 透明延伸区覆盖提示框与触发图标之间的空隙，让指针能连续移入提示框 */
+.tooltip::before { position: absolute; top: 100%; right: 0; left: 0; height: var(--space-3); content: ""; }
+
+.close {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 0;
+  border-radius: calc(var(--radius-control) / 2);
+  background: transparent;
+  color: inherit;
+  opacity: .72;
+  cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) { .close:hover { opacity: 1; } }
+
+@keyframes tooltip-in { from { opacity: 0; transform: translate(-50%, calc(-100% + 3px)); } }
+@media (prefers-reduced-motion: reduce) {
+  .icon { transition: none; }
+  .tooltip { animation: none; }
+}

@@ -1,0 +1,38 @@
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+}
+.info { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); min-width: 0; }
+.range, .compact { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); }
+.strong { color: var(--foreground); font-weight: 500; font-variant-numeric: tabular-nums; }
+.compact { display: none; }
+.group { display: flex; align-items: center; gap: var(--space-2); }
+.label { color: var(--text-secondary); font-size: var(--text-sm); white-space: nowrap; }
+.pageSize { width: 5.5rem; }
+.jumpInput {
+  width: 5rem;
+  min-height: var(--control-height-sm);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  padding: 0 var(--space-3);
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  outline: none;
+}
+.jumpInput:focus-visible { border-color: var(--foreground); }
+.jumpInput::placeholder { color: var(--text-muted); }
+
+/* 窄屏只显示“第 x / y 页”与页码导航，与 Vue 版移动端一致 */
+@media (max-width: 639px) {
+  .range { display: none; }
+  .compact { display: block; }
+  .group { display: none; }
+}

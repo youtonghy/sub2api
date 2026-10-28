@@ -1,0 +1,4 @@
+.blank { display: inline-block; width: 16px; height: 16px; }
+.spinning { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinning { animation: none; } }

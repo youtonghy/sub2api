@@ -1,0 +1,87 @@
+/* 与 Arc badge 相同的色调变量：分组徽章需要可截断的名称，所以外壳自绘 */
+.badge {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--badge-border, var(--border));
+  border-radius: var(--radius-control);
+  padding: 2px 8px;
+  color: var(--badge-foreground, var(--foreground));
+  background: var(--badge-background, var(--surface));
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1.4;
+  transition: background-color var(--duration-standard) var(--ease-standard), border-color var(--duration-standard) var(--ease-standard);
+}
+
+.badge[data-tone='neutral'] { --badge-color: var(--text-secondary); --badge-foreground: var(--text-secondary); --badge-background: var(--surface-muted); --badge-border: var(--border); }
+.badge[data-tone='success'] { --badge-color: var(--success); --badge-foreground: var(--success); --badge-background: color-mix(in oklab, var(--success) 10%, var(--surface)); --badge-border: color-mix(in oklab, var(--success) 25%, var(--border)); }
+.badge[data-tone='info'] { --badge-color: var(--accent); --badge-foreground: var(--accent-strong); --badge-background: var(--accent-subtle); --badge-border: color-mix(in oklab, var(--accent) 24%, var(--border)); }
+.badge[data-tone='warning'] { --badge-color: var(--warning); --badge-foreground: var(--warning); --badge-background: color-mix(in oklab, var(--warning) 11%, var(--surface)); --badge-border: color-mix(in oklab, var(--warning) 27%, var(--border)); }
+.badge[data-tone='danger'] { --badge-color: var(--danger); --badge-foreground: var(--danger); --badge-background: color-mix(in oklab, var(--danger) 10%, var(--surface)); --badge-border: color-mix(in oklab, var(--danger) 26%, var(--border)); }
+
+.badge[data-subscription] {
+  --badge-background: color-mix(in oklab, var(--badge-color) 16%, var(--surface));
+}
+
+.nameTruncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nameWrap {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.label,
+.peak {
+  flex-shrink: 0;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.label[data-tone='muted'] {
+  background: color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+.label[data-tone='theme'] {
+  background: color-mix(in oklab, var(--badge-color) 20%, var(--surface));
+}
+
+.label[data-tone='warning'] {
+  background: color-mix(in oklab, var(--warning) 20%, var(--surface));
+  color: var(--warning);
+}
+
+.label[data-tone='danger'] {
+  background: color-mix(in oklab, var(--danger) 18%, var(--surface));
+  color: var(--danger);
+}
+
+.strike {
+  margin-right: 2px;
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.customRate {
+  font-weight: 500;
+}
+
+.peak {
+  background: color-mix(in oklab, var(--warning) 14%, var(--surface));
+  color: var(--warning);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge { transition-duration: var(--duration-instant); }
+}

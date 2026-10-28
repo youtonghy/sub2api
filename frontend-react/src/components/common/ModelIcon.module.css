@@ -1,0 +1,15 @@
+.icon {
+  flex-shrink: 0;
+}
+
+.fallback {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: var(--accent-subtle);
+  color: var(--accent-strong);
+  font-weight: 500;
+  line-height: 1;
+}

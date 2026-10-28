@@ -1,0 +1,9 @@
+.field { width: 100%; }
+.required { color: var(--danger); }
+.control { position: relative; }
+.prefix, .suffix { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; color: var(--text-muted); }
+.prefix { left: var(--space-3); pointer-events: none; }
+.suffix { right: var(--space-3); }
+.input[data-prefix] { padding-left: calc(var(--space-3) + 1.75rem); }
+.input[data-suffix] { padding-right: calc(var(--space-3) + 1.75rem); }
+.message { margin: 0; }

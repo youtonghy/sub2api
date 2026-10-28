@@ -1,0 +1,22 @@
+.link {
+  display: inline-flex;
+  max-width: 100%;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-1);
+  border-radius: var(--radius-control);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  text-decoration: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .link:hover { text-decoration: underline; }
+}
+
+.text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

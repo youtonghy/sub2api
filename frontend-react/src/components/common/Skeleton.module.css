@@ -1,0 +1,10 @@
+/* 与 Arc skeleton 相同的底色与脉冲 */
+.block {
+  display: block;
+  border-radius: calc(var(--radius-control) / 2);
+  background: color-mix(in oklab, var(--border-strong) 38%, var(--surface));
+  animation: skeleton-pulse 1.8s var(--ease-in-out) infinite both;
+}
+.block[data-variant="circle"] { border-radius: var(--radius-pill); }
+@keyframes skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .52; } }
+@media (prefers-reduced-motion: reduce) { .block { animation: none; } }

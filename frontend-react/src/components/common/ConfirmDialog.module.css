@@ -1,0 +1,2 @@
+.content { display: grid; gap: var(--space-4); }
+.message { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); white-space: pre-line; }
