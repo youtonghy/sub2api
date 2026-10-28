@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">RetooAi</title>
+  <desc id="desc">An R monogram for RetooAi.</desc>
+  <rect x="16" y="16" width="480" height="480" rx="120" fill="#161816"/>
+  <g fill="none" stroke="#2DD4BF" stroke-linecap="round" stroke-linejoin="round" stroke-width="44">
+    <path d="M180 380V132h96a74 74 0 0 1 0 148h-96"/>
+    <path d="M262 280l80 100"/>
+  </g>
+</svg>
