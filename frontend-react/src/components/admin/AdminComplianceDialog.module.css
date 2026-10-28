@@ -1,0 +1,43 @@
+/* 合规文档较长，比 Arc 默认 440px 宽；属性选择器保证覆盖 Arc 的默认宽度 */
+.dialog[role="dialog"] { width: min(calc(100vw - var(--space-8)), 56rem); }
+/* 强制确认：隐藏 Arc 对话框内置的关闭按钮（onOpenChange 为空操作，按钮本身也无法关闭） */
+.dialog [aria-label="Close dialog"] { display: none; }
+
+.layout { display: grid; gap: var(--space-5); }
+
+.notice { display: flex; gap: var(--space-3); padding: var(--space-4); border: 1px solid color-mix(in oklab, var(--warning) 40%, var(--border)); border-radius: var(--radius-panel); background: color-mix(in oklab, var(--warning) 10%, var(--surface)); color: var(--foreground); }
+.noticeIcon { flex: none; margin-top: 2px; color: var(--warning); }
+.noticeText { display: grid; gap: var(--space-2); }
+.noticeText p { margin: 0; line-height: 1.6; }
+.noticeTitle { font-weight: 500; }
+
+.documentGrid { display: grid; gap: var(--space-4); }
+@media (min-width: 768px) { .documentGrid { grid-template-columns: minmax(0, 1fr) 240px; } }
+
+.document { min-height: 320px; max-height: 46vh; overflow-y: auto; padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+
+.aside { display: grid; align-content: start; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface-muted); }
+.aside p { margin: 0; }
+.asideLabel { color: var(--text-muted); font-size: var(--text-xs); font-weight: 500; }
+.aside .version { margin-top: var(--space-1); color: var(--foreground); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; word-break: break-all; }
+.docLink { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--accent); text-decoration: underline; text-underline-offset: 4px; }
+.asideText { color: var(--text-secondary); line-height: 1.6; }
+
+.phraseGroup { display: grid; gap: var(--space-3); }
+.phrase { padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); background: var(--surface-muted); color: var(--foreground); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; font-size: var(--text-sm); }
+
+.legalNote { margin: 0; color: var(--text-muted); font-size: var(--text-xs); line-height: 1.6; }
+
+.footer { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+@media (min-width: 640px) { .footer { flex-direction: row; justify-content: flex-end; } }
+
+/* 合规文档 Markdown */
+.legal { color: var(--text-secondary); line-height: 1.75; overflow-wrap: anywhere; }
+.legal :global(h1) { margin: 0 0 var(--space-4); color: var(--foreground); font-size: var(--text-xl); font-weight: 500; line-height: 1.3; }
+.legal :global(h2) { margin: var(--space-6) 0 var(--space-3); color: var(--foreground); font-size: var(--text-lg); font-weight: 500; line-height: 1.3; }
+.legal :global(p) { margin: 0 0 var(--space-4); font-size: var(--text-sm); }
+.legal :global(ul), .legal :global(ol) { margin: 0 0 var(--space-4); padding-left: var(--space-6); font-size: var(--text-sm); }
+.legal :global(ul) { list-style: disc; }
+.legal :global(ol) { list-style: decimal; }
+.legal :global(li) { margin-bottom: var(--space-1); }
+.legal :global(strong) { color: var(--foreground); font-weight: 500; }

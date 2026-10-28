@@ -1,0 +1,10 @@
+/* 公告正文较长，比 Arc 默认 440px 宽；属性选择器保证覆盖 Arc 的默认宽度 */
+.dialog[role="dialog"] { width: min(calc(100vw - var(--space-8)), 680px); }
+
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+.time { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--text-secondary); font-size: var(--text-sm); }
+
+.content { max-height: 50vh; overflow-y: auto; padding-right: var(--space-1); }
+
+.footer { display: flex; justify-content: flex-end; margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+.buttonLabel { display: inline-flex; align-items: center; gap: var(--space-2); }

@@ -6,6 +6,8 @@ import { useEffect, useRef } from 'react'
 import { Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router'
 
 import { ToastStack, ToastStackProvider } from '@/components/arc/toast-stack/toast-stack'
+import AdminComplianceDialog from '@/components/admin/AdminComplianceDialog'
+import AnnouncementPopup from '@/components/common/AnnouncementPopup'
 import NavigationProgress from '@/components/common/NavigationProgress'
 import ToastBridge from '@/components/common/ToastBridge'
 import { getSetupStatus } from '@/api/setup'
@@ -161,6 +163,8 @@ export default function RootLayout() {
       <ScrollRestoration />
       <ToastBridge />
       <ToastStack />
+      <AnnouncementPopup />
+      <AdminComplianceDialog />
     </ToastStackProvider>
   )
 }

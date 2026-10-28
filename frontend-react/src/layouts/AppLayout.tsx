@@ -3,18 +3,23 @@
  * 对应 Vue 版 AppLayout + AppSidebar + AppHeader；作为父路由渲染，导航时不会重新挂载。
  */
 import { useCallback, useEffect, useRef } from 'react'
-import { BookOpen, Headset, KeyRound, LayoutGrid, User } from 'lucide-react'
+import { BookOpen, Headset, KeyRound, LayoutGrid, RotateCcw, User } from 'lucide-react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router'
 
 import { SidebarRail } from '@/components/arc/blocks/sidebar-rail/sidebar-rail'
 import { UserMenu } from '@/components/arc/user-menu/user-menu'
+import AnnouncementBell from '@/components/common/AnnouncementBell'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher'
+import SubscriptionProgressMini from '@/components/common/SubscriptionProgressMini'
+import VersionBadge from '@/components/common/VersionBadge'
+import { useOnboardingTour } from '@/composables/useOnboardingTour'
 import { useI18n } from '@/i18n/useI18n'
 import { resolveRouteMetaKeys } from '@/router/title'
 import { useCurrentRoute } from '@/router/useCurrentRoute'
 import { useAdminSettingsStore } from '@/stores/adminSettings'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
+import { useOnboardingStore } from '@/stores/onboarding'
 import { useTheme } from '@/theme/useTheme'
 import { FeatureFlags, resolveFeatureFlag } from '@/utils/featureFlags'
 import { resolveSiteBillingMode } from '@/utils/siteBillingMode'
@@ -22,6 +27,12 @@ import { sanitizeUrl } from '@/utils/url'
 import BalanceDisplay from './BalanceDisplay'
 import { resolveActiveEntry, useAppNavigation } from './useAppNavigation'
 import styles from './AppLayout.module.css'
+
+const TOUR_SELECTORS: Record<string, string> = {
+  '/admin/groups': '#sidebar-group-manage',
+  '/admin/accounts': '#sidebar-channel-manage',
+  '/keys': '[data-tour="sidebar-my-keys"]',
+}
 
 function SidebarBrand({ collapsed }: { collapsed: boolean }) {
   const siteName = useAppStore((state) => state.siteName)
@@ -33,13 +44,15 @@ function SidebarBrand({ collapsed }: { collapsed: boolean }) {
   const homePath = isAdmin ? '/admin/dashboard' : '/dashboard'
 
   return (
-    <Link to={homePath} className={styles.brand} aria-label={siteName}>
-      <span className={styles.logo}>{settingsLoaded && <img src={siteLogo || '/logo.svg'} alt="" />}</span>
-      <span className={styles.brandText} data-collapsed={collapsed || undefined} aria-hidden={collapsed}>
-        <strong>{siteName}</strong>
-        {siteVersion && <span>v{siteVersion}</span>}
-      </span>
-    </Link>
+    <div className={styles.brand}>
+      <Link to={homePath} className={styles.brandLink} aria-label={siteName}>
+        <span className={styles.logo}>{settingsLoaded && <img src={siteLogo || '/logo.svg'} alt="" />}</span>
+        <span className={styles.brandText} data-collapsed={collapsed || undefined} aria-hidden={collapsed}>
+          <strong>{siteName}</strong>
+        </span>
+      </Link>
+      <VersionBadge version={siteVersion} collapsed={collapsed} />
+    </div>
   )
 }
 
@@ -76,6 +89,7 @@ function HeaderActions() {
   const { t } = useI18n()
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
+  const isSimpleMode = useAuthStore((state) => state.isSimpleMode)
   const rawDocUrl = useAppStore((state) => state.docUrl)
   const contactInfo = useAppStore((state) => state.contactInfo)
   const settings = useAppStore((state) => state.cachedPublicSettings)
@@ -103,10 +117,15 @@ function HeaderActions() {
     { label: t('nav.apiKeys'), icon: <KeyRound size={16} strokeWidth={1.75} />, onSelect: () => navigate('/keys') },
     // 联系客服（仅配置后显示），与 Vue 版用户下拉菜单一致
     ...(contactInfo ? [{ label: `${t('common.contactSupport')}: ${contactInfo}`, icon: <Headset size={16} strokeWidth={1.75} /> }] : []),
+    // 只在标准模式的管理员下显示新手引导按钮
+    ...(!isSimpleMode && user.role === 'admin'
+      ? [{ label: t('onboarding.restartTour'), icon: <RotateCcw size={16} strokeWidth={1.75} />, onSelect: () => useOnboardingStore.getState().replay() }]
+      : []),
   ]
 
   return (
     <div className={styles.actions}>
+      <AnnouncementBell />
       {docUrl && (
         <a className={styles.iconLink} href={docUrl} target="_blank" rel="noopener noreferrer">
           <BookOpen size={16} strokeWidth={1.75} aria-hidden="true" />
@@ -120,6 +139,7 @@ function HeaderActions() {
         </Link>
       )}
       <LocaleSwitcher />
+      <SubscriptionProgressMini />
       <BalanceDisplay user={user} />
       <UserMenu
         user={{
@@ -156,6 +176,22 @@ export default function AppLayout() {
   const { sections, paths } = useAppNavigation()
   const activeId = resolveActiveEntry(location.pathname, paths)
   const contentRef = useRef<HTMLDivElement>(null)
+  const isAdminUser = useAuthStore((state) => state.user?.role === 'admin')
+  const { replayTour } = useOnboardingTour({ storageKey: isAdminUser ? 'admin_guide' : 'user_guide', autoStart: true })
+
+  useEffect(() => {
+    useOnboardingStore.getState().setReplayCallback(replayTour)
+  }, [replayTour])
+
+  function handleSelect(id: string) {
+    navigate(id)
+    // 新手引导：点击引导指向的菜单项时推进到下一步（与 Vue 版 AppSidebar 一致）
+    const selector = TOUR_SELECTORS[id]
+    const onboarding = useOnboardingStore.getState()
+    if (selector && onboarding.isCurrentStep(selector)) {
+      onboarding.nextStep(500)
+    }
+  }
 
   // 页面内容在外壳内部滚动，切换页面时回到顶部
   useEffect(() => {
@@ -166,7 +202,7 @@ export default function AppLayout() {
     <SidebarRail
       sections={sections}
       activeId={activeId}
-      onSelect={(id) => navigate(id)}
+      onSelect={handleSelect}
       brand={(isCollapsed) => <SidebarBrand collapsed={isCollapsed} />}
       topbar={<><PageHeading /><HeaderActions /></>}
       contentRef={contentRef}

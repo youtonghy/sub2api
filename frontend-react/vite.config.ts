@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv, type Plugin } from 'vite'
+import { defineConfig, loadEnv, searchForWorkspaceRoot, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 
@@ -102,6 +102,10 @@ export default defineConfig(({ mode }) => {
     server: {
       host: '0.0.0.0',
       port: devPort,
+      fs: {
+        // 管理员合规弹窗以 ?raw 引入仓库根目录 docs/legal/ 下的文档
+        allow: [searchForWorkspaceRoot(process.cwd()), resolve(import.meta.dirname, '../docs/legal')]
+      },
       proxy: {
         '/api': { target: backendUrl, changeOrigin: true, ws: true },
         '/v1': { target: backendUrl, changeOrigin: true },
