@@ -497,17 +497,12 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 
 	// 绑定分组
 	groupIDs := input.GroupIDs
-	// 如果没有指定分组,自动绑定对应平台的默认分组
+	// 如果没有指定分组，自动绑定默认分组。
+	// 全平台分组后不再有「按平台默认分组」的语义：优先复用历史上存在的同名
+	// `<platform>-default` 分组（保持旧行为可预期），否则绑定简单模式的 `default`。
 	if len(groupIDs) == 0 && !input.SkipDefaultGroupBind {
-		defaultGroupName := input.Platform + "-default"
-		groups, err := s.groupRepo.ListActiveByPlatform(ctx, input.Platform)
-		if err == nil {
-			for _, g := range groups {
-				if g.Name == defaultGroupName {
-					groupIDs = []int64{g.ID}
-					break
-				}
-			}
+		if gid, ok := s.resolveDefaultGroupIDForPlatform(ctx, input.Platform); ok {
+			groupIDs = []int64{gid}
 		}
 	}
 
@@ -951,6 +946,23 @@ func (s *adminServiceImpl) UpdateAccountExtra(ctx context.Context, id int64, upd
 		return nil
 	}
 	return s.accountRepo.UpdateExtra(ctx, id, updates)
+}
+
+// UpdateAccountSortOrders 批量写入账号优先级（账号管理界面拖动排序）。
+// 只做一件事：把一组 (id, priority) 在一个事务内落库，任一 ID 不存在则整体失败。
+func (s *adminServiceImpl) UpdateAccountSortOrders(ctx context.Context, updates []AccountPriorityUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+	for _, u := range updates {
+		if u.ID <= 0 {
+			return ErrAccountNotFound
+		}
+		if u.Priority < AccountPriorityMin || u.Priority > AccountPriorityMax {
+			return ErrAccountPriorityOutOfRange
+		}
+	}
+	return s.accountRepo.UpdatePriorities(ctx, updates)
 }
 
 // BulkUpdateAccounts updates multiple accounts in one request.
@@ -1411,14 +1423,8 @@ func (s *adminServiceImpl) CreateShadow(ctx context.Context, parentID int64, opt
 	} else if len(parent.GroupIDs) > 0 {
 		groupIDs = append([]int64(nil), parent.GroupIDs...)
 	} else if s.groupRepo != nil {
-		defaultGroupName := PlatformOpenAI + "-default"
-		if groups, gerr := s.groupRepo.ListActiveByPlatform(ctx, PlatformOpenAI); gerr == nil {
-			for _, g := range groups {
-				if g.Name == defaultGroupName {
-					groupIDs = []int64{g.ID}
-					break
-				}
-			}
+		if gid, ok := s.resolveDefaultGroupIDForPlatform(ctx, PlatformOpenAI); ok {
+			groupIDs = []int64{gid}
 		}
 	}
 	if err := s.ValidateAccountGroupBindings(ctx, groupIDs); err != nil {
@@ -1623,6 +1629,34 @@ func (s *adminServiceImpl) ValidateAccountGroupBindings(ctx context.Context, gro
 		}
 	}
 	return nil
+}
+
+// resolveDefaultGroupIDForPlatform 返回新账号应自动绑定的默认分组 ID。
+//
+// 全平台分组后不再存在真正的「按平台默认分组」，但为了保持旧部署的行为可预期：
+//   - 先找同名的 `<platform>-default`（历史数据或运营习惯保留的分组）；
+//   - 否则回落简单模式的 `default`；
+//   - 都找不到则不自动绑定。
+func (s *adminServiceImpl) resolveDefaultGroupIDForPlatform(ctx context.Context, platform string) (int64, bool) {
+	if s.groupRepo == nil {
+		return 0, false
+	}
+	groups, err := s.groupRepo.ListActive(ctx)
+	if err != nil {
+		return 0, false
+	}
+	platformDefault := strings.TrimSpace(platform) + "-default"
+	for _, g := range groups {
+		if g.Name == platformDefault {
+			return g.ID, true
+		}
+	}
+	for _, g := range groups {
+		if g.Name == "default" {
+			return g.ID, true
+		}
+	}
+	return 0, false
 }
 
 // CheckMixedChannelRisk checks whether target groups contain mixed channels for the current account platform.

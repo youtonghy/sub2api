@@ -14,10 +14,24 @@ var (
 	ErrAccountNotFound      = infraerrors.NotFound("ACCOUNT_NOT_FOUND", "account not found")
 	ErrAccountNilInput      = infraerrors.BadRequest("ACCOUNT_NIL_INPUT", "account input cannot be nil")
 	ErrAccountNotInFallback = infraerrors.BadRequest("ACCOUNT_NOT_IN_FALLBACK", "account is not in proxy fallback state")
+	// ErrAccountPriorityOutOfRange 账号拖动排序写入的优先级超出允许范围。
+	ErrAccountPriorityOutOfRange = infraerrors.BadRequest("ACCOUNT_PRIORITY_OUT_OF_RANGE", "account priority must be between 1 and 9999")
 )
 
 const AccountListGroupUngrouped int64 = -1
 const AccountPrivacyModeUnsetFilter = "__unset__"
+
+// AccountPriorityUpdate 描述一次账号优先级调整（用于账号管理界面的拖动排序）。
+type AccountPriorityUpdate struct {
+	ID       int64
+	Priority int
+}
+
+// AccountPriorityMin/Max 与前端拖动排序弹窗的取值范围保持一致。
+const (
+	AccountPriorityMin = 1
+	AccountPriorityMax = 9999
+)
 
 // OAuthRefreshPageOptions describes one bounded, cursor-stable scan of OAuth
 // accounts. Candidate platforms are supplied by TokenRefreshService's refresher
@@ -65,6 +79,8 @@ type AccountRepository interface {
 	// for all accounts that have been synced from CRS.
 	ListCRSAccountIDs(ctx context.Context) (map[string]int64, error)
 	Update(ctx context.Context, account *Account) error
+	// UpdatePriorities 在一个事务内批量写入账号优先级：任一 ID 不存在则整体失败（不部分更新）。
+	UpdatePriorities(ctx context.Context, updates []AccountPriorityUpdate) error
 	Delete(ctx context.Context, id int64) error
 
 	List(ctx context.Context, params pagination.PaginationParams) ([]Account, *pagination.PaginationResult, error)

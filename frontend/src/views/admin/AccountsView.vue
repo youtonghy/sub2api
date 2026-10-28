@@ -157,6 +157,12 @@
                           {{ t('admin.accounts.toolActions') }}
                         </div>
                       </div>
+                      <button class="account-tools-menu-item" @click="openSortOrderModal">
+                        <span class="account-tools-menu-icon bg-sky-50 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300">
+                          <Icon name="sort" size="sm" />
+                        </span>
+                        <span class="flex-1 text-left">{{ t('admin.accounts.sortOrder.title') }}</span>
+                      </button>
                       <button class="account-tools-menu-item" @click="openErrorPassthrough">
                         <span class="account-tools-menu-icon bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300">
                           <Icon name="shield" size="sm" />
@@ -238,7 +244,7 @@
           row-key="id"
           :server-side-sort="true"
           @sort="handleSort"
-          default-sort-key="name"
+          default-sort-key="priority"
           default-sort-order="asc"
           :sort-storage-key="ACCOUNT_SORT_STORAGE_KEY"
           :estimate-row-height="156"
@@ -261,32 +267,47 @@
             <span class="font-mono text-xs text-gray-500 dark:text-gray-400">#{{ value }}</span>
           </template>
           <template #cell-name="{ row, value }">
-            <div class="flex flex-col">
-              <HelpTooltip
-                v-if="accountHomepageUrl(row)"
-                :content="accountHomepageUrl(row)"
-                width-class="w-max max-w-sm break-all"
-                class="-ml-1 self-start"
+            <div class="flex items-start gap-1.5">
+              <!-- 拖拽把手：只有按住它才能拖动排序，按住行其它地方仍然是滑动多选。 -->
+              <button
+                type="button"
+                class="account-priority-drag-handle -ml-1 mt-0.5 shrink-0 cursor-grab touch-none rounded p-0.5 text-gray-300 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-500 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/row:opacity-100 active:cursor-grabbing dark:text-dark-500 dark:hover:bg-dark-700 dark:hover:text-gray-300 [@media(hover:none)]:opacity-100"
+                :class="{ '!opacity-100 text-primary-500 dark:text-primary-400': priorityDrag.activeId === row.id }"
+                :title="t('admin.accounts.sortOrder.dragHint')"
+                :aria-label="t('admin.accounts.sortOrder.dragHint')"
+                data-testid="account-priority-drag-handle"
+                @mousedown.stop.prevent="startPriorityDrag($event, row)"
+                @touchstart.stop="startPriorityDrag($event, row)"
               >
-                <template #trigger>
-                  <a
-                    :href="accountHomepageUrl(row)"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="border-b border-dotted border-gray-300 font-medium text-gray-900 dark:border-dark-600 dark:text-white"
-                  >
-                    {{ value }}
-                  </a>
-                </template>
-              </HelpTooltip>
-              <span v-else class="font-medium text-gray-900 dark:text-white">{{ value }}</span>
-              <span
-                v-if="accountDisplayEmail(row)"
-                class="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]"
-                :title="accountDisplayEmail(row) + (row.parent_chatgpt_account_id ? ' · ' + row.parent_chatgpt_account_id : '')"
-              >
-                {{ accountDisplayEmail(row) }}
-              </span>
+                <Icon name="menu" size="sm" />
+              </button>
+              <div class="flex min-w-0 flex-col">
+                <HelpTooltip
+                  v-if="accountHomepageUrl(row)"
+                  :content="accountHomepageUrl(row)"
+                  width-class="w-max max-w-sm break-all"
+                  class="-ml-1 self-start"
+                >
+                  <template #trigger>
+                    <a
+                      :href="accountHomepageUrl(row)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="border-b border-dotted border-gray-300 font-medium text-gray-900 dark:border-dark-600 dark:text-white"
+                    >
+                      {{ value }}
+                    </a>
+                  </template>
+                </HelpTooltip>
+                <span v-else class="font-medium text-gray-900 dark:text-white">{{ value }}</span>
+                <span
+                  v-if="accountDisplayEmail(row)"
+                  class="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]"
+                  :title="accountDisplayEmail(row) + (row.parent_chatgpt_account_id ? ' · ' + row.parent_chatgpt_account_id : '')"
+                >
+                  {{ accountDisplayEmail(row) }}
+                </span>
+              </div>
             </div>
           </template>
           <template #cell-notes="{ value }">
@@ -416,12 +437,16 @@
               @probe="handleProbeUpstreamBilling(row)"
             />
           </template>
+          <template #header-priority="{ column }">
+            <div class="flex items-center gap-1">
+              <span>{{ column.label }}</span>
+              <span @click.stop>
+                <HelpTooltip :content="t('admin.accounts.priorityOrderHint')" width-class="w-80" />
+              </span>
+            </div>
+          </template>
           <template #cell-priority="{ row }">
-            <AccountPriorityCell
-              :account="row"
-              @updated="handleAccountUpdated"
-              @error="(message: string) => appStore.showError(message)"
-            />
+            <AccountPriorityCell :rank="accountPriorityRank(row)" />
           </template>
           <template #header-scheduler_score="{ column }">
             <div class="flex items-center">
@@ -546,6 +571,7 @@
     </ConfirmDialog>
     <ErrorPassthroughRulesModal :show="showErrorPassthrough" @close="showErrorPassthrough = false" />
     <TLSFingerprintProfilesModal :show="showTLSFingerprintProfiles" @close="showTLSFingerprintProfiles = false" />
+    <AccountSortOrderModal :show="showSortOrderModal" @close="showSortOrderModal = false" @saved="reload" />
     <TotpStepUpDialog :controller="accountExportStepUp" />
   </AppLayout>
 </template>
@@ -560,6 +586,7 @@ import { adminAPI } from '@/api/admin'
 import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'
 import { useTableLoader } from '@/composables/useTableLoader'
 import { useSwipeSelect, type SwipeSelectVirtualContext } from '@/composables/useSwipeSelect'
+import { usePriorityDrag } from '@/composables/usePriorityDrag'
 import { useTableSelection } from '@/composables/useTableSelection'
 import { useStepUp, isStepUpBlocked, isStepUpCancelled, stepUpBlockReason } from '@/composables/useStepUp'
 import TotpStepUpDialog from '@/components/auth/TotpStepUpDialog.vue'
@@ -589,6 +616,7 @@ import AccountGroupsCell from '@/components/account/AccountGroupsCell.vue'
 import AccountCapacityCell from '@/components/account/AccountCapacityCell.vue'
 import UpstreamBillingRateCell from '@/components/account/UpstreamBillingRateCell.vue'
 import AccountPriorityCell from '@/components/account/AccountPriorityCell.vue'
+import AccountSortOrderModal from '@/components/account/AccountSortOrderModal.vue'
 import PlatformTypeBadge from '@/components/common/PlatformTypeBadge.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ErrorPassthroughRulesModal from '@/components/admin/ErrorPassthroughRulesModal.vue'
@@ -598,6 +626,7 @@ import { buildGrokUsageRefreshKey, buildOpenAIUsageRefreshKey } from '@/utils/ac
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import { computeDropPriority } from '@/utils/accountPriorityOrder'
 import { sanitizeUrl } from '@/utils/url'
 import { getFloatingPanelPosition } from '@/utils/floatingPanel'
 import { formatMultiplier } from '@/utils/formatters'
@@ -675,6 +704,7 @@ const showTest = ref(false)
 const showStats = ref(false)
 const showErrorPassthrough = ref(false)
 const showTLSFingerprintProfiles = ref(false)
+const showSortOrderModal = ref(false)
 const edAcc = ref<Account | null>(null)
 const tempUnschedAcc = ref<Account | null>(null)
 const deletingAcc = ref<Account | null>(null)
@@ -765,7 +795,9 @@ const ACCOUNT_SORTABLE_KEYS = new Set([
   'expires_at'
 ])
 const loadInitialAccountSortState = (): AccountSortState => {
-  const fallback: AccountSortState = { sort_by: 'name', sort_order: 'asc' }
+  // 账号列表默认按优先级升序：用户看到的第一行就是最先被调度的账号，
+  // 优先级列展示的位次也因此与列表顺序一致。
+  const fallback: AccountSortState = { sort_by: 'priority', sort_order: 'asc' }
   try {
     const raw = localStorage.getItem(ACCOUNT_SORT_STORAGE_KEY)
     if (!raw) return fallback
@@ -1279,31 +1311,95 @@ useSwipeSelect(accountTableRef, {
   batchUpdate
 }, swipeVirtualContext)
 
+// 行内拖动排序：只有按住名字列左侧的把手才进入拖动，
+// 按住行其它地方仍是上面的滑动多选，两者通过把手互不抢占。
+const priorityDrag = usePriorityDrag<AccountListItem>({
+  getRows: () => accounts.value,
+  getContainer: () => accountTableRef.value,
+  onDrop: (drop) => reorderAccountPriority(drop.moved, drop.previous, drop.next)
+})
+
+const startPriorityDrag = (event: MouseEvent | TouchEvent, row: AccountListItem) => {
+  priorityDrag.start(event, row)
+}
+
+// 优先级不再以数字呈现：整张表按"使用顺序"给出位次（1 = 最先被调度）。
+// 同优先级时用 id 兜底，与调度侧 ORDER BY priority, id 的稳定顺序一致。
+const priorityRankByAccountID = computed(() => {
+  const ordered = [...accounts.value].sort(
+    (left, right) => left.priority - right.priority || left.id - right.id
+  )
+  const ranks = new Map<number, number>()
+  ordered.forEach((account, index) => ranks.set(account.id, index + 1))
+  return ranks
+})
+
+const accountPriorityRank = (account: AccountListItem) =>
+  priorityRankByAccountID.value.get(account.id) ?? 0
+
+// 拖动落点 → 新的优先级。只写被拖动的这一个账号：取新前后邻居优先级的中点，
+// 邻居之间没有空位时才退回整页按位置重编号。
+const reorderAccountPriority = async (
+  moved: AccountListItem,
+  previous: AccountListItem | null,
+  next: AccountListItem | null
+) => {
+  const rows = accounts.value
+  const taken = new Set(rows.filter(row => row.id !== moved.id).map(row => row.priority))
+  const target = computeDropPriority({
+    lowerBound: previous?.priority ?? null,
+    upperBound: next?.priority ?? null,
+    taken
+  })
+  const changes = target != null
+    ? [{ id: moved.id, priority: target }]
+    : rows.map((row, index) => ({ id: row.id, priority: index + 1 }))
+  const before = new Map(rows.map(row => [row.id, row.priority]))
+  const effective = changes.filter(change => before.get(change.id) !== change.priority)
+  if (effective.length === 0) return
+
+  // 先把本地顺序改掉，失败再整体回滚，避免出现"拖完又跳回去"的闪烁。
+  const optimistic = new Map(rows.map(row => [row.id, row.priority]))
+  effective.forEach(change => optimistic.set(change.id, change.priority))
+  accounts.value = rows
+    .map(row => ({ ...row, priority: optimistic.get(row.id) ?? row.priority }))
+    .sort((left, right) => left.priority - right.priority || left.id - right.id)
+
+  try {
+    await adminAPI.accounts.updateSortOrder(effective)
+    appStore.showSuccess(t('admin.accounts.sortOrder.updated'))
+    // 顺序就是优先级本身：拖完把排序切回"优先级升序"，
+    // 让列表顺序、位次列、真实的调度顺序三者保持一致。
+    if (sortState.sort_by !== 'priority' || sortState.sort_order !== 'asc') {
+      sortState.sort_by = 'priority'
+      sortState.sort_order = 'asc'
+      void reload()
+    }
+  } catch (error) {
+    accounts.value = rows
+    appStore.showError(extractApiErrorMessage(error, t('admin.accounts.sortOrder.updateFailed')))
+  }
+}
+
 const resetAutoRefreshCache = () => {
   autoRefreshETag.value = null
   upstreamBillingRateETag.value = null
 }
-
-const isFirstLoad = ref(true)
 
 type AccountLoadOptions = {
   refreshTodayStats?: boolean
 }
 
 const load = async (options: AccountLoadOptions = {}) => {
-  const requestParams = params as any
   syncAccountListDerivedParams()
   hasPendingListSync.value = false
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = false
-  if (isFirstLoad.value) {
-    requestParams.lite = '1'
-  }
+  // lite=1 常驻列表参数：账号表只需要紧凑字段（分组/状态/用量摘要），
+  // 分页、排序、筛选与 ETag 增量刷新都必须沿用同一份紧凑响应，否则每次
+  // 翻页/排序都会退回全量 payload，丢掉账号表依赖的紧凑行结构。
+  // 需要完整账号的入口（编辑、测试、统计、复制）都先按 id 单独取全量。
   await baseLoad()
-  if (isFirstLoad.value) {
-    isFirstLoad.value = false
-    delete requestParams.lite
-  }
   if (options.refreshTodayStats !== false) {
     await Promise.all([refreshTodayStatsBatch(), refreshHourlyFailures()])
   }
@@ -1693,6 +1789,11 @@ const openExportDataDialogFromMenu = () => {
 const openErrorPassthrough = () => {
   closeAccountToolsDropdown()
   showErrorPassthrough.value = true
+}
+
+const openSortOrderModal = () => {
+  closeAccountToolsDropdown()
+  showSortOrderModal.value = true
 }
 
 const openTLSFingerprintProfiles = () => {
@@ -2701,12 +2802,21 @@ onMounted(async () => {
 
   load()
   loadUpstreamBillingProbeGlobalState()
-  try {
-    const [p, g] = await Promise.all([adminAPI.proxies.getAll(), adminAPI.groups.getAll()])
-    proxies.value = p
-    groups.value = g
-  } catch (error) {
-    console.error('Failed to load proxies/groups:', error)
+  // 代理与分组各自独立加载：代理服务故障不应连带清空分组筛选选项，
+  // 反之亦然（两者是账号表不同维度的筛选项）。
+  const [proxiesResult, groupsResult] = await Promise.allSettled([
+    adminAPI.proxies.getAll(),
+    adminAPI.groups.getAll()
+  ])
+  if (proxiesResult.status === 'fulfilled') {
+    proxies.value = proxiesResult.value
+  } else {
+    console.error('Failed to load proxies:', proxiesResult.reason)
+  }
+  if (groupsResult.status === 'fulfilled') {
+    groups.value = groupsResult.value
+  } else {
+    console.error('Failed to load groups:', groupsResult.reason)
   }
   try {
     const loadModelOptions = adminAPI.accounts.getModelOptions

@@ -2428,6 +2428,39 @@ func (h *AccountHandler) BatchUpdateCredentials(c *gin.Context) {
 	})
 }
 
+// UpdateAccountSortOrderRequest 账号拖动排序请求体（一次性写入一组账号的优先级）。
+type UpdateAccountSortOrderRequest struct {
+	Updates []struct {
+		ID       int64 `json:"id" binding:"required"`
+		Priority int   `json:"priority"`
+	} `json:"updates" binding:"required,min=1"`
+}
+
+// UpdateSortOrder 批量写入账号优先级，用于账号管理界面的拖动排序。
+// PUT /api/v1/admin/accounts/sort-order
+func (h *AccountHandler) UpdateSortOrder(c *gin.Context) {
+	var req UpdateAccountSortOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	updates := make([]service.AccountPriorityUpdate, 0, len(req.Updates))
+	for _, u := range req.Updates {
+		updates = append(updates, service.AccountPriorityUpdate{
+			ID:       u.ID,
+			Priority: u.Priority,
+		})
+	}
+
+	if err := h.adminService.UpdateAccountSortOrders(c.Request.Context(), updates); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{"message": "Account sort order updated successfully"})
+}
+
 // BulkUpdate handles bulk updating accounts with selected fields/credentials.
 // POST /api/v1/admin/accounts/bulk-update
 func (h *AccountHandler) BulkUpdate(c *gin.Context) {

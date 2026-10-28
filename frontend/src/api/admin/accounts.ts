@@ -364,6 +364,19 @@ export async function update(id: number, updates: UpdateAccountRequest): Promise
   return data
 }
 
+/**
+ * Persist the drag-and-drop priority order in one transaction.
+ * @param updates - Array of { id, priority } objects (lower priority value = used first)
+ */
+export async function updateSortOrder(
+  updates: Array<{ id: number; priority: number }>
+): Promise<{ message: string }> {
+  const { data } = await apiClient.put<{ message: string }>('/admin/accounts/sort-order', {
+    updates
+  })
+  return data
+}
+
 export async function getGrokMediaEligibility(id: number): Promise<GrokMediaEligibilityState> {
   const { data } = await apiClient.get<GrokMediaEligibilityState>(
     `/admin/accounts/${id}/grok-media-eligibility`
@@ -1294,6 +1307,7 @@ export const accountsAPI = {
   batchCreate,
   batchUpdateCredentials,
   bulkUpdate,
+  updateSortOrder,
   previewFromCrs,
   syncFromCrs,
   exportData,

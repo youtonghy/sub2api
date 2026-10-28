@@ -1472,6 +1472,107 @@ func (r *accountRepository) BatchUpdateLastUsed(ctx context.Context, updates map
 	return nil
 }
 
+// UpdatePriorities 批量更新账号优先级（单条 CASE WHEN UPDATE，事务内完成）。
+// 语义与分组拖动排序一致：任一 ID 不存在/已删除时整体失败，不做部分更新；
+// 提交后立即刷新调度器快照，保证新的优先级顺序马上生效。
+func (r *accountRepository) UpdatePriorities(ctx context.Context, updates []service.AccountPriorityUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	// 去重后保留最后一个排序值，避免重复 ID 造成 CASE 分支冲突。
+	priorityByID := make(map[int64]int, len(updates))
+	ids := make([]int64, 0, len(updates))
+	for _, u := range updates {
+		if u.ID <= 0 {
+			continue
+		}
+		if _, exists := priorityByID[u.ID]; !exists {
+			ids = append(ids, u.ID)
+		}
+		priorityByID[u.ID] = u.Priority
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	baseCtx := ctx
+	contextTx := dbent.TxFromContext(ctx)
+	exec := r.sql
+	var tx *dbent.Tx
+	if contextTx != nil {
+		exec = contextTx.Client()
+	} else if r.client != nil {
+		var txErr error
+		tx, txErr = r.client.Tx(ctx)
+		if txErr != nil && !errors.Is(txErr, dbent.ErrTxStarted) {
+			return txErr
+		}
+		if tx != nil {
+			defer func() { _ = tx.Rollback() }()
+			ctx = dbent.NewTxContext(ctx, tx)
+			exec = tx.Client()
+		}
+	}
+
+	args := make([]any, 0, len(ids)*2+1)
+	// 先确认所有 ID 都存在：不存在时直接返回 not found，避免部分写入已落库。
+	var existingCount int
+	if err := scanSingleRow(
+		ctx,
+		exec,
+		`SELECT COUNT(*) FROM accounts WHERE deleted_at IS NULL AND id = ANY($1)`,
+		[]any{pq.Array(ids)},
+		&existingCount,
+	); err != nil {
+		return err
+	}
+	if existingCount != len(ids) {
+		return service.ErrAccountNotFound
+	}
+
+	caseClauses := make([]string, 0, len(ids))
+	placeholder := 1
+	for _, id := range ids {
+		// THEN 分支必须显式 ::int 并配 ELSE：缺了 ELSE 的 CASE 分支无法从
+		// 上下文推断类型，PostgreSQL 会把参数当 text 处理，写入时直接报
+		// "column \"priority\" is of type integer but expression is of type text"。
+		caseClauses = append(caseClauses,
+			"WHEN $"+itoa(placeholder)+" THEN $"+itoa(placeholder+1)+"::int")
+		args = append(args, id, priorityByID[id])
+		placeholder += 2
+	}
+	query := "UPDATE accounts SET priority = CASE id " + joinClauses(caseClauses, " ") +
+		" ELSE priority END, updated_at = NOW() WHERE id = ANY($" + itoa(placeholder) + ") AND deleted_at IS NULL"
+	args = append(args, pq.Array(ids))
+
+	result, err := exec.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != int64(len(ids)) {
+		return service.ErrAccountNotFound
+	}
+
+	payload := map[string]any{"account_ids": ids}
+	if err := enqueueSchedulerOutbox(ctx, exec, service.SchedulerOutboxEventAccountBulkChanged, nil, nil, payload); err != nil {
+		return err
+	}
+	if tx != nil {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+	if contextTx == nil {
+		r.syncSchedulerAccountSnapshots(baseCtx, ids)
+	}
+	return nil
+}
+
 func (r *accountRepository) SetError(ctx context.Context, id int64, errorMsg string) error {
 	_, err := r.client.Account.Update().
 		Where(dbaccount.IDEQ(id)).

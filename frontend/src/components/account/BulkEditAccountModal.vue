@@ -757,34 +757,6 @@
         <div>
           <div class="mb-3 flex items-center justify-between">
             <label
-              id="bulk-edit-priority-label"
-              class="input-label mb-0"
-              for="bulk-edit-priority-enabled"
-            >
-              {{ t('admin.accounts.priority') }}
-            </label>
-            <input
-              v-model="enablePriority"
-              id="bulk-edit-priority-enabled"
-              type="checkbox"
-              aria-controls="bulk-edit-priority"
-              class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-            />
-          </div>
-          <input
-            v-model.number="priority"
-            id="bulk-edit-priority"
-            type="number"
-            min="1"
-            :disabled="!enablePriority"
-            class="input"
-            :class="!enablePriority && 'cursor-not-allowed opacity-50'"
-            aria-labelledby="bulk-edit-priority-label"
-          />
-        </div>
-        <div>
-          <div class="mb-3 flex items-center justify-between">
-            <label
               id="bulk-edit-rate-multiplier-label"
               class="input-label mb-0"
               for="bulk-edit-rate-multiplier-enabled"
@@ -1654,7 +1626,6 @@ const enableHeaderOverride = ref(false)
 const enableProxy = ref(false)
 const enableConcurrency = ref(false)
 const enableLoadFactor = ref(false)
-const enablePriority = ref(false)
 const enableRateMultiplier = ref(false)
 const enableStatus = ref(false)
 const enableGroups = ref(false)
@@ -1689,7 +1660,6 @@ const headerOverrideRows = ref<HeaderOverrideRow[]>([])
 const proxyId = ref<number | null>(null)
 const concurrency = ref(1)
 const loadFactor = ref<number | null>(null)
-const priority = ref(1)
 const rateMultiplier = ref(1)
 const status = ref<'active' | 'inactive'>('active')
 const groupIds = ref<number[]>([])
@@ -1953,10 +1923,6 @@ const buildUpdatePayload = (): Record<string, unknown> | null => {
     updates.load_factor = (lf != null && !Number.isNaN(lf) && lf > 0) ? lf : 0
   }
 
-  if (enablePriority.value) {
-    updates.priority = priority.value
-  }
-
   if (enableRateMultiplier.value) {
     updates.rate_multiplier = rateMultiplier.value
   }
@@ -2215,7 +2181,6 @@ const handleSubmit = async () => {
     enableProxy.value ||
     enableConcurrency.value ||
     enableLoadFactor.value ||
-    enablePriority.value ||
     enableRateMultiplier.value ||
     enableStatus.value ||
     enableGroups.value ||
@@ -2361,7 +2326,6 @@ watch(
       enableProxy.value = false
       enableConcurrency.value = false
       enableLoadFactor.value = false
-      enablePriority.value = false
       enableRateMultiplier.value = false
       enableStatus.value = false
       enableGroups.value = false
@@ -2399,7 +2363,6 @@ watch(
       proxyId.value = null
       concurrency.value = 1
       loadFactor.value = null
-      priority.value = 1
       rateMultiplier.value = 1
       status.value = 'active'
       groupIds.value = []
