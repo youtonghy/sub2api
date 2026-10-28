@@ -182,7 +182,7 @@ export default {
     modelPlaza: 'Model Plaza',
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
-    modelVerification: 'Model Verification',
+    modelFingerprint: 'Model Fingerprint',
     plugins: 'Plugins',
     proxies: 'Proxies',
     redeemCodes: 'Redeem Codes',

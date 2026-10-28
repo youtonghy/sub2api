@@ -831,5 +831,9 @@ func (s *stubAdminService) CreateShadow(ctx context.Context, parentID int64, opt
 	}, nil
 }
 
+func (s *stubAdminService) UpdateAccountSortOrders(ctx context.Context, updates []service.AccountPriorityUpdate) error {
+	return nil
+}
+
 // Ensure stub implements interface.
 var _ service.AdminService = (*stubAdminService)(nil)

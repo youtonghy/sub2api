@@ -913,6 +913,10 @@ func TestAPIContracts(t *testing.T) {
 					"claude_oauth_system_prompt_blocks": "",
 					"enable_anthropic_cache_ttl_1h_injection": false,
 					"rewrite_message_cache_control": false,
+					"rewrite_parallel_tool_calls_to_false": false,
+					"strict_priority_fallback": false,
+					"strict_priority_retry_count": 0,
+					"strict_priority_cooldown_minutes": 0,
 					"enable_client_dateline_normalization": true,
 					"antigravity_user_agent_version": "",
 					"enable_fingerprint_unification": true,
@@ -1232,6 +1236,10 @@ func TestAPIContracts(t *testing.T) {
 					"claude_oauth_system_prompt_blocks": "",
 					"enable_anthropic_cache_ttl_1h_injection": false,
 					"rewrite_message_cache_control": false,
+					"rewrite_parallel_tool_calls_to_false": false,
+					"strict_priority_fallback": false,
+					"strict_priority_retry_count": 0,
+					"strict_priority_cooldown_minutes": 0,
 					"enable_client_dateline_normalization": true,
 					"antigravity_user_agent_version": "",
 					"min_codex_version": "",
@@ -2969,3 +2977,8 @@ var (
 	_ service.UsageLogRepository         = (*stubUsageLogRepo)(nil)
 	_ service.SettingRepository          = (*stubSettingRepo)(nil)
 )
+
+// UpdatePriorities 拖动排序端点用；契约测试不会走到该路径。
+func (s *stubAccountRepo) UpdatePriorities(context.Context, []service.AccountPriorityUpdate) error {
+	return nil
+}

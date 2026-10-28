@@ -182,7 +182,7 @@ export default {
     modelPlaza: '模型广场',
     subscriptions: '订阅管理',
     accounts: '账号管理',
-    modelVerification: '模型验证',
+    modelFingerprint: '模型指纹检测',
     plugins: '插件管理',
     proxies: 'IP管理',
     redeemCodes: '兑换码',

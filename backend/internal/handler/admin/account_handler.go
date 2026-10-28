@@ -68,7 +68,7 @@ type AccountHandler struct {
 	grokImportProber        grokImportProber
 	upstreamBillingProbe    *service.UpstreamBillingProbeService
 	ollamaCloudUsage        *service.OllamaCloudUsageService
-	modelVerificationJobs   sync.Map
+	modelFingerprintJobs    sync.Map
 	cfg                     *config.Config
 	opencodeGoUsage         *service.OpenCodeGoUsageService
 }
@@ -1299,26 +1299,30 @@ type TestAccountRequest struct {
 	AudioDataURL string `json:"audio_data_url"`
 }
 
-type ModelVerificationRequest struct {
-	AccountIDs []int64  `json:"account_ids" binding:"required,min=1"`
-	ModelID    string   `json:"model_id"`
-	ModelIDs   []string `json:"model_ids"`
-	Level      string   `json:"level"`
+// ModelFingerprintRequest starts a fingerprint detection batch over
+// account_ids × model_ids. Rounds controls how many challenge prompts each
+// combination receives (3 gives a calibrated probability).
+type ModelFingerprintRequest struct {
+	AccountIDs  []int64  `json:"account_ids" binding:"required,min=1"`
+	ModelIDs    []string `json:"model_ids" binding:"required,min=1"`
+	Rounds      int      `json:"rounds"`
+	Concurrency int      `json:"concurrency"`
 }
 
-type modelVerificationJob struct {
+type modelFingerprintJob struct {
 	ID        string                           `json:"job_id"`
 	Status    string                           `json:"status"`
-	Report    *service.ModelVerificationReport `json:"report,omitempty"`
+	Progress  service.ModelFingerprintProgress `json:"progress"`
+	Report    *service.ModelFingerprintReport  `json:"report,omitempty"`
 	Error     string                           `json:"error,omitempty"`
 	CreatedAt time.Time                        `json:"created_at"`
 	UpdatedAt time.Time                        `json:"updated_at"`
 }
 
-// VerifyModels queues behavioral probes for selected accounts.
-// POST /api/v1/admin/accounts/model-verification
-func (h *AccountHandler) VerifyModels(c *gin.Context) {
-	var req ModelVerificationRequest
+// ModelFingerprint queues a fingerprint detection batch.
+// POST /api/v1/admin/accounts/model-fingerprint
+func (h *AccountHandler) ModelFingerprint(c *gin.Context) {
+	var req ModelFingerprintRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -1327,66 +1331,67 @@ func (h *AccountHandler) VerifyModels(c *gin.Context) {
 		response.InternalError(c, "account test service unavailable")
 		return
 	}
-	modelIDs := req.ModelIDs
-	if len(modelIDs) == 0 && req.ModelID != "" {
-		modelIDs = []string{req.ModelID}
+	job := &modelFingerprintJob{ID: uuid.NewString(), Status: "running", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	h.modelFingerprintJobs.Store(job.ID, job)
+	options := service.ModelFingerprintOptions{
+		AccountIDs:  append([]int64(nil), req.AccountIDs...),
+		ModelIDs:    append([]string(nil), req.ModelIDs...),
+		Rounds:      req.Rounds,
+		Concurrency: req.Concurrency,
+		OnProgress: func(progress service.ModelFingerprintProgress) {
+			if value, ok := h.modelFingerprintJobs.Load(job.ID); ok {
+				if current, ok := value.(*modelFingerprintJob); ok {
+					updated := *current
+					updated.Progress = progress
+					updated.UpdatedAt = time.Now().UTC()
+					h.modelFingerprintJobs.Store(job.ID, &updated)
+				}
+			}
+		},
 	}
-	job := &modelVerificationJob{ID: uuid.NewString(), Status: "running", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
-	h.modelVerificationJobs.Store(job.ID, job)
-	accountIDs := append([]int64(nil), req.AccountIDs...)
-	models := append([]string(nil), modelIDs...)
-	level := req.Level
 	go func() {
-		report, err := h.accountTestService.VerifyModels(context.Background(), accountIDs, models, level)
-		completed := &modelVerificationJob{ID: job.ID, Status: "completed", Report: report, CreatedAt: job.CreatedAt, UpdatedAt: time.Now().UTC()}
-		if err != nil {
-			completed.Status, completed.Error = "failed", err.Error()
+		report := h.accountTestService.RunModelFingerprintBatch(context.Background(), options)
+		completed := &modelFingerprintJob{
+			ID:        job.ID,
+			Status:    "completed",
+			Report:    report,
+			Progress:  service.ModelFingerprintProgress{Total: len(report.Results), Completed: len(report.Results)},
+			CreatedAt: job.CreatedAt,
+			UpdatedAt: time.Now().UTC(),
 		}
-		h.modelVerificationJobs.Store(job.ID, completed)
+		if len(report.Errors) > 0 && len(report.Results) == 0 {
+			completed.Status = "failed"
+			completed.Error = strings.Join(report.Errors, "; ")
+		}
+		h.modelFingerprintJobs.Store(job.ID, completed)
 	}()
 	response.Success(c, job)
 }
 
-// GetModelVerificationJob returns the current background verification state.
-func (h *AccountHandler) GetModelVerificationJob(c *gin.Context) {
+// GetModelFingerprintJob returns the current background detection state.
+func (h *AccountHandler) GetModelFingerprintJob(c *gin.Context) {
 	jobID := strings.TrimSpace(c.Param("job_id"))
-	value, ok := h.modelVerificationJobs.Load(jobID)
+	value, ok := h.modelFingerprintJobs.Load(jobID)
 	if !ok {
-		response.NotFound(c, "model verification job not found")
+		response.NotFound(c, "model fingerprint job not found")
 		return
 	}
 	response.Success(c, value)
 }
 
-// GetModelVerificationHistory returns persisted verification summaries.
-func (h *AccountHandler) GetModelVerificationHistory(c *gin.Context) {
-	ids := make([]int64, 0)
-	for _, raw := range strings.Split(c.Query("account_ids"), ",") {
-		raw = strings.TrimSpace(raw)
-		if raw == "" {
-			continue
-		}
-		id, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || id <= 0 {
-			response.BadRequest(c, "invalid account_ids")
-			return
-		}
-		ids = append(ids, id)
-	}
-	if len(ids) == 0 {
-		response.BadRequest(c, "account_ids is required")
-		return
-	}
+// GetModelFingerprintBank returns the bundled reference bank metadata so the UI
+// can show the data version and which models are comparable.
+func (h *AccountHandler) GetModelFingerprintBank(c *gin.Context) {
 	if h.accountTestService == nil {
 		response.InternalError(c, "account test service unavailable")
 		return
 	}
-	history, err := h.accountTestService.GetModelVerificationHistory(c.Request.Context(), ids)
+	info, err := h.accountTestService.GetModelFingerprintBank(c.Request.Context())
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
-	response.Success(c, gin.H{"accounts": history})
+	response.Success(c, info)
 }
 
 type SyncFromCRSRequest struct {

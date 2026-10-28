@@ -185,68 +185,117 @@ export async function getModelOptions(): Promise<string[]> {
   return data.models ?? []
 }
 
-export interface ModelVerificationProbe {
+/** One challenge round: how many numbers the model actually produced. */
+export interface ModelFingerprintSample {
   index: number
-  prompt: string
+  expected_count: number
   status: string
-  matched: boolean
-  response?: string
-  error?: string
+  parsed_numbers: number
+  minimum_numbers: number
+  accepted: boolean
   latency_ms: number
-  profile?: string
-  effort?: string
+  preview?: string
+  error?: string
 }
 
-export interface ModelVerificationAccountReport {
+/** One ranked candidate from the bundled reference bank. */
+export interface ModelFingerprintCandidate {
+  model: string
+  display_name: string
+  family: string
+  family_name: string
+  score: number
+  probability?: number | null
+}
+
+export interface ModelFingerprintSequence {
+  autocorrelation: number
+  small_step_share: number
+  model_like: boolean
+}
+
+/** Verdict for one account × model combination. */
+export interface ModelFingerprintResult {
   account_id: number
+  account_name?: string
+  platform?: string
   model_id: string
-  authenticity_percent: number
-  matched_probes: number
-  completed_probes?: number
-  total_probes: number
-  status: string
-  probes: ModelVerificationProbe[]
-  model_scores?: Record<string, number>
-  scoring_mode?: string
-  evidence_quality?: number
-  hard_anomalies?: string[]
-  juice_evidence?: string[]
-  juice_classifications?: string[]
-  juice_state?: string
-  verdict?: string
-  fingerprint_model?: string
-  fingerprint_claim_mismatch?: boolean
-  tested_at?: string
+  requested_model?: string
+  /** scored | partial | unscorable | not_model | error */
+  decision: string
+  prediction?: string
+  prediction_name?: string
+  family_prediction?: string
+  family_name?: string
+  ranking_score?: number | null
+  /** Closed-set confidence; present only for three valid samples. */
+  probability?: number | null
+  matches_claim: boolean
+  claim_comparable: boolean
+  used_outputs: number
+  requested_rounds: number
+  candidates?: ModelFingerprintCandidate[]
+  samples: ModelFingerprintSample[]
+  sequence?: ModelFingerprintSequence
+  method?: string
+  bank_built_at?: string
+  evidence?: string
+  error?: string
+  tested_at: string
 }
 
-export interface ModelVerificationReport {
-  model_id?: string
-  level: string
+export interface ModelFingerprintReport {
   started_at: string
-  finished_at: string
-  accounts?: ModelVerificationAccountReport[]
-  models: Array<{ model_id: string; accounts: ModelVerificationAccountReport[] }>
+  finished_at?: string
+  rounds: number
+  bank_built_at?: string
+  bank_models?: string[]
+  results: ModelFingerprintResult[]
+  errors?: string[]
 }
 
-export async function verifyModels(payload: {
-  account_ids: number[]
-  model_id?: string
-  model_ids?: string[]
-  level: 'low' | 'medium' | 'high'
-}): Promise<ModelVerificationReport> {
-	const { data } = await apiClient.post<{ job_id?: string; status?: string; report?: ModelVerificationReport }>('/admin/accounts/model-verification', payload)
-	if (!data.job_id) return data as unknown as ModelVerificationReport
-	for (let attempt = 0; attempt < 1800; attempt++) {
-		await new Promise(resolve => setTimeout(resolve, 2000))
-		const job = await apiClient.get<{ job_id: string; status: string; report?: ModelVerificationReport; error?: string }>(`/admin/accounts/model-verification/jobs/${data.job_id}`)
-		if (job.data.status === 'completed' && job.data.report) return job.data.report
-		if (job.data.status === 'failed') throw new Error(job.data.error || 'model verification failed')
-	}
-	throw new Error('model verification timed out')
+export interface ModelFingerprintJob {
+  job_id: string
+  status: string
+  progress: { total: number; completed: number; matched: number }
+  report?: ModelFingerprintReport
+  error?: string
 }
 
-export async function getModelVerificationHistory(accountIds: number[]): Promise<{ accounts: Record<string, Array<Record<string, unknown>>> }> {
-  const { data } = await apiClient.get<{ accounts: Record<string, Array<Record<string, unknown>>> }>('/admin/accounts/model-verification/history', { params: { account_ids: accountIds.join(',') } })
+export interface ModelFingerprintBankModel {
+  id: string
+  display_name: string
+  family: string
+  family_name: string
+}
+
+export interface ModelFingerprintBankInfo {
+  built_at: string
+  schema: string
+  models: ModelFingerprintBankModel[]
+}
+
+/** Run a fingerprint batch and resolve with the finished report. */
+export async function modelFingerprint(
+  payload: { account_ids: number[]; model_ids: string[]; rounds?: number; concurrency?: number },
+  options?: { onProgress?: (progress: ModelFingerprintJob['progress']) => void; signal?: AbortSignal }
+): Promise<ModelFingerprintReport> {
+  const { data } = await apiClient.post<ModelFingerprintJob>('/admin/accounts/model-fingerprint', payload)
+  if (!data.job_id) throw new Error('model fingerprint job was not created')
+  for (let attempt = 0; attempt < 3600; attempt++) {
+    if (options?.signal?.aborted) throw new DOMException('aborted', 'AbortError')
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    const job = await apiClient.get<ModelFingerprintJob>(`/admin/accounts/model-fingerprint/jobs/${data.job_id}`)
+    options?.onProgress?.(job.data.progress)
+    if (job.data.status === 'completed' && job.data.report) return job.data.report
+    if (job.data.status === 'failed') throw new Error(job.data.error || 'model fingerprint failed')
+  }
+  throw new Error('model fingerprint timed out')
+}
+
+/** Bundled reference bank version and its model list. */
+export async function getModelFingerprintBank(): Promise<ModelFingerprintBankInfo> {
+  const { data } = await apiClient.get<ModelFingerprintBankInfo>('/admin/accounts/model-fingerprint/bank')
   return data
 }
 
@@ -1211,8 +1260,8 @@ export const accountsAPI = {
   getUpstreamBillingRatesWithEtag,
   getById,
   getModelOptions,
-  verifyModels,
-  getModelVerificationHistory,
+  modelFingerprint,
+  getModelFingerprintBank,
   create,
   duplicate,
   update,

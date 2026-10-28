@@ -441,3 +441,8 @@ func TestUpdateSessionWindow_NoStatusHeader(t *testing.T) {
 		t.Errorf("expected no calls when status header absent, got %d", len(repo.sessionWindowCalls))
 	}
 }
+
+// UpdatePriorities 拖动排序专用；这些桩不会走到该路径。
+func (s *sessionWindowMockRepo) UpdatePriorities(context.Context, []AccountPriorityUpdate) error {
+	panic("unexpected UpdatePriorities call")
+}

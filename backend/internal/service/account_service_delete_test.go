@@ -289,3 +289,8 @@ func TestAccountService_Delete_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []int64{55}, repo.deletedIDs) // 验证正确的 ID 被删除
 }
+
+// UpdatePriorities 拖动排序专用；这些桩不会走到该路径。
+func (s *accountRepoStub) UpdatePriorities(context.Context, []AccountPriorityUpdate) error {
+	panic("unexpected UpdatePriorities call")
+}
