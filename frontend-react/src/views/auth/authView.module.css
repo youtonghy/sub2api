@@ -1,0 +1,42 @@
+/* 登录类页面共用样式：内容位于 AuthLayout 的 24rem 表单列 */
+.page { display: grid; gap: var(--space-6); }
+.form { display: grid; gap: var(--space-5); }
+.field { display: grid; gap: var(--space-2); }
+.fullWidth { width: 100%; }
+.alternatives { display: grid; gap: var(--space-3); padding-top: var(--space-1); }
+
+.fieldFooter { display: flex; justify-content: flex-end; }
+.link { color: var(--accent-strong); font-weight: 500; text-decoration: none; text-underline-offset: 4px; }
+@media (hover: hover) and (pointer: fine) { .link:hover { text-decoration: underline; } }
+.footerText { margin: 0; color: var(--text-secondary); }
+.footerButton { display: inline-flex; align-items: center; gap: var(--space-2); border: 0; padding: 0; background: none; color: var(--text-secondary); font: inherit; cursor: pointer; }
+@media (hover: hover) and (pointer: fine) { .footerButton:hover { color: var(--foreground); } }
+
+.optional { margin-left: var(--space-1); color: var(--text-muted); font-size: var(--text-xs); font-weight: 400; }
+.labelRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.statusLine { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--text-sm); line-height: var(--leading-body); }
+.statusValid { color: var(--success); }
+.statusInvalid { color: var(--danger); }
+.statusPending { color: var(--text-muted); }
+.spinner { animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+
+.center { display: flex; justify-content: center; }
+.resend { border: 0; padding: 0; background: none; color: var(--accent-strong); font: inherit; font-size: var(--text-sm); cursor: pointer; }
+.resend:disabled { color: var(--text-muted); cursor: not-allowed; }
+.emphasis { color: var(--foreground); font-weight: 500; }
+
+/* 无布局的整页（OAuth 回调、微信支付回调） */
+.standalone { min-height: 100dvh; padding: var(--space-10) var(--space-4); background: var(--background); color: var(--foreground); }
+.standaloneInner { width: 100%; max-width: 42rem; margin: 0 auto; }
+.panel { display: grid; gap: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-surface); padding: var(--space-6); background: var(--surface); }
+.panelCentered { text-align: center; justify-items: center; }
+.panelTitle { margin: 0; font-size: var(--text-lg); font-weight: 500; line-height: var(--leading-body); }
+.panelText { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.panelHeader { display: grid; gap: var(--space-2); }
+.copyRow { display: flex; align-items: flex-end; gap: var(--space-2); }
+.copyRow > :first-child { min-width: 0; flex: 1; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.loader { display: flex; justify-content: center; padding: var(--space-8) 0; color: var(--text-muted); }
+.inlineError { margin: 0; color: var(--danger); font-size: var(--text-sm); line-height: var(--leading-body); }

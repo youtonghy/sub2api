@@ -1,0 +1,18 @@
+/* Turnstile：容器占满宽度，加载完成前用占位覆盖 */
+.turnstile { position: relative; width: 100%; }
+.turnstileContainer { width: 100%; min-height: 65px; }
+/* 让 Turnstile iframe 填满容器宽度 */
+.turnstileContainer iframe { width: 100% !important; }
+.turnstileLoading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-muted); color: var(--text-secondary); font-size: var(--text-sm); }
+
+/* 腾讯国际站 Robot checkbox 容器：可见时居中占位，隐藏时缩到不可见但保留在 DOM 中供 SDK 预加载 */
+.intlVisible { display: flex; width: 100%; min-height: 60px; justify-content: center; }
+.intlHidden { position: fixed; top: 0; left: 50%; display: flex; width: 302px; height: 60px; opacity: 0; pointer-events: none; transform: translateX(-50%) scale(.01); }
+
+/* 阿里云触发按钮 */
+.aliyun { width: 100%; }
+.aliyunButton { display: flex; width: 100%; min-height: var(--control-height-lg); align-items: center; justify-content: center; gap: var(--space-2); border: 1px solid var(--border-strong); border-radius: var(--radius-control); padding: var(--space-2) var(--space-3); background: var(--surface-muted); color: var(--foreground); font: inherit; font-size: var(--text-sm); font-weight: 500; cursor: pointer; transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
+@media (hover: hover) and (pointer: fine) { .aliyunButton:hover:not(:disabled) { border-color: var(--foreground); background: var(--surface); } }
+.aliyunButton[data-verified] { border-color: var(--success); background: color-mix(in srgb, var(--success) 8%, var(--surface)); color: var(--success); cursor: default; }
+.aliyunButton svg { flex: none; }
+@media (prefers-reduced-motion: reduce) { .aliyunButton { transition: none; } }

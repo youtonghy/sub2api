@@ -7,6 +7,7 @@ import batchImage from './batchImage'
 import admin from './admin'
 import misc from './misc'
 import shell from './shell'
+import authUi from './authUi'
 
 export default {
   adminAccessKeys,
@@ -18,4 +19,5 @@ export default {
   admin,
   ...misc,
   ...shell,
+  ...authUi,
 }

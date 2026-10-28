@@ -1,0 +1,26 @@
+/* 勾选模式：复选框加协议链接 */
+.consent { display: flex; align-items: flex-start; gap: var(--space-2); padding: 0 2px; }
+.consentText { min-width: 0; flex: 1; margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.consentLabel { color: var(--foreground); cursor: pointer; }
+.link { color: var(--accent-strong); font-weight: 500; text-decoration: none; text-underline-offset: 4px; }
+@media (hover: hover) and (pointer: fine) { .link:hover { text-decoration: underline; } }
+
+/* 弹窗模式且未同意：提示条 */
+.notice { display: flex; align-items: flex-start; gap: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-panel); padding: var(--space-3); background: var(--accent-subtle); }
+.noticeIcon { flex: none; margin-top: 2px; color: var(--accent-strong); }
+.noticeCopy { min-width: 0; flex: 1; }
+.noticeTitle { margin: 0; font-size: var(--text-sm); font-weight: 500; }
+.noticeDescription { margin: var(--space-1) 0 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+
+.dialog { width: min(calc(100vw - var(--space-8)), 600px); }
+.dialogBody { display: grid; gap: var(--space-3); max-height: 58vh; overflow-y: auto; }
+.sectionTitle { margin: 0; font-size: var(--text-sm); font-weight: 500; }
+.documentGrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+@media (min-width: 640px) { .documentGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.documentCard { display: flex; min-height: 72px; align-items: center; gap: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-panel); padding: var(--space-3) var(--space-4); background: var(--surface-muted); color: var(--foreground); text-decoration: none; transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
+@media (hover: hover) and (pointer: fine) { .documentCard:hover { border-color: var(--border-strong); background: var(--surface); } }
+.documentIcon { display: grid; width: 40px; height: 40px; flex: none; place-items: center; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); color: var(--text-secondary); }
+.documentTitle { min-width: 0; flex: 1; overflow: hidden; font-size: var(--text-sm); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.documentExternal { flex: none; color: var(--text-muted); }
+.dialogActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin-top: var(--space-5); }
+@media (prefers-reduced-motion: reduce) { .documentCard { transition: none; } }

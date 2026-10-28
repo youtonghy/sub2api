@@ -1,0 +1,17 @@
+.section { display: grid; gap: var(--space-4); }
+.fullWidth { width: 100%; }
+
+.divider { display: flex; align-items: center; gap: var(--space-3); }
+.dividerLine { height: 1px; flex: 1; background: var(--border); }
+.dividerText { color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
+
+.mark { width: 20px; height: 20px; flex: none; }
+/* 无品牌图标的提供方用首字母徽标 */
+.initial { display: inline-flex; width: 20px; height: 20px; flex: none; align-items: center; justify-content: center; border-radius: var(--radius-pill); background: var(--accent-subtle); color: var(--accent-strong); font-size: var(--text-xs); font-weight: 500; line-height: 1; }
+.initialWechat { background: color-mix(in srgb, var(--success) 14%, var(--surface)); color: var(--success); }
+
+.providerGrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+@media (min-width: 640px) { .providerGrid[data-columns="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.providerButton { width: 100%; min-height: var(--control-height-lg); }
+
+.hint { margin: 0; color: var(--warning); font-size: var(--text-sm); line-height: var(--leading-body); }
