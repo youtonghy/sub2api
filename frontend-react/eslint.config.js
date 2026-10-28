@@ -26,5 +26,16 @@ export default tseslint.config(
       '@typescript-eslint/ban-ts-comment': 'off',
       '@typescript-eslint/no-explicit-any': 'off'
     }
+  },
+  {
+    // Arc 组件源码（shadcn 安装）：保留原样。源码里有针对 Next.js 规则的 disable 注释，
+    // 这里注册一个空实现避免“规则未定义”报错。
+    files: ['src/components/arc/**/*.{ts,tsx}'],
+    plugins: {
+      '@next/next': { rules: { 'no-img-element': { create: () => ({}) } } }
+    },
+    rules: {
+      'react-refresh/only-export-components': 'off'
+    }
   }
 )

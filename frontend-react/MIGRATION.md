@@ -21,7 +21,11 @@ git diff <基线提交>..HEAD -- frontend/src
 - `i18n/`：使用 `@intlify/core-base`（vue-i18n 的框架无关内核），消息格式不变。组件内用 `useI18n()`，组件外直接 `import { t } from '@/i18n'`。
 - `stores/`：Pinia store 换成 Zustand，状态与方法同名。组件内用 `useAppStore(selector)`，组件外用 `useAppStore.getState()`。
 - `constants/platformCatalog.ts`、`constants/platforms.ts`、`utils/ipGeoLookup.ts`：Vue 响应式换成模块状态加订阅函数，导出 API 不变。
-- 主题：`<html data-theme>` 与 `data-accent="retoo"`，沿用 localStorage 键 `theme`。
+- 主题：`<html data-theme>` 与 `data-accent="retoo"`，沿用 localStorage 键 `theme`；未保存时跟随系统。
+- 路由：`router/routes.ts` 与 Vue 路由表一一对应（路径、名称、meta）。守卫是 `router/guard.ts` 中的纯函数，由每条路由的 loader 调用；未迁移的页面暂用 `pending()`，迁移后替换为真实 import。
+- 布局：`AppLayout`（侧边栏外壳）与 `AuthLayout`（登录类页面）作为父路由，页面内不再包裹布局组件；登录页的页脚插槽改用 `<AuthFooter>`。
+- 新增文案放在 `i18n/locales/{en,zh}/shell.ts`，与 Vue 共享的语言文件保持原样。
+- Arc Pro 文件清单见仓库根目录 `NOTICE`，新增 Pro 组件时同步更新。
 
 ## 常用命令
 

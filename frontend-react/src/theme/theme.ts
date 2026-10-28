@@ -1,44 +1,78 @@
 /**
  * 主题：Arc 通过 <html data-theme="dark"> 切换深色模式，data-accent 选择强调色。
- * 沿用 Vue 版的 localStorage 键 `theme`，切换后用户的主题偏好保持不变。
+ * 沿用 Vue 版的 localStorage 键 `theme`：未保存时跟随系统，与 Vue 版行为一致。
  */
 export type ThemeMode = 'light' | 'dark'
+export type ThemePreference = ThemeMode | 'system'
 
 const THEME_KEY = 'theme'
 const ACCENT = 'retoo'
+const DARK_QUERY = '(prefers-color-scheme: dark)'
 
 const listeners = new Set<() => void>()
 
-function readTheme(): ThemeMode {
-  const savedTheme = localStorage.getItem(THEME_KEY)
-  const shouldUseDark =
-    savedTheme === 'dark' ||
-    (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  return shouldUseDark ? 'dark' : 'light'
+function readPreference(): ThemePreference {
+  const saved = localStorage.getItem(THEME_KEY)
+  return saved === 'dark' || saved === 'light' ? saved : 'system'
 }
 
-let current: ThemeMode = 'light'
+function resolve(preference: ThemePreference): ThemeMode {
+  if (preference !== 'system') return preference
+  return window.matchMedia(DARK_QUERY).matches ? 'dark' : 'light'
+}
 
-function apply(theme: ThemeMode): void {
-  current = theme
+let preference: ThemePreference = 'system'
+let current: ThemeMode = 'light'
+let systemWatcher: MediaQueryList | null = null
+
+function notify(): void {
+  listeners.forEach((listener) => listener())
+}
+
+function apply(): void {
+  current = resolve(preference)
   const root = document.documentElement
-  root.setAttribute('data-theme', theme)
+  root.setAttribute('data-theme', current)
   root.setAttribute('data-accent', ACCENT)
+}
+
+function onSystemChange(): void {
+  if (preference !== 'system') return
+  apply()
+  notify()
 }
 
 /** 挂载前调用，避免首屏闪烁 */
 export function initTheme(): void {
-  apply(readTheme())
+  preference = readPreference()
+  apply()
+  if (!systemWatcher) {
+    systemWatcher = window.matchMedia(DARK_QUERY)
+    systemWatcher.addEventListener?.('change', onSystemChange)
+  }
 }
 
 export function getTheme(): ThemeMode {
   return current
 }
 
+export function getThemePreference(): ThemePreference {
+  return preference
+}
+
+export function setThemePreference(next: ThemePreference): void {
+  preference = next
+  if (next === 'system') {
+    localStorage.removeItem(THEME_KEY)
+  } else {
+    localStorage.setItem(THEME_KEY, next)
+  }
+  apply()
+  notify()
+}
+
 export function setTheme(theme: ThemeMode): void {
-  apply(theme)
-  localStorage.setItem(THEME_KEY, theme)
-  listeners.forEach((listener) => listener())
+  setThemePreference(theme)
 }
 
 export function toggleTheme(): void {

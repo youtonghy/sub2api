@@ -1,8 +1,25 @@
 import { useSyncExternalStore } from 'react'
 
-import { getTheme, setTheme, subscribeTheme, toggleTheme, type ThemeMode } from './theme'
+import {
+  getTheme,
+  getThemePreference,
+  setTheme,
+  setThemePreference,
+  subscribeTheme,
+  toggleTheme,
+  type ThemeMode,
+  type ThemePreference,
+} from './theme'
 
-export function useTheme(): { theme: ThemeMode; isDark: boolean; setTheme: typeof setTheme; toggleTheme: typeof toggleTheme } {
+export function useTheme(): {
+  theme: ThemeMode
+  preference: ThemePreference
+  isDark: boolean
+  setTheme: typeof setTheme
+  setThemePreference: typeof setThemePreference
+  toggleTheme: typeof toggleTheme
+} {
   const theme = useSyncExternalStore(subscribeTheme, getTheme, getTheme)
-  return { theme, isDark: theme === 'dark', setTheme, toggleTheme }
+  const preference = useSyncExternalStore(subscribeTheme, getThemePreference, getThemePreference)
+  return { theme, preference, isDark: theme === 'dark', setTheme, setThemePreference, toggleTheme }
 }

@@ -1,0 +1,19 @@
+RetooAi
+Copyright the RetooAi and Sub2API contributors.
+
+This project is licensed under the GNU Lesser General Public License v3.0
+(see LICENSE), with the exception of the files listed below.
+
+Arc Pro (https://uiarc.dev)
+---------------------------
+The following files are Arc Pro source, or are derived from it, and are used
+under the Arc Pro license as part of this end product. They are NOT covered by
+this project's open-source license and may not be redistributed on their own,
+modified or not, or reused in other projects without your own Arc Pro license.
+See https://uiarc.dev/license.
+
+  frontend-react/src/components/arc/blocks/sidebar-rail/   (adapted from the Arc Pro sidebar-rail block)
+  frontend-react/src/layouts/AuthLayout.module.css         (frame styles derived from the Arc Pro login-split block)
+
+Free Arc components under frontend-react/src/components/arc/ are distributed
+under their own license from https://uiarc.dev.
