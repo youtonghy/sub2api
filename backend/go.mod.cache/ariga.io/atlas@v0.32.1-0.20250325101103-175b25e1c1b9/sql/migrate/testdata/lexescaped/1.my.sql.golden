@@ -1,7 +1,0 @@
-create table t (c text default '\\');
--- end --
-create table t (c text default "\\");
--- end --
-create table t (c text default "\"");
--- end --
-create table t (c text default "\"" + '\'');

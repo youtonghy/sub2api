@@ -28,6 +28,8 @@ vendor/
 
 # Go 编译缓存
 backend/.gocache/
+# 本机 Go module 缓存（构建时以 docker volume 挂载，不进版本控制）
+backend/go.mod.cache/
 
 # ===================
 # Node.js / Vue 前端

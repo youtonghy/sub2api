@@ -1,3 +1,0 @@
-variable "hobby" {
-  type = string
-}

@@ -1,8 +1,0 @@
-typedef HttpRequest;
-typedef HttpResponse;
-typedef HttpTransport;
-
-init(){
-}
-
-async function call(request: HttpRequest, transport: HttpTransport): HttpResponse;
