@@ -13,8 +13,10 @@ export interface MessagesDispatchFormState {
   exact_model_mappings: MessagesDispatchMappingRow[];
 }
 
-export function supportsMessagesDispatchPlatform(platform: string): boolean {
-  return platform === "openai" || platform === "composite";
+// 分组已不再归属单一平台：所有分组都是全平台分组（composite），Messages 调度
+// 模型映射一律可配置。参数保留以对齐后端签名，便于将来恢复平台维度。
+export function supportsMessagesDispatchPlatform(_platform: string): boolean {
+  return true;
 }
 
 export function createDefaultMessagesDispatchFormState(): MessagesDispatchFormState {

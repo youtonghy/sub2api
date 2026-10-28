@@ -1135,11 +1135,29 @@ func (s *GatewayService) isStickyAccountUpstreamRestricted(ctx context.Context, 
 // UpstreamFailoverError：按 error.type/message 还原真实语义状态码并触发账号侧副作用，
 // 同时登记 stream_error 运维记录。
 //
-// outputStarted 只影响调用方是否允许本次请求内换号：event:error 可能在响应字节已经
-// 下发给客户端之后才到达，此时换号不安全，但账号健康仍必须观察到真实状态，否则下一个
-// 请求还是会命中同一个限流/过载来源。
+// outputStarted 只影响本次请求能否换号：event:error 可能在响应字节已经下发给客户端
+// 之后才到达，此时换号不安全，但账号健康仍必须观察到真实状态，否则下一个请求还是会
+// 命中同一个限流/过载来源。因此：
+//   - 账号副作用与运维归因始终用真实语义状态码；
+//   - 已下发字节时返回不可重试的终止状态（403），避免调用方在流已提交后重试造成流拼接腐化。
 func (s *GatewayService) sseStreamErrorEventFailover(ctx context.Context, c *gin.Context, account *Account, resp *http.Response, rawData, model string, outputStarted bool) *UpstreamFailoverError {
-	_ = outputStarted
+	// 原生 Anthropic 转发路径：始终返回真实语义状态码（overloaded 529、rate limit 429 …），
+	// 调用方以「已写入字节数」为唯一换号门禁，不依赖状态码判断可重试性。
+	return s.sseStreamErrorEventFailoverWithCommittedStatus(ctx, c, account, resp, rawData, model, outputStarted, 0)
+}
+
+// sseStreamErrorEventFailoverCompat 供 chat/responses 兼容流转发路径使用。
+//
+// 兼容流在响应字节已下发时把状态码收敛为 403（不可重试的终止状态），与原生收尾
+// 约定一致：避免调用方在流已提交后重试造成流拼接腐化。账号健康观测与运维归因仍
+// 使用真实语义状态码。
+func (s *GatewayService) sseStreamErrorEventFailoverCompat(ctx context.Context, c *gin.Context, account *Account, resp *http.Response, rawData, model string, outputStarted bool) *UpstreamFailoverError {
+	return s.sseStreamErrorEventFailoverWithCommittedStatus(ctx, c, account, resp, rawData, model, outputStarted, http.StatusForbidden)
+}
+
+// sseStreamErrorEventFailoverWithCommittedStatus 是两条路径的共用实现。
+// committedStatus <= 0 表示保持语义状态码；> 0 表示响应已下发时改用该终止状态码。
+func (s *GatewayService) sseStreamErrorEventFailoverWithCommittedStatus(ctx context.Context, c *gin.Context, account *Account, resp *http.Response, rawData, model string, outputStarted bool, committedStatus int) *UpstreamFailoverError {
 	body := []byte(rawData)
 	semanticStatus := anthropicSSEErrorStatus(body)
 	syntheticResp := &http.Response{
@@ -1181,8 +1199,14 @@ func (s *GatewayService) sseStreamErrorEventFailover(ctx context.Context, c *gin
 		truncateString(rawData, 1000),
 	)
 
+	// 响应字节已下发时本次请求无法换号：对需要终止语义的调用方返回固定状态，
+	// 让上层直接收尾；真实语义状态码已在上面的账号副作用与 ops 归因里使用。
+	clientStatus := semanticStatus
+	if outputStarted && committedStatus > 0 {
+		clientStatus = committedStatus
+	}
 	return &UpstreamFailoverError{
-		StatusCode:   semanticStatus,
+		StatusCode:   clientStatus,
 		ResponseBody: body,
 	}
 }

@@ -81,9 +81,14 @@ func (Group) Fields() []ent.Field {
 			Comment("内部幂等恢复标识，不对 API 暴露"),
 
 		// Subscription-related fields (added by migration 003)
+		// platform 已退化为「分组形态标记」：分组不再归属单一平台，恒为 composite。
+		// 账号仍属于具体平台，请求按模型解析出的目标平台在该平台账号池内调度。
+		// 字段保留是为了让既有的 composite 运行时分枝（定价匹配、模型广场、用量平台
+		// 推导、可用渠道等）继续生效，并为将来彻底移除留出回滚余地。
 		field.String("platform").
 			MaxLen(50).
-			Default(domain.PlatformAnthropic),
+			Default(domain.PlatformComposite).
+			Comment("分组形态标记，恒为 composite（全平台）；请求目标平台由模型解析得出"),
 		field.String("subscription_type").
 			MaxLen(20).
 			Default(domain.SubscriptionTypeStandard),

@@ -145,8 +145,10 @@ type Group struct {
 
 // IsGroupBindableInSimpleMode is the shared policy for groups that may be
 // surfaced and bound to accounts while running in simple mode.
+//
+// 全平台分组改造后所有分组都是 composite 形态，简单模式不再排除任何分组。
 func IsGroupBindableInSimpleMode(group *Group) bool {
-	return group != nil && group.Platform != PlatformComposite
+	return group != nil
 }
 
 func (g *Group) IsActive() bool {
@@ -407,15 +409,16 @@ func validProfitControlRatio(v float64) bool {
 	return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 && v < 1
 }
 
-// NormalizeGroupPlatform 把创建分组时省略的 platform 归一化为默认平台。
+// NormalizeGroupPlatform 把分组 platform 归一化为全平台形态。
+//
+// 分组已不再归属单一平台：一个分组可以绑定任意平台的账号，请求按模型解析出的
+// 目标平台在该平台账号池内调度。platform 列因此退化为「分组形态标记」，恒为
+// composite；这里忽略调用方传入的具体平台值，只做单一收口。
+//
 // handler 的入参预校验必须与 CreateGroup 落库时用同一个归一化结果，否则
-// 「省略 platform + 启用利润控制」会被 handler 以「平台不支持」400 掉，
-// 而该分组本会被建成受支持的 anthropic 分组。
-func NormalizeGroupPlatform(platform string) string {
-	if platform == "" {
-		return PlatformAnthropic
-	}
-	return platform
+// 「携带单平台值 + 启用利润控制」会被 handler 以「平台不支持」400 掉。
+func NormalizeGroupPlatform(_ string) string {
+	return PlatformComposite
 }
 
 // ValidateProfitControlConfig 是分组利润控制配置的唯一校验来源，handler 与 service 层共用。
@@ -427,7 +430,7 @@ func ValidateProfitControlConfig(platform string, enabled bool, minMargin, safet
 		return nil
 	}
 	if !profitControlPlatformSupported(platform) {
-		return errors.New("利润控制仅支持 openai、anthropic、gemini、grok、antigravity 平台分组")
+		return errors.New("利润控制仅支持全平台分组")
 	}
 	if !validProfitControlRatio(minMargin) {
 		return fmt.Errorf("profit_min_margin 应为 [0,1) 的小数，got %v", minMargin)
@@ -462,13 +465,12 @@ func NormalizeProfitControlConfig(platform string, enabled bool, minMargin, safe
 	return enabled, minMargin, safetyBuffer
 }
 
-func profitControlPlatformSupported(platform string) bool {
-	switch platform {
-	case PlatformOpenAI, PlatformAnthropic, PlatformGemini, PlatformGrok, PlatformAntigravity:
-		return true
-	default:
-		return false
-	}
+// profitControlPlatformSupported 判定分组是否可启用利润控制。
+//
+// 全平台分组（composite）覆盖了原先受支持的具体平台，因此这里恒为 true：利润控制
+// 的准入按「账号倍率 vs 分组下游倍率」比较，与请求最终解析到哪个上游平台无关。
+func profitControlPlatformSupported(_ string) bool {
+	return true
 }
 
 // GetSearchPricePer1k returns explicit search/tool price per 1k calls if configured.

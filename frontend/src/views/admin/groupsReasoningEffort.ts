@@ -17,14 +17,6 @@ const openAIReasoningEffortSourceValues = [
   ...openAIReasoningEffortValues,
 ] as const;
 
-const anthropicReasoningEffortValues = [
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-] as const;
-
 const reasoningEffortMatchTypes: readonly ReasoningEffortMatchType[] = [
   "exact",
   "prefix",
@@ -35,19 +27,18 @@ export const reasoningEffortOverLimitDowngrade = "downgrade";
 export const reasoningEffortOverLimitDeny = "deny";
 export const reasoningEffortMappingDeny = "deny";
 
+// 全平台分组：一个分组可能同时服务 Anthropic 与 OpenAI 系请求，配置项必须取并集。
+// Anthropic 侧的取值集合是 OpenAI 集合去掉 minimal 的子集，而 minimal 在后端
+// anthropicCompatibleReasoningEffortPolicy 里会被降级为 low，因此这里直接用 OpenAI
+// 集合即可覆盖两边的全部合法取值。
 const reasoningEffortValuesForPlatform = (
-  platform: GroupPlatform,
-): readonly string[] =>
-  platform === "anthropic"
-    ? anthropicReasoningEffortValues
-    : supportsReasoningEffortPolicyPlatform(platform)
-      ? openAIReasoningEffortValues
-      : [];
+  _platform: GroupPlatform,
+): readonly string[] => openAIReasoningEffortValues;
 
 export function supportsReasoningEffortPolicyPlatform(
-  platform: GroupPlatform,
+  _platform: GroupPlatform,
 ): boolean {
-  return platform === "anthropic" || platform === "openai" || platform === "composite";
+  return true;
 }
 
 export function reasoningEffortOptionsForPlatform(platform: GroupPlatform) {

@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
-	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -55,14 +54,8 @@ func (s *simpleModeAccountService) BulkUpdateAccounts(ctx context.Context, input
 	return &service.BulkUpdateAccountsResult{}, nil
 }
 
+// 与生产策略一致：全平台分组（composite）在简单模式下也可绑定，不再按平台拒绝。
 func (s *simpleModeAccountService) ValidateAccountGroupBindings(_ context.Context, groupIDs []int64) error {
-	for _, id := range groupIDs {
-		for i := range s.groups {
-			if s.groups[i].ID == id && s.groups[i].Platform == service.PlatformComposite {
-				return infraerrors.BadRequest("SIMPLE_MODE_GROUP_NOT_BINDABLE", "composite groups cannot be bound in simple mode")
-			}
-		}
-	}
 	return nil
 }
 
@@ -117,14 +110,15 @@ func TestAccountHandlerSimpleModeUsesMinimalGroupReferences(t *testing.T) {
 			}
 			groups, ok := data["groups"].([]any)
 			require.True(t, ok)
-			require.Len(t, groups, 1)
-			require.Equal(t, []any{float64(7)}, data["group_ids"])
+			// 全平台分组改造后简单模式不再隐藏任何分组，两个绑定都要出现。
+			require.Len(t, groups, 2)
+			require.Equal(t, []any{float64(7), float64(9)}, data["group_ids"])
 			group, ok := groups[0].(map[string]any)
 			require.True(t, ok)
 			require.ElementsMatch(t, []string{"id", "name", "platform", "status"}, mapKeys(group))
 			accountGroups, ok := data["account_groups"].([]any)
 			require.True(t, ok)
-			require.Len(t, accountGroups, 1)
+			require.Len(t, accountGroups, 2)
 			accountGroup, ok := accountGroups[0].(map[string]any)
 			require.True(t, ok)
 			require.ElementsMatch(t, []string{"account_id", "group_id", "priority", "created_at", "group"}, mapKeys(accountGroup))
@@ -161,7 +155,7 @@ func TestAccountHandlerSimpleModeLitePreservesCompactShapeAndETag(t *testing.T) 
 	}
 	require.NoError(t, json.Unmarshal(res.Body.Bytes(), &payload))
 	require.Len(t, payload.Data.Items, 1)
-	require.Equal(t, []any{float64(7)}, payload.Data.Items[0]["group_ids"])
+	require.Equal(t, []any{float64(7), float64(9)}, payload.Data.Items[0]["group_ids"])
 	require.NotContains(t, payload.Data.Items[0], "groups")
 	require.NotContains(t, payload.Data.Items[0], "account_groups")
 
@@ -172,7 +166,8 @@ func TestAccountHandlerSimpleModeLitePreservesCompactShapeAndETag(t *testing.T) 
 	require.Equal(t, http.StatusNotModified, notModified.Code)
 }
 
-func TestAccountHandlerSimpleModeRejectsCompositeGroupBindingsBeforeWrites(t *testing.T) {
+// 回归：简单模式下把账号绑定到全平台分组必须成功落库，而不是在 handler 前被拒。
+func TestAccountHandlerSimpleModeAcceptsUniversalGroupBindingsBeforeWrites(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, tt := range []struct{ name, method, path, body string }{
 		{"create", http.MethodPost, "/accounts", `{"name":"account","platform":"anthropic","type":"apikey","credentials":{"key":"x"},"group_ids":[9]}`},
@@ -192,10 +187,8 @@ func TestAccountHandlerSimpleModeRejectsCompositeGroupBindingsBeforeWrites(t *te
 			req := httptest.NewRequest(tt.method, tt.path, bytes.NewBufferString(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			r.ServeHTTP(res, req)
-			require.Equal(t, http.StatusBadRequest, res.Code, res.Body.String())
-			require.Zero(t, svc.createCalls)
-			require.Zero(t, svc.updateCalls)
-			require.Zero(t, svc.bulkCalls)
+			require.Equal(t, http.StatusOK, res.Code, res.Body.String())
+			require.NotZero(t, svc.createCalls+svc.updateCalls+svc.bulkCalls)
 		})
 	}
 }
@@ -215,19 +208,20 @@ func TestAccountHandlerSimpleModePreservesBasicGroupBinding(t *testing.T) {
 	require.Equal(t, 1, svc.createCalls)
 }
 
-func TestAccountHandlerSimpleModeBatchPrevalidatesAllGroupsAtomically(t *testing.T) {
+// 回归：批量建号里把账号绑定到全平台分组不再被拒（旧行为按平台原子拒绝）。
+func TestAccountHandlerSimpleModeBatchAcceptsUniversalGroupBindings(t *testing.T) {
 	svc := &simpleModeAccountService{stubAdminService: newStubAdminService()}
-	svc.groups = []service.Group{{ID: 7, Platform: service.PlatformAnthropic}, {ID: 9, Platform: service.PlatformComposite}}
+	svc.groups = []service.Group{{ID: 7, Platform: service.PlatformComposite}, {ID: 9, Platform: service.PlatformComposite}}
 	h := NewAccountHandler(svc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	h.cfg = &config.Config{RunMode: config.RunModeSimple}
 	r := gin.New()
 	r.POST("/accounts/batch", h.BatchCreate)
 	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/accounts/batch", bytes.NewBufferString(`{"accounts":[{"name":"first","platform":"anthropic","type":"apikey","credentials":{"key":"x"},"group_ids":[7]},{"name":"second","platform":"anthropic","type":"apikey","credentials":{"key":"y"},"group_ids":[9]}]}`))
+	req := httptest.NewRequest(http.MethodPost, "/accounts/batch", bytes.NewBufferString(`{"accounts":[{"name":"first","platform":"anthropic","type":"apikey","credentials":{"key":"x"},"group_ids":[7]},{"name":"second","platform":"openai","type":"apikey","credentials":{"key":"y"},"group_ids":[9]}]}`))
 	req.Header.Set("Content-Type", "application/json")
 	r.ServeHTTP(res, req)
-	require.Equal(t, http.StatusBadRequest, res.Code, res.Body.String())
-	require.Zero(t, svc.createCalls)
+	require.Equal(t, http.StatusOK, res.Code, res.Body.String())
+	require.Equal(t, 2, svc.createCalls)
 }
 
 func TestAccountHandlerAdvancedModeKeepsFullGroupReferences(t *testing.T) {

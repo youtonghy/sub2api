@@ -67,7 +67,7 @@ describe('platform catalog with a newly registered platform', () => {
       'Kimi', 'Zhipu GLM', 'DeepSeek', 'MiniMax', 'OpenCode', 'TypeSafe / Jev', 'Command Code', 'Cline'
     ])
     expect(platformLabel('zhipu')).toBe('Zhipu GLM')
-    expect(platformLabel('composite')).toBe('Composite')
+    expect(platformLabel('composite')).toBe('All platforms')
     expect(platformLabel('')).toBe('API')
   })
 

@@ -48,7 +48,7 @@ type Group struct {
 	Status string `json:"status,omitempty"`
 	// 内部幂等恢复标识，不对 API 暴露
 	DuplicateOperationID *string `json:"duplicate_operation_id,omitempty"`
-	// Platform holds the value of the "platform" field.
+	// 分组形态标记，恒为 composite（全平台）；请求目标平台由模型解析得出
 	Platform string `json:"platform,omitempty"`
 	// SubscriptionType holds the value of the "subscription_type" field.
 	SubscriptionType string `json:"subscription_type,omitempty"`

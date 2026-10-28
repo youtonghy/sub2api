@@ -13,13 +13,14 @@ const maxCodexModelsManifestAccounts = 10
 
 // normalizeCodexModelsManifestConfig normalizes a group's pinned-accounts Codex
 // manifest config before persistence:
-//   - Non-OpenAI platforms always persist a disabled zero config (spec: silently
-//     normalize instead of rejecting).
+//   - The config is kept on universal (composite) groups. Concrete-platform
+//     groups no longer exist after the universal-group migration, so a concrete
+//     value here means a stale caller/config and is normalized to a zero config.
 //   - Account IDs are de-duplicated preserving first-seen order; invalid IDs (<= 0)
 //     are dropped. The list is kept even when disabled so toggling enabled back
 //     on does not lose the previous selection.
 func normalizeCodexModelsManifestConfig(platform string, cfg GroupCodexModelsManifestConfig) GroupCodexModelsManifestConfig {
-	if platform != PlatformOpenAI {
+	if platform != PlatformComposite && platform != PlatformOpenAI {
 		return GroupCodexModelsManifestConfig{}
 	}
 	out := GroupCodexModelsManifestConfig{

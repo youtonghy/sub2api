@@ -1,13 +1,37 @@
-# Composite Groups
+# Universal Groups
 
-Composite groups are an admin routing layer for API keys that should choose a
-concrete provider from the requested model instead of binding the key to a
-single provider group. They support both built-in model detection and an
-admin-configured model route registry for public model aliases.
+Every group in sub2api is now a **universal group**: one group can hold upstream
+accounts from any platform, and one subscription to that group gives access to
+all of them. The group no longer belongs to a single provider platform.
+
+`groups.platform` is kept only as a shape marker and is always `composite`. The
+concrete provider platform for a request is resolved per request from the
+requested model (and from the optional route registry below), and that resolved
+platform is used for account selection, user platform quota checks, post-usage
+billing, ops error attribution, channel mapping/pricing lookup, and platform
+usage reporting.
+
+## What a universal group means
+
+- Accounts are still bound to a concrete platform (`accounts.platform`); only the
+  group became platform-agnostic. Binding Anthropic, OpenAI, Gemini, Grok, Kimi,
+  Zhipu, DeepSeek and MiniMax accounts to the same group is supported.
+- A request is still dispatched **only** to accounts of the resolved platform.
+  This gate is load-bearing: removing it would send OpenAI credentials to an
+  Anthropic upstream. Universal groups do not mean platform-agnostic account
+  selection.
+- A model name that cannot be resolved (no explicit route and no recognizable
+  provider prefix) fails closed with a client error instead of guessing.
+- Group-level configuration that used to be platform-scoped is now available on
+  every group and applies per resolved platform at runtime: profit control, the
+  Codex models-manifest pinned accounts, OpenAI Messages dispatch mappings,
+  `allow_live`, `force_openai_fast`/`free_openai_fast`, MCP XML injection,
+  supported model scopes, image/video/audio pricing, and the invalid-request
+  fallback group.
 
 ## Supported Providers
 
-Composite groups can route to these concrete account platforms:
+Universal groups can route to these concrete account platforms:
 
 - Anthropic
 - Gemini
@@ -89,22 +113,23 @@ guessing a provider.
 
 ## Admin Workflows
 
-- Admins can create a group with platform `composite`.
+- Admins create a group; the platform selector is gone and the value is always
+  `composite`.
 - Admins can add, edit, delete, and preview composite model routes.
-- Composite groups can copy accounts from concrete provider groups.
-- Concrete provider accounts can be assigned directly to composite groups from
-  account create/edit and bulk account workflows.
-- Subscription payment plans can bind to a composite group when that group's
-  `subscription_type` is `subscription`. The plan grants access to the
-  composite group; each request is still billed and quota-checked against the
-  resolved concrete provider platform.
-- Channel configuration exposes composite groups in concrete provider sections.
-  The channel `group_ids` payload is still flat; provider-specific model
-  mapping and pricing remain keyed by concrete platform.
+- Any group can copy accounts from any other group; platforms no longer have to
+  match.
+- Accounts of any platform can be assigned directly to any group from account
+  create/edit and bulk account workflows.
+- Subscription payment plans bind a group. The plan grants access to the whole
+  group; each request is still billed and quota-checked against the resolved
+  concrete provider platform.
+- Channel configuration exposes universal groups in every concrete provider
+  section. The channel `group_ids` payload is still flat; provider-specific
+  model mapping and pricing remain keyed by concrete platform.
 
 ## Bucket 2 Setup: OpenAI + Claude + Gemini + Grok
 
-Use one composite subscription group when one customer-facing plan should expose
+Use one universal subscription group when one customer-facing plan should expose
 model aliases across OpenAI, Claude, Gemini, and Grok without issuing separate
 keys per provider.
 
@@ -132,15 +157,27 @@ names such as `gpt-*`, `claude-*`, `gemini-*`, and `grok-*`. Explicit routes are
 recommended for bundled plan aliases because they make endpoint, provider, and
 upstream model attribution reviewable in the admin UI.
 
+## Pricing and quotas
+
+Group-level media prices (image `1K/2K/4K`, video `480p/720p/1080p`, audio
+real-time / TTS / STT) are a single price card shared by every platform in the
+group. When a platform needs its own prices, configure per-entry `platform` on
+the channel model pricing rows instead; universal groups do not add a
+group-by-platform price matrix.
+
+Account cost statistics resolve channel pricing by the account's own platform,
+and user platform quotas are charged against the resolved target platform.
+
 ## Limits
 
-Composite routes choose a concrete provider and upstream model; they do not
-create synthetic model metadata, pricing, or upstream capability records by
-themselves. Keep channel pricing/model mapping configured for the concrete
-provider platforms that the routes target.
+Routes choose a concrete provider and upstream model; they do not create
+synthetic model metadata, pricing, or upstream capability records by themselves.
+Keep channel pricing/model mapping configured for the concrete provider
+platforms that the routes target.
 
-This PR intentionally does not implement:
+Not implemented by design:
 
 - AUTO smart-routing among multiple providers for the same abstract task.
-- Direct API-key binding to several existing groups without a composite group.
 - Protocol-agnostic provider decoupling or a LiteLLM-style adapter rewrite.
+- Removing the `groups.platform` column; it stays as an always-`composite`
+  marker so existing composite-aware code paths and rollbacks keep working.

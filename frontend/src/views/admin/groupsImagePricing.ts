@@ -1,22 +1,14 @@
-export const imagePricingPlatforms = new Set([
-  "antigravity",
-  "composite",
-  "gemini",
-  "grok",
-  "openai",
-]);
+// 分组已不再归属单一平台：所有分组都是全平台分组，图片/视频定价与生图开关
+// 一律可配置。平台参数保留以对齐后端签名（并在需要时用于占位价选择）。
+export const supportsImagePricingPlatform = (_platform: string): boolean => true;
 
-export const supportsImagePricingPlatform = (platform: string): boolean =>
-  imagePricingPlatforms.has(platform);
+// 与后端 DefaultAllowImageGenerationForPlatform 一致：全平台分组新建时默认允许生图
+// （开关在运行时仍受请求解析出的目标平台约束）。
+export const defaultAllowImageGenerationForPlatform = (
+  _platform: string,
+): boolean => true;
 
-// 与后端 DefaultAllowImageGenerationForPlatform 一致：这些平台新建分组默认允许生图。
-const imageGenerationDefaultPlatforms = new Set(["antigravity", "gemini", "grok"]);
-
-export const defaultAllowImageGenerationForPlatform = (platform: string): boolean =>
-  imageGenerationDefaultPlatforms.has(platform);
-
-export const supportsVideoPricingPlatform = (platform: string): boolean =>
-  platform === "grok";
+export const supportsVideoPricingPlatform = (_platform: string): boolean => true;
 
 export const imagePricingI18nKey = (_platform: string, key: string): string =>
   `admin.groups.imagePricing.${key}`;
@@ -63,7 +55,8 @@ export const getImagePricePlaceholder = (
   platform: string,
   tier: ImagePricingTierKey,
 ): string => {
-  const card = defaultImagePricePlaceholders[platform] ?? defaultImagePricePlaceholders.default;
+  const card =
+    defaultImagePricePlaceholders[platform] ?? defaultImagePricePlaceholders.default;
   return card[tier];
 };
 

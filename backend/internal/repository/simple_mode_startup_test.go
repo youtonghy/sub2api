@@ -33,16 +33,9 @@ func TestEnsureSimpleModeStartup(t *testing.T) {
 				if tt.seed {
 					// The first seeding operation backfills auto-created Grok groups.
 					mock.ExpectExec(`UPDATE "groups"`).WillReturnResult(sqlmock.NewResult(0, 0))
-					// Existing groups exercise the complete seeding path without inserts.
-					for i := 0; i < 5; i++ {
-						mock.ExpectQuery(`SELECT COUNT\(.*FROM "groups"`).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
-					}
-					// Antigravity only counts; other platforms check the default name.
-					for i := 0; i < 4; i++ {
-						mock.ExpectQuery(`SELECT "groups"\."id" FROM "groups"`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
-					}
-					// Platform map iteration order is unspecified.
-					mock.MatchExpectationsInOrder(false)
+					// 全平台分组改造后只确保存在单个 `default` 分组：一次按名称的
+					// 存在性检查，返回一行即视为已存在，不再按平台逐个 COUNT / 查询。
+					mock.ExpectQuery(`SELECT "groups"\."id" FROM "groups"`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 				}
 				mock.ExpectQuery(`SELECT .*FROM "settings"`).
 					WithArgs(simpleModeAdminConcurrencyUpgradeKey).

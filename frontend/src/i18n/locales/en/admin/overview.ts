@@ -983,8 +983,6 @@ export default {
       },
       enterGroupName: 'Enter group name',
       optionalDescription: 'Optional description',
-      platformHint: 'Select the platform this group is associated with',
-      platformNotEditable: 'Platform cannot be changed after creation',
       saving: 'Saving...',
       noGroups: 'No groups yet',
       noGroupsDescription: 'Create a group to better manage API keys and rates.',
@@ -1054,7 +1052,7 @@ export default {
         minimax: 'MiniMax',
         opencode_go: 'OpenCode',
         typesafe: 'TypeSafe / Jev',
-        composite: 'Composite',
+        composite: 'All platforms',
       },
       deleteConfirm:
         "Are you sure you want to delete '{name}'? All associated API keys will no longer belong to any group.",

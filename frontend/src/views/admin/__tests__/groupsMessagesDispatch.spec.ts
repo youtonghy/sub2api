@@ -9,10 +9,10 @@ import {
 } from "../groupsMessagesDispatch";
 
 describe("groupsMessagesDispatch", () => {
-  it("supports OpenAI and composite groups", () => {
-    expect(supportsMessagesDispatchPlatform("openai")).toBe(true);
-    expect(supportsMessagesDispatchPlatform("composite")).toBe(true);
-    expect(supportsMessagesDispatchPlatform("anthropic")).toBe(false);
+  it("supports every group since all groups are universal", () => {
+    for (const platform of ["openai", "composite", "anthropic", "gemini", "grok"]) {
+      expect(supportsMessagesDispatchPlatform(platform)).toBe(true);
+    }
   });
 
   it("returns the expected default form state", () => {

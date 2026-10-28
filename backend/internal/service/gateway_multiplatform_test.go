@@ -3586,3 +3586,8 @@ func TestGatewayService_SelectAccountForModelWithPlatform_RoutedOpenAIGroup(t *t
 	require.NotNil(t, acc)
 	require.Equal(t, int64(2), acc.ID, "routed account must win over the higher-priority unrouted one")
 }
+
+// UpdatePriorities 拖动排序专用；这些桩不会走到该路径。
+func (m *mockAccountRepoForPlatform) UpdatePriorities(context.Context, []AccountPriorityUpdate) error {
+	panic("unexpected UpdatePriorities call")
+}

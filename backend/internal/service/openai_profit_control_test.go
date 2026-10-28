@@ -262,12 +262,12 @@ func TestProfitControlSchedulerFiltersCandidates(t *testing.T) {
 
 func TestValidateProfitControlConfig(t *testing.T) {
 	require.NoError(t, ValidateProfitControlConfig(PlatformAnthropic, false, 0, 0))
-	for _, platform := range []string{PlatformOpenAI, PlatformAnthropic, PlatformGemini, PlatformGrok, PlatformAntigravity} {
+	// 全平台分组（composite）也支持利润控制。
+	for _, platform := range []string{PlatformOpenAI, PlatformAnthropic, PlatformGemini, PlatformGrok, PlatformAntigravity, PlatformComposite} {
 		require.NoError(t, ValidateProfitControlConfig(platform, true, 0.3, 0.05))
 		require.NoError(t, ValidateProfitControlConfig(platform, true, 0, 0))
 	}
 
-	require.Error(t, ValidateProfitControlConfig(PlatformComposite, true, 0.3, 0))
 	require.Error(t, ValidateProfitControlConfig(PlatformOpenAI, true, -0.1, 0))
 	require.Error(t, ValidateProfitControlConfig(PlatformOpenAI, true, 1.0, 0))
 	require.Error(t, ValidateProfitControlConfig(PlatformOpenAI, true, 0, 1.0))
@@ -275,15 +275,15 @@ func TestValidateProfitControlConfig(t *testing.T) {
 }
 
 func TestNormalizeProfitControlConfig(t *testing.T) {
-	t.Run("unsupported platform resets everything", func(t *testing.T) {
+	t.Run("universal group retains configuration", func(t *testing.T) {
 		enabled, margin, buffer := NormalizeProfitControlConfig(PlatformComposite, true, 0.3, 0.1)
-		require.False(t, enabled)
-		require.Zero(t, margin)
-		require.Zero(t, buffer)
+		require.True(t, enabled)
+		require.InDelta(t, 0.3, margin, 1e-12)
+		require.InDelta(t, 0.1, buffer, 1e-12)
 	})
 
-	t.Run("all five platforms retain configuration", func(t *testing.T) {
-		for _, platform := range []string{PlatformOpenAI, PlatformAnthropic, PlatformGemini, PlatformGrok, PlatformAntigravity} {
+	t.Run("all platforms retain configuration", func(t *testing.T) {
+		for _, platform := range []string{PlatformOpenAI, PlatformAnthropic, PlatformGemini, PlatformGrok, PlatformAntigravity, PlatformComposite} {
 			enabled, margin, buffer := NormalizeProfitControlConfig(platform, true, 0.3, 0.1)
 			require.True(t, enabled)
 			require.InDelta(t, 0.3, margin, 1e-12)

@@ -1007,3 +1007,8 @@ func TestGeminiMessagesCompatService_isModelSupportedByAccount(t *testing.T) {
 		})
 	}
 }
+
+// UpdatePriorities 拖动排序专用；这些桩不会走到该路径。
+func (m *mockAccountRepoForGemini) UpdatePriorities(context.Context, []AccountPriorityUpdate) error {
+	panic("unexpected UpdatePriorities call")
+}

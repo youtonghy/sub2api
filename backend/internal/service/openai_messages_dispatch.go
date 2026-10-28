@@ -112,13 +112,17 @@ func (g *Group) ResolveMessagesDispatchModel(requestedModel string) string {
 	}
 }
 
+// sanitizeGroupMessagesDispatchFields 清洗 Messages 调度配置。
+//
+// 全平台分组（composite）上，`/v1/messages` 是否会被解析到 OpenAI 系平台由请求模型
+// 决定，分组级无法预知，因此不再因分组平台而清空开关与模型映射：管理员可以为全平台
+// 分组配置完整的 Opus/Sonnet/Haiku 映射，运行时只在请求真的落在 OpenAI 时使用。
+// 只有明确的单一非 OpenAI 平台（迁移后不应出现）才继续清零。
 func sanitizeGroupMessagesDispatchFields(g *Group) {
-	if g == nil || g.Platform == PlatformOpenAI {
+	if g == nil || g.Platform == PlatformOpenAI || g.Platform == PlatformComposite {
 		return
 	}
-	if g.Platform != PlatformComposite {
-		g.AllowMessagesDispatch = false
-	}
+	g.AllowMessagesDispatch = false
 	g.DefaultMappedModel = ""
 	g.MessagesDispatchModelConfig = OpenAIMessagesDispatchModelConfig{}
 }

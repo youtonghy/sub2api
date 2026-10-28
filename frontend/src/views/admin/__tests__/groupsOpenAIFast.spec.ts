@@ -8,16 +8,17 @@ import en from "@/i18n/locales/en/admin/overview";
 import zh from "@/i18n/locales/zh/admin/overview";
 
 describe("groupsOpenAIFast", () => {
-  it("supports OpenAI and composite groups", () => {
-    expect(supportsGroupOpenAIFast("openai")).toBe(true);
-    expect(supportsGroupOpenAIFast("composite")).toBe(true);
-    expect(supportsGroupOpenAIFast("anthropic")).toBe(false);
+  it("supports every group since all groups are universal", () => {
+    for (const platform of ["openai", "composite", "anthropic", "gemini", "grok"]) {
+      expect(supportsGroupOpenAIFast(platform)).toBe(true);
+    }
   });
 
-  it("clears stale enabled state on unsupported platforms", () => {
-    expect(normalizeGroupOpenAIFast("openai", true)).toBe(true);
-    expect(normalizeGroupOpenAIFast("composite", true)).toBe(true);
-    expect(normalizeGroupOpenAIFast("anthropic", true)).toBe(false);
+  it("keeps the switch value on every platform", () => {
+    // 全平台分组的 Fast 开关只在请求解析到 OpenAI 时生效，保存时不得被归零。
+    for (const platform of ["openai", "composite", "anthropic", "gemini"]) {
+      expect(normalizeGroupOpenAIFast(platform, true)).toBe(true);
+    }
     expect(normalizeGroupOpenAIFast("openai", false)).toBe(false);
   });
 

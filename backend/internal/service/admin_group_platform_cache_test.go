@@ -32,33 +32,45 @@ type channelCacheInvalidatorSpy struct {
 
 func (s *channelCacheInvalidatorSpy) InvalidateCache() { s.calls++ }
 
-// 渠道缓存持有 groupID → platform，而渠道定价/模型映射/模型白名单都按平台严格隔离。
-// 改了分组平台却不失效缓存，最长 10 分钟内这些查找仍按旧平台匹配（静默走错价）。
-func TestUpdateGroupInvalidatesChannelCacheOnPlatformChange(t *testing.T) {
+// 渠道缓存持有 groupID → platform，而渠道定价/模型映射/模型白名单都按平台隔离。
+// 全平台分组改造后 platform 恒为 composite：迁移前的单平台历史分组第一次被更新时
+// 会被归一为 composite，该次归一必须失效渠道缓存；已经是 composite 的分组再更新
+// 不再产生平台变化，因此不需要失效。
+func TestUpdateGroupInvalidatesChannelCacheOnPlatformNormalization(t *testing.T) {
 	tests := []struct {
 		name          string
 		fromPlatform  string
 		inputPlatform string
 		wantCalls     int
+		wantPlatform  string
 	}{
 		{
-			name:          "platform changed invalidates",
+			name:          "legacy concrete platform is normalized and invalidates",
 			fromPlatform:  PlatformAnthropic,
 			inputPlatform: PlatformOpenAI,
 			wantCalls:     1,
+			wantPlatform:  PlatformComposite,
 		},
 		{
-			name:          "same platform does not invalidate",
-			fromPlatform:  PlatformAnthropic,
-			inputPlatform: PlatformAnthropic,
-			wantCalls:     0,
-		},
-		{
-			// 请求里不带 platform 字段时不应该动缓存
-			name:          "platform omitted does not invalidate",
+			name:          "legacy concrete platform invalidates even without input platform",
 			fromPlatform:  PlatformAnthropic,
 			inputPlatform: "",
+			wantCalls:     1,
+			wantPlatform:  PlatformComposite,
+		},
+		{
+			name:          "already universal group does not invalidate",
+			fromPlatform:  PlatformComposite,
+			inputPlatform: PlatformOpenAI,
 			wantCalls:     0,
+			wantPlatform:  PlatformComposite,
+		},
+		{
+			name:          "already universal group with platform omitted does not invalidate",
+			fromPlatform:  PlatformComposite,
+			inputPlatform: "",
+			wantCalls:     0,
+			wantPlatform:  PlatformComposite,
 		},
 	}
 
@@ -71,17 +83,18 @@ func TestUpdateGroupInvalidatesChannelCacheOnPlatformChange(t *testing.T) {
 			got, err := svc.UpdateGroup(context.Background(), 7, &UpdateGroupInput{Platform: tt.inputPlatform})
 			require.NoError(t, err)
 			require.NotNil(t, got)
+			require.Equal(t, tt.wantPlatform, got.Platform)
 			require.Equal(t, tt.wantCalls, spy.calls)
 		})
 	}
 }
 
-// 依赖可以不注入（例如测试或裁剪构建），此时不应 panic——缓存靠 TTL 自然重建。
+// 分组平台恒为 composite：即使请求想把平台改回某个具体平台，落库值也不变。
 func TestUpdateGroupWithoutChannelCacheInvalidator(t *testing.T) {
-	repo := &groupPlatformRepoStub{group: &Group{ID: 7, Name: "g", Platform: PlatformAnthropic}}
+	repo := &groupPlatformRepoStub{group: &Group{ID: 7, Name: "g", Platform: PlatformComposite}}
 	svc := &adminServiceImpl{groupRepo: repo}
 
 	got, err := svc.UpdateGroup(context.Background(), 7, &UpdateGroupInput{Platform: PlatformOpenAI})
 	require.NoError(t, err)
-	require.Equal(t, PlatformOpenAI, got.Platform)
+	require.Equal(t, PlatformComposite, got.Platform)
 }

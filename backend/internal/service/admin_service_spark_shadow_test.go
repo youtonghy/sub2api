@@ -436,6 +436,12 @@ func (s *sparkShadowGroupRepoStub) ListActiveByPlatform(_ context.Context, _ str
 	return s.groups, nil
 }
 
+// ListActive 是全平台分组改造后的默认分组查找入口：先匹配同名 `<platform>-default`，
+// 再回落 simple 模式的 `default`。stub 保持返回同一批分组即可覆盖两条路径。
+func (s *sparkShadowGroupRepoStub) ListActive(_ context.Context) ([]Group, error) {
+	return s.groups, nil
+}
+
 // TestCreateShadow_DefaultGroupBinding 验证外审 F4:未指定 group_ids 时
 // 影子回落绑定 openai-default 组(否则无组、组内路由选不到)。
 func TestCreateShadow_DefaultGroupBinding(t *testing.T) {

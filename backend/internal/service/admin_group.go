@@ -345,11 +345,13 @@ func AccountModelOptions(accounts []Account) []string {
 
 // DefaultAllowImageGenerationForPlatform reports whether new groups on the platform allow
 // image generation. CreateGroup ORs the requested value with it, so a false in the create
-// request does not turn it off. Composite defaults disabled because the same switch also
-// gates OpenAI image generation there.
+// request does not turn it off.
+//
+// 全平台分组同时容纳 Gemini/Grok/Antigravity 与 OpenAI 账号，所以默认开启：关闭后
+// 需要逐个分组手动打开，而开关本身在运行时仍受解析出的目标平台约束。
 func DefaultAllowImageGenerationForPlatform(platform string) bool {
 	switch platform {
-	case PlatformGrok, PlatformGemini, PlatformAntigravity:
+	case PlatformGrok, PlatformGemini, PlatformAntigravity, PlatformComposite:
 		return true
 	default:
 		return false
@@ -397,6 +399,14 @@ func groupSupportsOpenAIFast(platform string) bool {
 	return platform == PlatformOpenAI || platform == PlatformComposite
 }
 
+// supportsGroupAllowLive 报告分组是否可开启 Live 接口。
+//
+// Live 只在请求解析到 OpenAI 系平台时有意义；全平台分组也可以打开开关，
+// 运行时仅在解析为 OpenAI 时生效（见 openai_live.go 的入口判定）。
+func supportsGroupAllowLive(platform string) bool {
+	return platform == PlatformOpenAI || platform == PlatformComposite
+}
+
 func sanitizeGroupOpenAIFast(group *Group) {
 	if group == nil || !groupSupportsOpenAIFast(group.Platform) {
 		if group != nil {
@@ -424,9 +434,6 @@ func normalizeUpdateGroupInputForSimpleMode(input *UpdateGroupInput) {
 }
 
 func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupInput) (*Group, error) {
-	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple && NormalizeGroupPlatform(input.Platform) == PlatformComposite {
-		return nil, infraerrors.BadRequest("SIMPLE_MODE_GROUP_NOT_BINDABLE", "composite groups are not supported in simple mode")
-	}
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
 		normalizeCreateGroupInputForSimpleMode(input)
 	}
@@ -565,7 +572,8 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	}
 
 	allowImageGeneration := input.AllowImageGeneration || DefaultAllowImageGenerationForPlatform(platform)
-	allowBatchImageGeneration := input.AllowBatchImageGeneration && allowImageGeneration && platform == PlatformGemini
+	allowBatchImageGeneration := input.AllowBatchImageGeneration && allowImageGeneration &&
+		(platform == PlatformGemini || platform == PlatformComposite)
 	imageCountBilling := input.ImageCountBilling && allowImageGeneration &&
 		(platform == PlatformComposite || platform == PlatformOpenAI)
 
@@ -674,7 +682,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	}
 	sanitizeGroupMessagesDispatchFields(group)
 	sanitizeGroupOpenAIFast(group)
-	if group.Platform != PlatformOpenAI && group.Platform != PlatformComposite {
+	if !supportsGroupAllowLive(group.Platform) {
 		group.AllowLive = false
 	}
 	sanitizeGroupReasoningEffortPolicy(group)
@@ -768,13 +776,17 @@ func (s *adminServiceImpl) validateFallbackGroup(ctx context.Context, currentGro
 	}
 }
 
-// validateFallbackGroupOnInvalidRequest 校验无效请求兜底分组的有效性
+// validateFallbackGroupOnInvalidRequest 校验无效请求兜底分组的有效性。
+//
+// 全平台分组下，非 Claude Code 的请求会整组降级到兜底分组，再由兜底分组按模型
+// 解析目标平台，所以不再要求双方必顶是 anthropic——只保留结构性约束。
+//
 // currentGroupID: 当前分组 ID（新建时为 0）
 // platform/subscriptionType: 当前分组的有效平台/订阅类型
 // fallbackGroupID: 兜底分组 ID
 func (s *adminServiceImpl) validateFallbackGroupOnInvalidRequest(ctx context.Context, currentGroupID int64, platform, subscriptionType string, fallbackGroupID int64) error {
-	if platform != PlatformAnthropic && platform != PlatformAntigravity {
-		return fmt.Errorf("invalid request fallback only supported for anthropic or antigravity groups")
+	if !supportsInvalidRequestFallback(platform) {
+		return fmt.Errorf("invalid request fallback only supported for universal groups")
 	}
 	if subscriptionType == SubscriptionTypeSubscription {
 		return fmt.Errorf("subscription groups cannot set invalid request fallback")
@@ -787,8 +799,8 @@ func (s *adminServiceImpl) validateFallbackGroupOnInvalidRequest(ctx context.Con
 	if err != nil {
 		return fmt.Errorf("fallback group not found: %w", err)
 	}
-	if fallbackGroup.Platform != PlatformAnthropic {
-		return fmt.Errorf("fallback group must be anthropic platform")
+	if !supportsInvalidRequestFallback(fallbackGroup.Platform) {
+		return fmt.Errorf("fallback group must be a universal group")
 	}
 	if fallbackGroup.SubscriptionType == SubscriptionTypeSubscription {
 		return fmt.Errorf("fallback group cannot be subscription type")
@@ -799,6 +811,17 @@ func (s *adminServiceImpl) validateFallbackGroupOnInvalidRequest(ctx context.Con
 	return nil
 }
 
+// supportsInvalidRequestFallback 报告分组是否可作为无效请求兜底的两端。
+// 全平台分组总能按模型解析目标平台，因此总是允许；antigravity 保留为兼容历史数据。
+func supportsInvalidRequestFallback(platform string) bool {
+	switch platform {
+	case PlatformComposite, PlatformAnthropic, PlatformAntigravity:
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *UpdateGroupInput) (*Group, error) {
 	group, err := s.groupRepo.GetByID(ctx, id)
 	if err != nil {
@@ -806,9 +829,6 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 	if err := s.validateSimpleModeGroupAccess(group); err != nil {
 		return nil, err
-	}
-	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple && input.Platform == PlatformComposite {
-		return nil, infraerrors.BadRequest("SIMPLE_MODE_GROUP_NOT_BINDABLE", "composite groups are not supported in simple mode")
 	}
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
 		normalizeUpdateGroupInputForSimpleMode(input)
@@ -830,9 +850,8 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 		}
 		group.I18n = i18n
 	}
-	if input.Platform != "" {
-		group.Platform = input.Platform
-	}
+	// 分组平台恒为全平台形态：忽略客户端传入的具体平台值，只做单一收口。
+	group.Platform = NormalizeGroupPlatform(group.Platform)
 	if input.RateMultiplier != nil {
 		if *input.RateMultiplier <= 0 {
 			return nil, errors.New("rate_multiplier must be > 0")
@@ -877,7 +896,7 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.AllowBatchImageGeneration != nil {
 		group.AllowBatchImageGeneration = *input.AllowBatchImageGeneration
 	}
-	if !group.AllowImageGeneration || group.Platform != PlatformGemini {
+	if !group.AllowImageGeneration || (group.Platform != PlatformGemini && group.Platform != PlatformComposite) {
 		group.AllowBatchImageGeneration = false
 	}
 	if input.ImageCountBilling != nil {
@@ -1102,7 +1121,7 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 	sanitizeGroupMessagesDispatchFields(group)
 	sanitizeGroupOpenAIFast(group)
-	if group.Platform != PlatformOpenAI && group.Platform != PlatformComposite {
+	if !supportsGroupAllowLive(group.Platform) {
 		group.AllowLive = false
 	}
 	sanitizeGroupReasoningEffortPolicy(group)

@@ -95,15 +95,17 @@ func TestGroupHandlerSimpleModeSanitizesCommercialFields(t *testing.T) {
 	require.Nil(t, updated.RPMLimit)
 }
 
-func TestGroupHandlerSimpleModeRejectsCompositeBeforeService(t *testing.T) {
+// 回归：全平台分组（composite）在简单模式下也是合法形态，handler 不得在进入
+// service 之前以「平台不支持」拒绝建组。
+func TestGroupHandlerSimpleModeAcceptsUniversalGroup(t *testing.T) {
 	svc := newStubAdminService()
 	r := newSimpleModeGroupRouter(svc)
-	req := httptest.NewRequest(http.MethodPost, "/groups", bytes.NewBufferString(`{"name":"composite","platform":"composite"}`))
+	req := httptest.NewRequest(http.MethodPost, "/groups", bytes.NewBufferString(`{"name":"default","platform":"composite"}`))
 	req.Header.Set("Content-Type", "application/json")
 	res := httptest.NewRecorder()
 	r.ServeHTTP(res, req)
-	require.Equal(t, http.StatusBadRequest, res.Code)
-	require.Empty(t, svc.createdGroups)
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Len(t, svc.createdGroups, 1)
 }
 
 func TestGroupHandlerSimpleModeDeleteRejectsNonEmptyGroupBeforeCascade(t *testing.T) {
@@ -186,16 +188,17 @@ func TestGroupHandlerSimpleModeResponseUsesFieldAllowlist(t *testing.T) {
 	}
 }
 
-func TestGroupHandlerSimpleModeListsOnlyBindableGroups(t *testing.T) {
+// 回归：简单模式不再隐藏全平台分组，两个分组都要出现在列表里。
+func TestGroupHandlerSimpleModeListsUniversalGroups(t *testing.T) {
 	svc := newStubAdminService()
-	svc.groups = []service.Group{{ID: 1, Name: "basic", Platform: service.PlatformAnthropic}, {ID: 2, Name: "composite", Platform: service.PlatformComposite}}
+	svc.groups = []service.Group{{ID: 1, Name: "legacy", Platform: service.PlatformAnthropic}, {ID: 2, Name: "default", Platform: service.PlatformComposite}}
 	r := newSimpleModeGroupRouter(svc)
 	for _, path := range []string{"/groups", "/groups/all"} {
 		res := httptest.NewRecorder()
 		r.ServeHTTP(res, httptest.NewRequest(http.MethodGet, path, nil))
 		require.Equal(t, http.StatusOK, res.Code)
-		require.Contains(t, res.Body.String(), `"name":"basic"`)
-		require.NotContains(t, res.Body.String(), `"name":"composite"`)
+		require.Contains(t, res.Body.String(), `"name":"legacy"`)
+		require.Contains(t, res.Body.String(), `"name":"default"`)
 	}
 }
 

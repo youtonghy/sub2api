@@ -22,8 +22,8 @@ const (
 	openAIWSConnHealthCheckIdle = 90 * time.Second
 	// coder/websocket cannot consume pong frames without a reader. Recycle
 	// unsupported idle sockets before the upstream keepalive window expires.
-	openAIWSConnIdleRecycleAfter   = 90 * time.Second
-	openAIWSConnHealthCheckTO      = 2 * time.Second
+	openAIWSConnIdleRecycleAfter = 90 * time.Second
+	openAIWSConnHealthCheckTO    = 2 * time.Second
 	// 不在请求热路径上的探活（后台巡检、轮次间预检）给经代理链路的 pong 留足余量，
 	// 实测最大往返约 1.7s；误判的代价是换连甚至断会话，比多等几秒重得多。
 	openAIWSProbePingTO            = 10 * time.Second

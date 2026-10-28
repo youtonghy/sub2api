@@ -756,6 +756,11 @@ func (s *OpenAIGatewayService) inflightEstimateDeps() inflightEstimateDeps {
 				return accounts, err
 			},
 			func(ctx context.Context, apiKey *APIKey, model string) (string, bool, bool) {
+				// 全平台分组的账号映射候选必须按“本次请求实际解析到的平台”查，
+				// 否则会固定按 openai 读快照，导致 grok/gemini/国产平台的预估价缺失。
+				if resolved, ok := ResolvedTargetPlatformFromContext(ctx); ok {
+					return NormalizeOpenAICompatiblePlatform(resolved), false, true
+				}
 				platform := PlatformOpenAI
 				if apiKey.Group != nil && apiKey.Group.Platform != "" && apiKey.Group.Platform != PlatformComposite {
 					platform = apiKey.Group.Platform

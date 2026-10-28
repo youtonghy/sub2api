@@ -345,6 +345,7 @@ export function platformGradientSubtextClass(p: string): string {
 
 /** 平台展示名：来自平台清单（后端 domain/platforms.go），新登记的平台同样适用。 */
 export function platformLabel(p: string): string {
-  if (p === 'composite') return 'Composite'
+  // 分组已不再归属单一平台：composite 即「全平台」，不再是某类特殊分组。
+  if (p === 'composite') return 'All platforms'
   return getPlatformSpec(p)?.display_name ?? (p || 'API')
 }

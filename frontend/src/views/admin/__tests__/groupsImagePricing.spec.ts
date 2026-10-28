@@ -6,7 +6,6 @@ import {
   getDefaultVideoPreviewPrice,
   getImagePricePlaceholder,
   getVideoPricePlaceholder,
-  imagePricingPlatforms,
   imagePricingI18nKey,
   supportsImagePricingPlatform,
   supportsVideoPricingPlatform,
@@ -14,31 +13,35 @@ import {
 } from "../groupsImagePricing";
 
 describe("groups image pricing platform support", () => {
-  it("includes Grok image groups", () => {
-    expect(supportsImagePricingPlatform("grok")).toBe(true);
-    expect(imagePricingPlatforms.has("grok")).toBe(true);
+  it("enables media pricing controls for every group", () => {
+    // 全平台分组：分组不再归属单一平台，媒体定价对所有分组一律可配置。
+    for (const platform of [
+      "composite",
+      "grok",
+      "gemini",
+      "antigravity",
+      "openai",
+      "anthropic",
+      "kimi",
+    ]) {
+      expect(supportsImagePricingPlatform(platform)).toBe(true);
+      expect(supportsVideoPricingPlatform(platform)).toBe(true);
+    }
   });
 
-  it("enables video pricing controls for Grok only", () => {
-    expect(supportsVideoPricingPlatform("grok")).toBe(true);
-    expect(supportsVideoPricingPlatform("openai")).toBe(false);
-  });
-
-  it("keeps non-media group platforms out of the image pricing controls", () => {
-    expect(supportsImagePricingPlatform("anthropic")).toBe(false);
-  });
-
-  it("defaults image generation on for Grok and Gemini-family groups only", () => {
-    expect(defaultAllowImageGenerationForPlatform("grok")).toBe(true);
-    expect(defaultAllowImageGenerationForPlatform("gemini")).toBe(true);
-    expect(defaultAllowImageGenerationForPlatform("antigravity")).toBe(true);
-    expect(defaultAllowImageGenerationForPlatform("composite")).toBe(false);
-    expect(defaultAllowImageGenerationForPlatform("openai")).toBe(false);
-  });
-
-  it("includes Composite groups in image pricing controls", () => {
-    expect(supportsImagePricingPlatform("composite")).toBe(true);
-    expect(imagePricingPlatforms.has("composite")).toBe(true);
+  it("defaults image generation on for every group", () => {
+    // 与后端 DefaultAllowImageGenerationForPlatform 对齐：全平台分组默认开启生图，
+    // 运行时仍受请求解析出的目标平台约束。
+    for (const platform of [
+      "composite",
+      "grok",
+      "gemini",
+      "antigravity",
+      "openai",
+      "anthropic",
+    ]) {
+      expect(defaultAllowImageGenerationForPlatform(platform)).toBe(true);
+    }
   });
 
   it("keeps image and video pricing copy separate", () => {

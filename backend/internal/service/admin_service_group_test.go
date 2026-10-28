@@ -126,36 +126,39 @@ func (s *groupRepoStubForAdmin) ListBindableWithFilters(ctx context.Context, par
 	return s.ListWithFilters(ctx, params, platform, status, search, isExclusive)
 }
 
-func TestAdminServiceSimpleModeValidatesRequestedGroupIDsDirectly(t *testing.T) {
+// 回归：简单模式下全平台分组（composite）可正常绑定，只有不存在的分组才被拒。
+func TestAdminServiceSimpleModeAcceptsUniversalGroupBindings(t *testing.T) {
 	groups := make(map[int64]*Group, 1002)
 	for id := int64(1); id <= 1001; id++ {
-		groups[id] = &Group{ID: id, Platform: PlatformAnthropic}
+		groups[id] = &Group{ID: id, Platform: PlatformComposite}
 	}
-	groups[1002] = &Group{ID: 1002, Platform: PlatformComposite}
+	groups[1002] = &Group{ID: 1002, Platform: PlatformAnthropic} // 迁移残留的单平台行
 	svc := &adminServiceImpl{cfg: &config.Config{RunMode: config.RunModeSimple}, groupRepo: &groupRepoStubForAdmin{getByIDByID: groups}}
 
-	require.Error(t, svc.ValidateAccountGroupBindings(context.Background(), []int64{1, 1002}))
+	require.NoError(t, svc.ValidateAccountGroupBindings(context.Background(), []int64{1, 1002}))
 	require.ErrorIs(t, svc.ValidateAccountGroupBindings(context.Background(), []int64{1, 2000}), ErrGroupNotFound)
 	require.NoError(t, svc.ValidateAccountGroupBindings(context.Background(), []int64{1, 1001}))
 }
 
-func TestAdminServiceSimpleModeRejectsDirectCompositeGroupAccess(t *testing.T) {
+// 回归：简单模式不再把全平台分组当作不可访问的形态。
+func TestAdminServiceSimpleModeAllowsUniversalGroupAccess(t *testing.T) {
 	repo := &groupRepoStubForAdmin{getByID: &Group{ID: 9, Platform: PlatformComposite}}
 	svc := &adminServiceImpl{cfg: &config.Config{RunMode: config.RunModeSimple}, groupRepo: repo, emptyGroupDeleteRepo: repo}
 
-	_, err := svc.GetGroup(context.Background(), 9)
-	require.Error(t, err)
+	group, err := svc.GetGroup(context.Background(), 9)
+	require.NoError(t, err)
+	require.NotNil(t, group)
 	_, err = svc.UpdateGroup(context.Background(), 9, &UpdateGroupInput{})
-	require.Error(t, err)
-	require.Nil(t, repo.updated)
-	require.Error(t, svc.DeleteGroupIfEmpty(context.Background(), 9))
+	require.NoError(t, err)
 }
 
-func TestAdminServiceSimpleModeRejectsAccountListCompositeFilter(t *testing.T) {
+// 回归：简单模式下按全平台分组过滤账号列表不再被拒。
+func TestAdminServiceSimpleModeAllowsAccountListUniversalGroupFilter(t *testing.T) {
 	repo := &groupRepoStubForAdmin{getByID: &Group{ID: 9, Platform: PlatformComposite}}
 	svc := &adminServiceImpl{cfg: &config.Config{RunMode: config.RunModeSimple}, groupRepo: repo}
-	_, _, err := svc.ListAccounts(context.Background(), 1, 20, "", "", "", "", 9, "", "", "")
-	require.Error(t, err)
+	// 分组校验通过后才会走到仓储；accountRepo 为 nil 时会在 ListWithFilters 处 panic，
+	// 因此这里只断言分组校验本身不再返回 SIMPLE_MODE_GROUP_NOT_BINDABLE。
+	require.NoError(t, svc.ValidateAccountGroupBindings(context.Background(), []int64{9}))
 }
 
 func TestAdminServiceSimpleModeRejectsAdvancedGroupOperationsDirectly(t *testing.T) {
@@ -199,16 +202,14 @@ func TestAdminServiceSimpleModeRejectsAdvancedGroupOperationsDirectly(t *testing
 	}
 }
 
-func TestAdminServiceSimpleModeRejectsCompositeCreateAndConversionDirectly(t *testing.T) {
-	svc := &adminServiceImpl{cfg: &config.Config{RunMode: config.RunModeSimple}}
-	_, err := svc.CreateGroup(context.Background(), &CreateGroupInput{Platform: PlatformComposite, RateMultiplier: 1})
-	require.Error(t, err)
-
-	repo := &groupRepoStubForAdmin{getByID: &Group{ID: 1, Platform: PlatformAnthropic}}
-	svc.groupRepo = repo
-	_, err = svc.UpdateGroup(context.Background(), 1, &UpdateGroupInput{Platform: PlatformComposite})
-	require.Error(t, err)
-	require.Nil(t, repo.updated)
+// 回归：简单模式不再拒绝创建全平台分组（改造后它是唯一形态）。
+func TestAdminServiceSimpleModeCreatesUniversalGroup(t *testing.T) {
+	repo := &groupRepoStubForAdmin{}
+	svc := &adminServiceImpl{cfg: &config.Config{RunMode: config.RunModeSimple}, groupRepo: repo}
+	created, err := svc.CreateGroup(context.Background(), &CreateGroupInput{Name: "default", Platform: PlatformComposite, RateMultiplier: 1})
+	require.NoError(t, err)
+	require.NotNil(t, created)
+	require.Equal(t, PlatformComposite, created.Platform)
 }
 
 func TestAdminServiceSimpleModeNormalizesAllUnsupportedCreateFieldsDirectly(t *testing.T) {
@@ -275,7 +276,8 @@ func TestAdminServiceSimpleModeNormalizesAllUnsupportedUpdateFieldsDirectly(t *t
 	require.Equal(t, UpdateGroupInput{Name: "renamed", Description: &description}, *input)
 	require.Equal(t, "renamed", updated.Name)
 	require.Equal(t, description, updated.Description)
-	require.Equal(t, PlatformAnthropic, updated.Platform)
+	// 迁移残留的单平台行在更新时被归一为全平台形态。
+	require.Equal(t, PlatformComposite, updated.Platform)
 	require.Equal(t, StatusActive, updated.Status)
 	require.Equal(t, 3.0, updated.RateMultiplier)
 	require.Equal(t, 8, updated.RPMLimit)
@@ -615,35 +617,34 @@ func TestAdminService_CreateGroup_DefaultsGeminiFamilyImageGenerationEnabled(t *
 	}
 }
 
-func TestAdminService_CreateGroup_PreservesImageGenerationDisabledWithoutPlatformDefault(t *testing.T) {
-	for _, platform := range []string{PlatformAnthropic, PlatformComposite} {
-		t.Run(platform, func(t *testing.T) {
-			repo := &groupRepoStubForAdmin{}
-			svc := &adminServiceImpl{groupRepo: repo}
-
-			group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
-				Name:           platform + "-text",
-				Description:    "Group without image default",
-				Platform:       platform,
-				RateMultiplier: 1.0,
-			})
-			require.NoError(t, err)
-			require.NotNil(t, group)
-			require.NotNil(t, repo.created)
-			require.False(t, repo.created.AllowImageGeneration)
-			require.False(t, group.AllowImageGeneration)
-		})
-	}
-}
-
-func TestAdminService_CreateGroup_DisablesBatchImageForNonGeminiPlatform(t *testing.T) {
+// 全平台分组同时容纳 gemini/grok/antigravity 与 openai 账号，所以新建时默认开启生图；
+// 运行时仍受请求解析出的目标平台约束。
+func TestAdminService_CreateGroup_DefaultsImageGenerationOnForUniversalGroup(t *testing.T) {
 	repo := &groupRepoStubForAdmin{}
 	svc := &adminServiceImpl{groupRepo: repo}
 
 	group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
-		Name:                      "openai-image",
-		Description:               "OpenAI image group",
-		Platform:                  PlatformOpenAI,
+		Name:           "universal-text",
+		Description:    "Group without explicit image switch",
+		Platform:       PlatformComposite,
+		RateMultiplier: 1.0,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, group)
+	require.NotNil(t, repo.created)
+	require.True(t, repo.created.AllowImageGeneration)
+	require.True(t, group.AllowImageGeneration)
+}
+
+// 全平台分组不再按平台清洗批量生图开关（原先仅 gemini 允许）。
+func TestAdminService_CreateGroup_KeepsBatchImageForUniversalGroup(t *testing.T) {
+	repo := &groupRepoStubForAdmin{}
+	svc := &adminServiceImpl{groupRepo: repo}
+
+	group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
+		Name:                      "universal-image",
+		Description:               "Universal image group",
+		Platform:                  PlatformComposite,
 		RateMultiplier:            1.0,
 		AllowImageGeneration:      true,
 		AllowBatchImageGeneration: true,
@@ -652,8 +653,8 @@ func TestAdminService_CreateGroup_DisablesBatchImageForNonGeminiPlatform(t *test
 	require.NotNil(t, group)
 	require.NotNil(t, repo.created)
 	require.True(t, repo.created.AllowImageGeneration)
-	require.False(t, repo.created.AllowBatchImageGeneration)
-	require.False(t, group.AllowBatchImageGeneration)
+	require.True(t, repo.created.AllowBatchImageGeneration)
+	require.True(t, group.AllowBatchImageGeneration)
 }
 
 // TestAdminService_UpdateGroup_WithImagePricing 测试更新分组时 ImagePrice 字段正确更新
@@ -846,11 +847,12 @@ func TestAdminService_UpdateGroup_DisablesBatchImageWhenImageGenerationDisabled(
 	require.False(t, group.AllowBatchImageGeneration)
 }
 
-func TestAdminService_UpdateGroup_DisablesBatchImageWhenPlatformChangesFromGemini(t *testing.T) {
+// 平台已恒为 composite：更新请求里的具体平台值被忽略，批量生图开关不再被清空。
+func TestAdminService_UpdateGroup_KeepsBatchImageOnUniversalGroup(t *testing.T) {
 	existingGroup := &Group{
 		ID:                        1,
-		Name:                      "existing-gemini",
-		Platform:                  PlatformGemini,
+		Name:                      "existing-universal",
+		Platform:                  PlatformComposite,
 		Status:                    StatusActive,
 		AllowImageGeneration:      true,
 		AllowBatchImageGeneration: true,
@@ -864,9 +866,9 @@ func TestAdminService_UpdateGroup_DisablesBatchImageWhenPlatformChangesFromGemin
 	require.NoError(t, err)
 	require.NotNil(t, group)
 	require.NotNil(t, repo.updated)
-	require.Equal(t, PlatformOpenAI, repo.updated.Platform)
-	require.False(t, repo.updated.AllowBatchImageGeneration)
-	require.False(t, group.AllowBatchImageGeneration)
+	require.Equal(t, PlatformComposite, repo.updated.Platform)
+	require.True(t, repo.updated.AllowBatchImageGeneration)
+	require.True(t, group.AllowBatchImageGeneration)
 }
 
 func TestAdminService_UpdateGroup_ClearsDescriptionWhenEmptyString(t *testing.T) {
@@ -1146,9 +1148,10 @@ func TestAdminService_UpdateGroup_ClearsReasoningPolicyForUnsupportedPlatform(t 
 	_, err := svc.UpdateGroup(context.Background(), existing.ID, &UpdateGroupInput{Platform: PlatformGemini})
 
 	require.NoError(t, err)
-	require.Empty(t, repo.updated.MaxReasoningEffort)
-	require.Equal(t, ReasoningEffortOverLimitDowngrade, repo.updated.MaxReasoningEffortOverLimit)
-	require.Empty(t, repo.updated.ReasoningEffortMappings)
+	// 全平台分组：推理强度策略不再因平台被清空，只做取值归一。
+	require.Equal(t, "medium", repo.updated.MaxReasoningEffort)
+	require.Equal(t, ReasoningEffortOverLimitDeny, repo.updated.MaxReasoningEffortOverLimit)
+	require.Equal(t, []ReasoningEffortMapping{{From: "max", To: "xhigh"}}, repo.updated.ReasoningEffortMappings)
 }
 
 func TestAdminService_CreateGroup_InvalidPeakRateReturnsBadRequest(t *testing.T) {
@@ -1319,10 +1322,11 @@ func TestAdminService_CreateGroup_ClearsMessagesDispatchFieldsForNonOpenAIPlatfo
 	require.NoError(t, err)
 	require.NotNil(t, group)
 	require.NotNil(t, repo.created)
-	require.False(t, repo.created.AllowMessagesDispatch)
-	require.False(t, repo.created.AllowLive)
-	require.Empty(t, repo.created.DefaultMappedModel)
-	require.Equal(t, OpenAIMessagesDispatchModelConfig{}, repo.created.MessagesDispatchModelConfig)
+	// 全平台分组：Messages 调度与 Live 开关及其映射都保留，运行时按解析平台生效。
+	require.True(t, repo.created.AllowMessagesDispatch)
+	require.True(t, repo.created.AllowLive)
+	require.Equal(t, "gpt-5.4", repo.created.DefaultMappedModel)
+	require.Equal(t, "gpt-5.4", repo.created.MessagesDispatchModelConfig.OpusMappedModel)
 }
 
 func TestAdminService_CreateCompositeGroupPreservesLive(t *testing.T) {
@@ -1350,7 +1354,9 @@ func TestAdminService_CreateGroup_NormalizesForceOpenAIFastByPlatform(t *testing
 	}{
 		{name: "openai", platform: PlatformOpenAI, want: true},
 		{name: "composite", platform: PlatformComposite, want: true},
-		{name: "anthropic", platform: PlatformAnthropic, want: false},
+		// 全平台分组：Fast 开关处处可开，运行时仅对解析到 OpenAI 的请求生效。
+		{name: "anthropic", platform: PlatformAnthropic, want: true},
+		{name: "gemini", platform: PlatformGemini, want: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &groupRepoStubForAdmin{}
@@ -1368,9 +1374,10 @@ func TestAdminService_CreateGroup_NormalizesForceOpenAIFastByPlatform(t *testing
 	}
 }
 
-func TestAdminService_UpdateGroup_ClearsForceOpenAIFastWhenPlatformChanges(t *testing.T) {
+// 全平台分组：更新请求里的具体平台值被忽略，Fast 开关不再被清空。
+func TestAdminService_UpdateGroup_KeepsForceOpenAIFastOnUniversalGroup(t *testing.T) {
 	existingGroup := &Group{
-		ID: 1, Name: "existing-fast", Platform: PlatformOpenAI, Status: StatusActive, ForceOpenAIFast: true, FreeOpenAIFast: true,
+		ID: 1, Name: "existing-fast", Platform: PlatformComposite, Status: StatusActive, ForceOpenAIFast: true, FreeOpenAIFast: true,
 	}
 	repo := &groupRepoStubForAdmin{getByID: existingGroup}
 	svc := &adminServiceImpl{groupRepo: repo}
@@ -1381,8 +1388,9 @@ func TestAdminService_UpdateGroup_ClearsForceOpenAIFastWhenPlatformChanges(t *te
 
 	require.NoError(t, err)
 	require.NotNil(t, group)
-	require.False(t, repo.updated.ForceOpenAIFast)
-	require.False(t, repo.updated.FreeOpenAIFast)
+	require.Equal(t, PlatformComposite, repo.updated.Platform)
+	require.True(t, repo.updated.ForceOpenAIFast)
+	require.True(t, repo.updated.FreeOpenAIFast)
 }
 
 func TestAdminService_UpdateGroup_ForceOpenAIFastInvalidatesAuthCache(t *testing.T) {
@@ -1449,11 +1457,11 @@ func TestAdminService_UpdateGroup_ClearsMessagesDispatchFieldsWhenPlatformChange
 	require.NoError(t, err)
 	require.NotNil(t, group)
 	require.NotNil(t, repo.updated)
-	require.Equal(t, PlatformAnthropic, repo.updated.Platform)
-	require.False(t, repo.updated.AllowMessagesDispatch)
-	require.False(t, repo.updated.AllowLive)
-	require.Empty(t, repo.updated.DefaultMappedModel)
-	require.Equal(t, OpenAIMessagesDispatchModelConfig{}, repo.updated.MessagesDispatchModelConfig)
+	require.Equal(t, PlatformComposite, repo.updated.Platform)
+	require.True(t, repo.updated.AllowMessagesDispatch)
+	require.True(t, repo.updated.AllowLive)
+	require.Equal(t, "gpt-5.4", repo.updated.DefaultMappedModel)
+	require.Equal(t, "gpt-5.3-codex", repo.updated.MessagesDispatchModelConfig.SonnetMappedModel)
 }
 
 func TestAdminService_ListGroups_WithSearch(t *testing.T) {
@@ -1698,16 +1706,17 @@ func TestAdminService_CreateGroup_InvalidRequestFallbackRejectsUnsupportedPlatfo
 	}
 	svc := &adminServiceImpl{groupRepo: repo}
 
-	_, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
+	// 全平台分组：无效请求兜底不再限制平台，openai/全平台当前分组都可以配置兜底。
+	created, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
 		Name:                            "g1",
 		Platform:                        PlatformOpenAI,
 		RateMultiplier:                  1.0,
 		SubscriptionType:                SubscriptionTypeStandard,
 		FallbackGroupIDOnInvalidRequest: &fallbackID,
 	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid request fallback only supported for anthropic or antigravity groups")
-	require.Nil(t, repo.created)
+	require.NoError(t, err)
+	require.NotNil(t, created)
+	require.Equal(t, &fallbackID, created.FallbackGroupIDOnInvalidRequest)
 }
 
 func TestAdminService_CreateGroup_InvalidRequestFallbackRejectsSubscription(t *testing.T) {
@@ -1738,14 +1747,10 @@ func TestAdminService_CreateGroup_InvalidRequestFallbackRejectsFallbackGroup(t *
 		wantMessage string
 	}{
 		{
-			name:        "openai_target",
+			// 迁移残留的单平台具体平台行不再是合法的兜底目标。
+			name:        "concrete_openai_target",
 			fallback:    &Group{ID: 10, Platform: PlatformOpenAI, SubscriptionType: SubscriptionTypeStandard},
-			wantMessage: "fallback group must be anthropic platform",
-		},
-		{
-			name:        "antigravity_target",
-			fallback:    &Group{ID: 10, Platform: PlatformAntigravity, SubscriptionType: SubscriptionTypeStandard},
-			wantMessage: "fallback group must be anthropic platform",
+			wantMessage: "fallback group must be a universal group",
 		},
 		{
 			name:        "subscription_group",
@@ -1863,12 +1868,14 @@ func TestAdminService_UpdateGroup_InvalidRequestFallbackPlatformMismatch(t *test
 	}
 	svc := &adminServiceImpl{groupRepo: repo}
 
-	_, err := svc.UpdateGroup(context.Background(), existing.ID, &UpdateGroupInput{
+	// 全平台分组：更新时把分组标成 openai 也会被归一为 composite，兜底配置保持不变。
+	updated, err := svc.UpdateGroup(context.Background(), existing.ID, &UpdateGroupInput{
 		Platform: PlatformOpenAI,
 	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid request fallback only supported for anthropic or antigravity groups")
-	require.Nil(t, repo.updated)
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	require.Equal(t, PlatformComposite, updated.Platform)
+	require.Equal(t, &fallbackID, updated.FallbackGroupIDOnInvalidRequest)
 }
 
 func TestAdminService_UpdateGroup_InvalidRequestFallbackSubscriptionMismatch(t *testing.T) {
@@ -2277,12 +2284,14 @@ func TestAdminService_UpdateGroup_CodexModelsManifestConfigValidation(t *testing
 	})
 }
 
-func TestAdminService_UpdateGroup_CodexModelsManifestConfigZeroedForNonOpenAIPlatform(t *testing.T) {
-	existing := &Group{ID: 1, Name: "g", Platform: PlatformOpenAI, Status: StatusActive}
+// 回归：全平台分组保存 Codex manifest 固定账号配置时不再被平台 sanitizer 归零；
+// 账号成员校验仍要求 openai 平台账号。
+func TestAdminService_UpdateGroup_CodexModelsManifestConfigSurvivesUniversalGroup(t *testing.T) {
+	existing := &Group{ID: 1, Name: "g", Platform: PlatformComposite, Status: StatusActive}
 	repo := &groupRepoStubForAdmin{getByID: existing}
 	svc := &adminServiceImpl{
 		groupRepo:   repo,
-		accountRepo: &accountRepoStubForGroupCodexManifest{},
+		accountRepo: &accountRepoStubForGroupCodexManifest{accounts: openAIGroupCodexManifestAccounts(1, 2)},
 	}
 
 	group, err := svc.UpdateGroup(context.Background(), existing.ID, &UpdateGroupInput{
@@ -2295,8 +2304,10 @@ func TestAdminService_UpdateGroup_CodexModelsManifestConfigZeroedForNonOpenAIPla
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, GroupCodexModelsManifestConfig{}, repo.updated.CodexModelsManifestConfig)
-	require.Equal(t, GroupCodexModelsManifestConfig{}, group.CodexModelsManifestConfig)
+	// 全平台分组：Codex manifest 配置不再因平台被归零，但账号成员校验仍要求 openai 平台。
+	require.True(t, repo.updated.CodexModelsManifestConfig.Enabled)
+	require.Equal(t, []int64{1, 2}, repo.updated.CodexModelsManifestConfig.AccountIDs)
+	require.True(t, group.CodexModelsManifestConfig.FallbackToScheduler)
 }
 
 func TestAdminService_UpdateGroup_CodexModelsManifestConfigUntouchedWhenOmitted(t *testing.T) {

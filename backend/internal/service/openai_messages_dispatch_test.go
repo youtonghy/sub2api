@@ -87,7 +87,9 @@ func TestSanitizeGroupMessagesDispatchFields_PreservesCompositeDispatchToggle(t 
 
 	sanitizeGroupMessagesDispatchFields(group)
 
+	// 全平台分组：开关与映射都保留，运行时按请求解析到的目标平台生效。
 	require.True(t, group.AllowMessagesDispatch)
-	require.Empty(t, group.DefaultMappedModel)
-	require.Equal(t, OpenAIMessagesDispatchModelConfig{}, group.MessagesDispatchModelConfig)
+	require.Equal(t, "gpt-5.6-sol", group.DefaultMappedModel)
+	require.Equal(t, "gpt-5.3-codex", group.MessagesDispatchModelConfig.SonnetMappedModel)
+	require.Equal(t, map[string]string{"claude-fable-5": "gpt-5.6-sol"}, group.MessagesDispatchModelConfig.ExactModelMappings)
 }

@@ -184,11 +184,14 @@ func sanitizeUpdateGroupRequestForSimpleMode(req *UpdateGroupRequest) {
 }
 
 // CreateGroupRequest represents create group request
+//
+// Platform 字段保留仅为兼容旧客户端：分组已不再归属单一平台，传入值会被忽略，
+// 落库恒为 composite。因此不再做 group_platform 枚举校验。
 type CreateGroupRequest struct {
 	Name                      string                        `json:"name" binding:"required"`
 	Description               string                        `json:"description"`
-	I18n                      service.GroupI18n             `json:"i18n"` // 名称与描述的界面语言译文
-	Platform                  string                        `json:"platform" binding:"omitempty,group_platform"`
+	I18n                      service.GroupI18n             `json:"i18n"`     // 名称与描述的界面语言译文
+	Platform                  string                        `json:"platform"` // 已废弃：恒为 composite
 	RateMultiplier            float64                       `json:"rate_multiplier"`
 	IsExclusive               bool                          `json:"is_exclusive"`
 	SubscriptionType          string                        `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
@@ -260,11 +263,13 @@ type CreateGroupRequest struct {
 }
 
 // UpdateGroupRequest represents update group request
+//
+// Platform 已废弃：分组不再归属单一平台，传入值会被忽略，保持 composite。
 type UpdateGroupRequest struct {
 	Name                      string                         `json:"name"`
 	Description               *string                        `json:"description"`
-	I18n                      *service.GroupI18n             `json:"i18n"` // 缺省不修改，传入则整体替换
-	Platform                  string                         `json:"platform" binding:"omitempty,group_platform"`
+	I18n                      *service.GroupI18n             `json:"i18n"`     // 缺省不修改，传入则整体替换
+	Platform                  string                         `json:"platform"` // 已废弃：恒为 composite
 	RateMultiplier            *float64                       `json:"rate_multiplier"`
 	IsExclusive               *bool                          `json:"is_exclusive"`
 	Status                    string                         `json:"status" binding:"omitempty,oneof=active inactive"`
@@ -646,10 +651,6 @@ func (h *GroupHandler) Create(c *gin.Context) {
 	var req CreateGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-	if h.isSimpleMode() && req.Platform == service.PlatformComposite {
-		response.BadRequest(c, "Platform is not supported in simple mode")
 		return
 	}
 	if h.isSimpleMode() {

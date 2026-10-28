@@ -106,12 +106,15 @@ func PlatformFromAPIKey(apiKey *APIKey) string {
 }
 
 // QuotaPlatform 返回 user×platform 配额计量使用的平台标识。
-// 强制平台路由（如 /antigravity）优先按 ctx 中的 ForcePlatform 计量，否则回退到
-// APIKey 关联 Group 的平台。
+// 强制平台路由（如 /antigravity）优先按 ctx 中的 ForcePlatform 计量，其次按请求已解析的
+// 目标平台（全平台分组的常规路径），最后回退到 APIKey 关联 Group 的平台。
 //
-// 注意：必须用带 ForcePlatform 的请求 context 调用（如 handler 的 c.Request.Context()）。
-// 后扣运行在 worker 池的 background ctx 上没有 ForcePlatform，因此后扣平台由 handler
-// 预先算定、经 RecordUsageInput.QuotaPlatform 传入，不要在后扣链路用 worker ctx 调用本函数。
+// 全平台分组下 Group.Platform 恒为 composite，不能直接作为配额维度：此时必须依赖 ctx
+// 已解析的目标平台；上下文确实没有解析结果时返回空串，由调用方（后扣链路）回退到账号平台。
+//
+// 注意：必须用带 ForcePlatform / 已解析平台的请求 context 调用（如 handler 的
+// c.Request.Context()）。后扣运行在 worker 池的 background ctx 上没有这些值，因此后扣平台
+// 由 handler 预先算定、经 RecordUsageInput.QuotaPlatform 传入，不要在后扣链路用 worker ctx 调用本函数。
 func QuotaPlatform(ctx context.Context, apiKey *APIKey) string {
 	if ctx != nil {
 		if fp, ok := ctx.Value(ctxkey.ForcePlatform).(string); ok && fp != "" {
@@ -845,7 +848,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	// 账号统计成本回落 total_cost（官方存储价）。
 	if apiKey.GroupID != nil && !isCacheStorageOnlyResult(result) {
 		applyAccountStatsCost(ctx, usageLog, s.channelService, s.billingService,
-			account.ID, *apiKey.GroupID, result.UpstreamModel, result.Model,
+			account.ID, account.Platform, *apiKey.GroupID, result.UpstreamModel, result.Model,
 			// Anthropic's input_tokens excludes cache_read and cache_creation (billed separately);
 			// OpenAI gateway uses actualInputTokens which also excludes cache_read for the same reason.
 			UsageTokens{

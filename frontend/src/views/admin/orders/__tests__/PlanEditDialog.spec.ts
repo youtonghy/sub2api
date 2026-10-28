@@ -190,7 +190,8 @@ describe('PlanEditDialog', () => {
 
     const options = wrapper.findAll('option').map(option => option.text())
 
-    expect(options).toContain('OpenAI + Claude + Gemini + Grok — composite (1.2x)')
-    expect(options).not.toContain('Standard OpenAI — openai (1x)')
+    // 全平台分组：下拉不再展示平台维度，只保留名称与倍率。
+    expect(options).toContain('OpenAI + Claude + Gemini + Grok (1.2x)')
+    expect(options).not.toContain('Standard OpenAI (1x)')
   })
 })

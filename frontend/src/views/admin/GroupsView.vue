@@ -22,13 +22,6 @@
               />
             </div>
             <Select
-              v-model="filters.platform"
-              :options="platformFilterOptions"
-              :placeholder="t('admin.groups.allPlatforms')"
-              class="w-44"
-              @change="loadGroups"
-            />
-            <Select
               v-model="filters.status"
               :options="statusOptions"
               :placeholder="t('admin.groups.allStatus')"
@@ -136,33 +129,13 @@
             >
           </template>
 
-          <template #cell-platform="{ value }">
+          <!-- 分组不再归属单一平台：平台列固定展示「全平台」 -->
+          <template #cell-platform>
             <span
-              :class="[
-                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',
-                value === 'anthropic'
-                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                  : value === 'openai'
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                    : value === 'antigravity'
-                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-                      : value === 'grok'
-                        ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100'
-                        : value === 'kimi'
-                          ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'
-                          : value === 'zhipu'
-                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
-                            : value === 'deepseek'
-                              ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400'
-                              : value === 'minimax'
-                                ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
-                              : value === 'opencode_go'
-                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
-                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-              ]"
+              class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
             >
-              <PlatformIcon :platform="value" size="xs" />
-              {{ t("admin.groups.platforms." + value, platformLabel(value)) }}
+              <PlatformIcon platform="composite" size="xs" />
+              {{ t("admin.groups.platforms.composite", "All platforms") }}
             </span>
           </template>
 
@@ -410,7 +383,7 @@
                 </span>
               </button>
               <button
-                v-if="!authStore.isSimpleMode && row.platform === 'composite'"
+                v-if="!authStore.isSimpleMode"
                 data-testid="group-composite-routes"
                 @click="handleCompositeRoutes(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-cyan-600 dark:hover:bg-dark-700 dark:hover:text-cyan-400"
@@ -508,18 +481,6 @@
             rows="3"
             :placeholder="t('admin.groups.optionalDescription')"
           />
-        </div>
-        <div>
-          <label class="input-label">{{
-            t("admin.groups.form.platform")
-          }}</label>
-          <Select
-            v-model="createForm.platform"
-            :options="platformOptions"
-            data-tour="group-form-platform"
-            @change="createForm.copy_accounts_from_group_ids = []"
-          />
-          <p class="input-hint">{{ t("admin.groups.platformHint") }}</p>
         </div>
         <!-- 从分组复制账号 -->
         <div v-if="!authStore.isSimpleMode && copyAccountsGroupOptions.length > 0">
@@ -922,7 +883,7 @@
             <label
               v-if="
                 createForm.allow_image_generation &&
-                (createForm.platform === 'composite' || createForm.platform === 'openai')
+                true
               "
               class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
             >
@@ -1001,7 +962,7 @@
               </div>
             </div>
           </div>
-          <div v-if="createForm.platform === 'gemini' && createForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
+          <div v-if="createForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
             <label
               class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
             >
@@ -1048,7 +1009,7 @@
             </div>
           </div>
           <p
-            v-else-if="createForm.platform !== 'gemini'"
+            v-else
             class="mt-4 border-t border-dashed border-gray-200 pt-4 text-xs text-gray-500 dark:border-dark-700 dark:text-gray-400"
           >
             {{ t("admin.groups.imagePricing.batchGeminiOnlyHint") }}
@@ -1284,7 +1245,7 @@
         </div>
 
         <!-- 支持的模型系列（仅 antigravity 平台） -->
-        <div v-if="createForm.platform === 'antigravity'" class="border-t pt-4">
+        <div class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t("admin.groups.supportedScopes.title") }}
@@ -1358,7 +1319,7 @@
         </div>
 
         <!-- MCP XML 协议注入（仅 antigravity 平台） -->
-        <div v-if="createForm.platform === 'antigravity'" class="border-t pt-4">
+        <div class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t("admin.groups.mcpXml.title") }}
@@ -1399,7 +1360,7 @@
         </div>
 
         <!-- Claude Code 客户端限制（仅 anthropic 平台） -->
-        <div v-if="createForm.platform === 'anthropic'" class="border-t pt-4">
+        <div class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t("admin.groups.claudeCode.title") }}
@@ -1456,7 +1417,7 @@
 
         <!-- Codex 网页搜索按次计费（仅 openai 平台） -->
         <div
-          v-if="createForm.platform === 'openai'"
+          v-if="true"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -1511,7 +1472,7 @@
 
         <!-- Grok Voice 显式定价（仅 grok 平台） -->
         <div
-          v-if="createForm.platform === 'grok'"
+          v-if="true"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1651,7 +1612,7 @@
 
           <div
             v-if="
-              createForm.platform === 'openai' &&
+              true &&
               createForm.allow_messages_dispatch
             "
             class="mt-3"
@@ -1911,7 +1872,7 @@
         </div>
 
         <!-- 模型路由配置（仅 anthropic 平台） -->
-        <div v-if="createForm.platform === 'anthropic'" class="border-t pt-4">
+        <div class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t("admin.groups.modelRouting.title") }}
@@ -2159,18 +2120,6 @@
             multiline
             rows="3"
           />
-        </div>
-        <div>
-          <label class="input-label">{{
-            t("admin.groups.form.platform")
-          }}</label>
-          <Select
-            v-model="editForm.platform"
-            :options="platformOptions"
-            :disabled="true"
-            data-tour="group-form-platform"
-          />
-          <p class="input-hint">{{ t("admin.groups.platformNotEditable") }}</p>
         </div>
         <template v-if="!authStore.isSimpleMode">
         <!-- 从分组复制账号（编辑时） -->
@@ -2576,7 +2525,7 @@
             <label
               v-if="
                 editForm.allow_image_generation &&
-                (editForm.platform === 'composite' || editForm.platform === 'openai')
+                true
               "
               class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
             >
@@ -2655,7 +2604,7 @@
               </div>
             </div>
           </div>
-          <div v-if="editForm.platform === 'gemini' && editForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
+          <div v-if="editForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
             <label
               class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
             >
@@ -2702,7 +2651,7 @@
             </div>
           </div>
           <p
-            v-else-if="editForm.platform !== 'gemini'"
+            v-else
             class="mt-4 border-t border-dashed border-gray-200 pt-4 text-xs text-gray-500 dark:border-dark-700 dark:text-gray-400"
           >
             {{ t("admin.groups.imagePricing.batchGeminiOnlyHint") }}
@@ -2938,7 +2887,7 @@
         </div>
 
         <!-- 支持的模型系列（仅 antigravity 平台） -->
-        <div v-if="editForm.platform === 'antigravity'" class="border-t pt-4">
+        <div class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t("admin.groups.supportedScopes.title") }}
@@ -3012,7 +2961,7 @@
         </div>
 
         <!-- MCP XML 协议注入（仅 antigravity 平台） -->
-        <div v-if="editForm.platform === 'antigravity'" class="border-t pt-4">
+        <div class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t("admin.groups.mcpXml.title") }}
@@ -3053,7 +3002,7 @@
         </div>
 
         <!-- Claude Code 客户端限制（仅 anthropic 平台） -->
-        <div v-if="editForm.platform === 'anthropic'" class="border-t pt-4">
+        <div class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t("admin.groups.claudeCode.title") }}
@@ -3110,7 +3059,7 @@
 
         <!-- Codex 网页搜索按次计费（仅 openai 平台） -->
         <div
-          v-if="editForm.platform === 'openai'"
+          v-if="true"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -3175,7 +3124,7 @@
 
         <!-- Grok Voice 显式定价（仅 grok 平台） -->
         <div
-          v-if="editForm.platform === 'grok'"
+          v-if="true"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -3315,7 +3264,7 @@
 
           <div
             v-if="
-              editForm.platform === 'openai' && editForm.allow_messages_dispatch
+              editForm.allow_messages_dispatch
             "
             class="mt-3"
           >
@@ -3574,7 +3523,7 @@
         </div>
 
         <!-- 模型路由配置（仅 anthropic 平台） -->
-        <div v-if="editForm.platform === 'anthropic'" class="border-t pt-4">
+        <div class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t("admin.groups.modelRouting.title") }}
@@ -4311,10 +4260,7 @@ import type {
   GroupPlatform,
   SubscriptionType,
 } from "@/types";
-import {
-  CONCRETE_PLATFORM_OPTIONS,
-  GROUP_PLATFORM_OPTIONS,
-} from "@/constants/platforms";
+import { CONCRETE_PLATFORM_OPTIONS } from "@/constants/platforms";
 import type { Column } from "@/components/common/types";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import TablePageLayout from "@/components/layout/TablePageLayout.vue";
@@ -4643,17 +4589,6 @@ const exclusiveOptions = computed(() => [
   { value: "false", label: t("admin.groups.nonExclusive") },
 ]);
 
-const platformOptions = computed(() =>
-  GROUP_PLATFORM_OPTIONS.filter(
-    (option) => !authStore.isSimpleMode || option.value !== "composite",
-  ),
-);
-
-const platformFilterOptions = computed(() => [
-  { value: "", label: t("admin.groups.allPlatforms") },
-  ...GROUP_PLATFORM_OPTIONS,
-]);
-
 const compositeRoutePlatformOptions = computed(() => [
   ...CONCRETE_PLATFORM_OPTIONS,
 ]);
@@ -4700,15 +4635,13 @@ const subscriptionTypeOptions = computed(() => [
 ]);
 
 // 降级分组选项（创建时）- 仅包含 anthropic 平台且未启用 claude_code_only 的分组
+// 全平台分组：兜底不再限制平台，只受 claude_code_only 与状态约束。
 const fallbackGroupOptions = computed(() => {
   const options: { value: number | null; label: string }[] = [
     { value: null, label: t("admin.groups.claudeCode.noFallback") },
   ];
   const eligibleGroups = groups.value.filter(
-    (g) =>
-      g.platform === "anthropic" &&
-      !g.claude_code_only &&
-      g.status === "active",
+    (g) => !g.claude_code_only && g.status === "active",
   );
   eligibleGroups.forEach((g) => {
     options.push({ value: g.id, label: g.name });
@@ -4724,7 +4657,6 @@ const fallbackGroupOptionsForEdit = computed(() => {
   const currentId = editingGroup.value?.id;
   const eligibleGroups = groups.value.filter(
     (g) =>
-      g.platform === "anthropic" &&
       !g.claude_code_only &&
       g.status === "active" &&
       g.id !== currentId,
@@ -4742,7 +4674,6 @@ const invalidRequestFallbackOptions = computed(() => {
   ];
   const eligibleGroups = groups.value.filter(
     (g) =>
-      g.platform === "anthropic" &&
       g.status === "active" &&
       g.subscription_type !== "subscription" &&
       g.fallback_group_id_on_invalid_request === null,
@@ -4761,7 +4692,6 @@ const invalidRequestFallbackOptionsForEdit = computed(() => {
   const currentId = editingGroup.value?.id;
   const eligibleGroups = groups.value.filter(
     (g) =>
-      g.platform === "anthropic" &&
       g.status === "active" &&
       g.subscription_type !== "subscription" &&
       g.fallback_group_id_on_invalid_request === null &&
@@ -4773,36 +4703,26 @@ const invalidRequestFallbackOptionsForEdit = computed(() => {
   return options;
 });
 
-const canCopyAccountsFromGroup = (targetPlatform: GroupPlatform, sourcePlatform: GroupPlatform) =>
-  targetPlatform === "composite" || sourcePlatform === targetPlatform;
-
+// 全平台分组：任意分组都可作为复制来源，不再比较平台。
 const copyAccountsGroupLabel = (g: AdminGroup) => {
   const count = g.account_count || 0;
-  const platform = t("admin.groups.platforms." + g.platform, platformLabel(g.platform));
-  return `${g.name} - ${platform} (${t("admin.groups.accountsCount", { count })})`;
+  return `${g.name} (${t("admin.groups.accountsCount", { count })})`;
 };
 
-// 复制账号的源分组选项（创建时）- 相同平台；composite 分组可汇总各平台账号
+// 复制账号的源分组选项（创建时）
 const copyAccountsGroupOptions = computed(() => {
-  const eligibleGroups = groups.value.filter(
-    (g) =>
-      canCopyAccountsFromGroup(createForm.platform, g.platform) &&
-      (g.account_count || 0) > 0,
-  );
+  const eligibleGroups = groups.value.filter((g) => (g.account_count || 0) > 0);
   return eligibleGroups.map((g) => ({
     value: g.id,
     label: copyAccountsGroupLabel(g),
   }));
 });
 
-// 复制账号的源分组选项（编辑时）- 相同平台；composite 分组可汇总各平台账号，排除自身
+// 复制账号的源分组选项（编辑时）- 排除自身
 const copyAccountsGroupOptionsForEdit = computed(() => {
   const currentId = editingGroup.value?.id;
   const eligibleGroups = groups.value.filter(
-    (g) =>
-      canCopyAccountsFromGroup(editForm.platform, g.platform) &&
-      (g.account_count || 0) > 0 &&
-      g.id !== currentId,
+    (g) => (g.account_count || 0) > 0 && g.id !== currentId,
   );
   return eligibleGroups.map((g) => ({
     value: g.id,
@@ -5573,17 +5493,14 @@ const resetDisabledBatchImagePricing = (
     | "batch_image_hold_multiplier"
   >,
 ) => {
-  if (form.platform !== "gemini" || !form.allow_image_generation) {
+  if (!form.allow_image_generation) {
     form.allow_batch_image_generation = false;
   }
   if (!form.allow_batch_image_generation) {
     form.batch_image_discount_multiplier = 0.5;
     form.batch_image_hold_multiplier = 0.6;
   }
-  if (
-    !form.allow_image_generation ||
-    (form.platform !== "composite" && form.platform !== "openai")
-  ) {
+  if (!form.allow_image_generation) {
     form.image_count_billing = false;
   }
 };

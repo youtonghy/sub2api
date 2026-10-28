@@ -11,48 +11,25 @@ import (
 
 const simpleModeDefaultGroupDescription = "Auto-created default group"
 
+// simpleModeDefaultGroupName 是简单模式下自动创建的唯一默认分组名称。
+// 分组不再归属单一平台，因此不再按 anthropic/openai/gemini/antigravity/grok 各建
+// 一个 `<platform>-default`：一个 `default` 分组就能容纳所有平台账号。
+const simpleModeDefaultGroupName = "default"
+
 func ensureSimpleModeDefaultGroups(ctx context.Context, client *dbent.Client) error {
 	if client == nil {
 		return fmt.Errorf("nil ent client")
 	}
 
+	// 历史部署可能已经存在 `*-default` 分组并且已绑定账号/产生用量，因此只做向后
+	// 兼容的图像生成回填，不删除也不迁移它们；新账号可以被显式绑定到这些分组，
+	// 自动绑定时也会优先复用同名 `<platform>-default`（见 resolveDefaultGroupIDForPlatform）。
 	if err := backfillSimpleModeGrokDefaultImageGeneration(ctx, client); err != nil {
 		return err
 	}
 
-	requiredByPlatform := map[string]int{
-		service.PlatformAnthropic:   1,
-		service.PlatformOpenAI:      1,
-		service.PlatformGemini:      1,
-		service.PlatformAntigravity: 2,
-		service.PlatformGrok:        1,
-	}
-
-	for platform, minCount := range requiredByPlatform {
-		count, err := client.Group.Query().
-			Where(group.PlatformEQ(platform), group.DeletedAtIsNil()).
-			Count(ctx)
-		if err != nil {
-			return fmt.Errorf("count groups for platform %s: %w", platform, err)
-		}
-
-		if platform == service.PlatformAntigravity {
-			if count < minCount {
-				for i := count; i < minCount; i++ {
-					name := fmt.Sprintf("%s-default-%d", platform, i+1)
-					if err := createGroupIfNotExists(ctx, client, name, platform); err != nil {
-						return err
-					}
-				}
-			}
-			continue
-		}
-
-		// Non-antigravity platforms: ensure <platform>-default exists.
-		name := platform + "-default"
-		if err := createGroupIfNotExists(ctx, client, name, platform); err != nil {
-			return err
-		}
+	if err := createGroupIfNotExists(ctx, client, simpleModeDefaultGroupName, service.PlatformComposite); err != nil {
+		return err
 	}
 
 	return nil

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"strings"
@@ -287,5 +288,67 @@ func normalizeOpenAIResponsesLitePayloadForAccount(body []byte, account *Account
 	if account.IsOpenAIOAuthLike() {
 		return normalizeOpenAIResponsesLiteToolsPayload(body)
 	}
-	return normalizeOpenAIResponsesLiteParallelToolCallsPayload(body)
+	// API Key 出口不做完整的 Lite 工具校验（不新增 400），但必须把顶层 namespace
+	// 声明搬到 input.additional_tools：Lite 端点按 naming space 解析工具声明，
+	// 两种凭证出口对同一端点必须发送同一种形状，否则 API Key 账号下带 namespace
+	// 工具的 Lite 请求会被上游拒绝。随后仍然强制 parallel_tool_calls=false。
+	return normalizeOpenAIResponsesLiteNamespaceToolsForAPIKeyPayload(body)
+}
+
+// normalizeOpenAIResponsesLiteNamespaceToolsForAPIKeyPayload 只做幂等的 namespace
+// 搬迁 + 显式 parallel_tool_calls=false，不做 tool 类型白名单校验，保持 API Key 请求
+// 与当前行为一致的宽容度。
+func normalizeOpenAIResponsesLiteNamespaceToolsForAPIKeyPayload(body []byte) ([]byte, bool, error) {
+	if len(body) == 0 || !bytes.Contains(body, []byte(`"namespace"`)) {
+		return normalizeOpenAIResponsesLiteParallelToolCallsPayload(body)
+	}
+
+	var requestBody map[string]any
+	if err := decodeOpenAIJSONUseNumber(body, &requestBody); err != nil {
+		return body, false, fmt.Errorf("decode responses Lite request body: %w", err)
+	}
+
+	changed := false
+	if rawTools, ok := requestBody["tools"].([]any); ok {
+		topLevelTools := make([]any, 0, len(rawTools))
+		namespaceTools := make([]any, 0, len(rawTools))
+		for _, rawTool := range rawTools {
+			tool, isObject := rawTool.(map[string]any)
+			if !isObject {
+				topLevelTools = append(topLevelTools, rawTool)
+				continue
+			}
+			if strings.TrimSpace(firstNonEmptyString(tool["type"])) == "namespace" {
+				namespaceTools = append(namespaceTools, rawTool)
+				continue
+			}
+			topLevelTools = append(topLevelTools, rawTool)
+		}
+		if len(namespaceTools) > 0 {
+			input, err := appendOpenAIResponsesLiteAdditionalTools(requestBody["input"], namespaceTools)
+			if err != nil {
+				return body, false, err
+			}
+			requestBody["input"] = input
+			if len(topLevelTools) == 0 {
+				delete(requestBody, "tools")
+			} else {
+				requestBody["tools"] = topLevelTools
+			}
+			changed = true
+		}
+	}
+
+	parallelChanged, err := ensureOpenAIResponsesLiteParallelToolCalls(requestBody, changed)
+	if err != nil {
+		return body, false, err
+	}
+	if !parallelChanged {
+		return body, false, nil
+	}
+	rebuilt, err := marshalOpenAIUpstreamJSON(requestBody)
+	if err != nil {
+		return body, false, fmt.Errorf("encode responses Lite request body: %w", err)
+	}
+	return rebuilt, true, nil
 }

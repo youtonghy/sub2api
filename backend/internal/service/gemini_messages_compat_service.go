@@ -117,7 +117,7 @@ func (s *GeminiMessagesCompatService) SelectAccountForModel(ctx context.Context,
 func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}) (*Account, error) {
 	// 1. 确定目标平台和调度模式
 	// Determine target platform and scheduling mode
-	platform, useMixedScheduling, hasForcePlatform, err := s.resolvePlatformAndSchedulingMode(ctx, groupID)
+	platform, useMixedScheduling, hasForcePlatform, err := s.resolvePlatformAndSchedulingMode(ctx, groupID, requestedModel)
 	if err != nil {
 		return nil, err
 	}
@@ -167,13 +167,22 @@ func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx co
 // resolvePlatformAndSchedulingMode 解析目标平台和调度模式。
 // 返回：平台名称、是否使用混合调度、是否强制平台、错误。
 //
+// 解析顺序与网关主调度保持一致：强制平台（/antigravity 路由）> 上下文已解析的
+// 目标平台（全平台分组经 composite 路由解析而来）> 按请求模型识别 > 分组平台
+// （仅适用于迁移前的单平台历史数据）。全平台分组下前两者都不命中时必须报错，
+// 不能回退到 composite 去匹配账号（那样只会选出 0 个账号、报一个含糊的
+// "no available Gemini accounts"）。
+//
 // resolvePlatformAndSchedulingMode resolves target platform and scheduling mode.
 // Returns: platform name, whether to use mixed scheduling, whether force platform, error.
-func (s *GeminiMessagesCompatService) resolvePlatformAndSchedulingMode(ctx context.Context, groupID *int64) (platform string, useMixedScheduling bool, hasForcePlatform bool, err error) {
+func (s *GeminiMessagesCompatService) resolvePlatformAndSchedulingMode(ctx context.Context, groupID *int64, requestedModel string) (platform string, useMixedScheduling bool, hasForcePlatform bool, err error) {
 	// 优先检查 context 中的强制平台（/antigravity 路由）
 	forcePlatform, hasForcePlatform := ctx.Value(ctxkey.ForcePlatform).(string)
 	if hasForcePlatform && forcePlatform != "" {
 		return forcePlatform, false, true, nil
+	}
+	if resolved, ok := ResolvedTargetPlatformFromContext(ctx); ok {
+		return resolved, resolved == PlatformGemini, false, nil
 	}
 
 	if groupID != nil {
@@ -187,8 +196,21 @@ func (s *GeminiMessagesCompatService) resolvePlatformAndSchedulingMode(ctx conte
 				return "", false, false, fmt.Errorf("get group failed: %w", err)
 			}
 		}
-		// gemini 分组支持混合调度（包含启用了 mixed_scheduling 的 antigravity 账户）
-		return group.Platform, group.Platform == PlatformGemini, false, nil
+		// 迁移前的单平台历史分组：分组平台是运营显式选择的，优先于模型名推断。
+		if group != nil && group.Platform != PlatformComposite && isConcreteRequestPlatform(group.Platform) {
+			// gemini 分组支持混合调度（包含启用了 mixed_scheduling 的 antigravity 账户）
+			return group.Platform, group.Platform == PlatformGemini, false, nil
+		}
+	}
+
+	// 全平台分组：按请求模型推断目标平台。
+	if detected, ok := DetectModelPlatform(requestedModel); ok {
+		return detected, detected == PlatformGemini, false, nil
+	}
+
+	if groupID != nil {
+		// 全平台分组且模型名无法定位平台：必须报错，不能返回 composite 去匹配账号。
+		return "", false, false, fmt.Errorf("cannot resolve target platform for model: %s", requestedModel)
 	}
 
 	// 无分组时只使用原生 gemini 平台

@@ -27,6 +27,7 @@ func resolveAccountStatsCost(
 	channelService *ChannelService,
 	billingService *BillingService,
 	accountID int64,
+	accountPlatform string,
 	groupID int64,
 	upstreamModel string,
 	tokens UsageTokens,
@@ -49,7 +50,13 @@ func resolveAccountStatsCost(
 		return nil
 	}
 
-	platform := channelService.GetGroupPlatform(ctx, groupID)
+	// 全平台分组后 GetGroupPlatform 返回的是形态标记 composite，拿它去精确匹配渠道定价
+	// 永远不会命中，会静默回退到 LiteLLM 价格表。账号成本统计天然是账号维度，所以直接
+	// 用账号自身的平台作为查询平台。
+	platform := strings.TrimSpace(accountPlatform)
+	if platform == "" || platform == PlatformComposite {
+		platform = channelService.GetGroupPlatform(ctx, groupID)
+	}
 
 	// 优先级 1：自定义规则（始终尝试）
 	if cost := tryCustomRules(channel, accountID, groupID, platform, upstreamModel, tokens, requestCount, reasoningEffort); cost != nil {
@@ -267,7 +274,7 @@ func applyAccountStatsCost(
 	ctx context.Context,
 	usageLog *UsageLog,
 	cs *ChannelService, bs *BillingService,
-	accountID int64, groupID int64,
+	accountID int64, accountPlatform string, groupID int64,
 	upstreamModel, requestedModel string,
 	tokens UsageTokens,
 	totalCost float64,
@@ -291,7 +298,7 @@ func applyAccountStatsCost(
 		reasoningEffort = *usageLog.ReasoningEffort
 	}
 	usageLog.AccountStatsCost = resolveAccountStatsCost(
-		ctx, cs, bs, accountID, groupID, model, tokens, requestCount, totalCost, serviceTier, pricingAt, longContextPricingEnabled, reasoningEffort,
+		ctx, cs, bs, accountID, accountPlatform, groupID, model, tokens, requestCount, totalCost, serviceTier, pricingAt, longContextPricingEnabled, reasoningEffort,
 	)
 }
 

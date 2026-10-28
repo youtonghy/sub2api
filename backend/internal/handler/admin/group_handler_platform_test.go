@@ -49,26 +49,28 @@ func TestGroupPlatformBinding_AllowedPlatforms(t *testing.T) {
 	}
 }
 
-func TestGroupPlatformBinding_RejectsInvalidPlatforms(t *testing.T) {
-	invalid := []string{
-		"moonshot", // 厂商别名,不是平台标识
-		"Kimi",     // 大小写敏感
+func TestGroupPlatformBinding_IgnoresUnrecognizedPlatformValues(t *testing.T) {
+	// 分组已不再归属单一平台：platform 是已废弃字段，任何值都不得让请求在
+	// binding 层被拒（落库值由 service 层统一归一为 composite）。
+	values := []string{
+		"moonshot", // 厂商别名
+		"Kimi",     // 大小写差异
 		"openai ",  // 尾随空格
 		"glm",
 		"bogus",
 	}
-	for _, platform := range invalid {
+	for _, platform := range values {
 		t.Run("create_"+platform, func(t *testing.T) {
 			var req CreateGroupRequest
 			body := fmt.Sprintf(`{"name":"g","platform":%q}`, platform)
-			require.Error(t, bindGroupPlatformJSON(t, &req, body),
-				"platform %q 应被 CreateGroupRequest 拒绝", platform)
+			require.NoError(t, bindGroupPlatformJSON(t, &req, body),
+				"platform %q 不应在 binding 层被拒", platform)
 		})
 		t.Run("update_"+platform, func(t *testing.T) {
 			var req UpdateGroupRequest
 			body := fmt.Sprintf(`{"platform":%q}`, platform)
-			require.Error(t, bindGroupPlatformJSON(t, &req, body),
-				"platform %q 应被 UpdateGroupRequest 拒绝", platform)
+			require.NoError(t, bindGroupPlatformJSON(t, &req, body),
+				"platform %q 不应在 binding 层被拒", platform)
 		})
 	}
 }

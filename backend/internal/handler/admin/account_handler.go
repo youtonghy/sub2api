@@ -247,22 +247,10 @@ func simpleModeGroupReferenceFromDTO(group *dto.Group) *simpleModeGroupReference
 	return &simpleModeGroupReference{ID: group.ID, Name: group.Name, Platform: group.Platform, Status: group.Status}
 }
 
+// 全平台分组改造后所有分组都是 composite 形态，不再存在「简单模式需要隐藏的组合分组」。
+// 保留空的集合以便调用方继续按 ID 过滤（无任何 ID 被隐藏）。
 func simpleModeCompositeGroupIDs(account *dto.Account) map[int64]struct{} {
-	hidden := make(map[int64]struct{})
-	if account == nil {
-		return hidden
-	}
-	for _, group := range account.Groups {
-		if group != nil && group.Platform == service.PlatformComposite {
-			hidden[group.ID] = struct{}{}
-		}
-	}
-	for _, accountGroup := range account.AccountGroups {
-		if accountGroup.Group != nil && accountGroup.Group.Platform == service.PlatformComposite {
-			hidden[accountGroup.GroupID] = struct{}{}
-		}
-	}
-	return hidden
+	return make(map[int64]struct{})
 }
 
 func filterSimpleModeGroupIDs(groupIDs []int64, hidden map[int64]struct{}) []int64 {
@@ -276,21 +264,7 @@ func filterSimpleModeGroupIDs(groupIDs []int64, hidden map[int64]struct{}) []int
 }
 
 func simpleModeCompositeServiceGroupIDs(account *service.Account) map[int64]struct{} {
-	hidden := make(map[int64]struct{})
-	if account == nil {
-		return hidden
-	}
-	for _, group := range account.Groups {
-		if group != nil && group.Platform == service.PlatformComposite {
-			hidden[group.ID] = struct{}{}
-		}
-	}
-	for _, accountGroup := range account.AccountGroups {
-		if accountGroup.Group != nil && accountGroup.Group.Platform == service.PlatformComposite {
-			hidden[accountGroup.GroupID] = struct{}{}
-		}
-	}
-	return hidden
+	return make(map[int64]struct{})
 }
 
 func (a AccountWithConcurrency) MarshalJSON() ([]byte, error) {
@@ -301,18 +275,12 @@ func (a AccountWithConcurrency) MarshalJSON() ([]byte, error) {
 	groups := make([]simpleModeGroupReference, 0, len(a.Groups))
 	compositeIDs := simpleModeCompositeGroupIDs(a.Account)
 	for _, group := range a.Groups {
-		if group != nil && group.Platform == service.PlatformComposite {
-			continue
-		}
 		if ref := simpleModeGroupReferenceFromDTO(group); ref != nil {
 			groups = append(groups, *ref)
 		}
 	}
 	accountGroups := make([]simpleModeAccountGroupReference, 0, len(a.AccountGroups))
 	for _, accountGroup := range a.AccountGroups {
-		if accountGroup.Group != nil && accountGroup.Group.Platform == service.PlatformComposite {
-			continue
-		}
 		if _, hidden := compositeIDs[accountGroup.GroupID]; hidden {
 			continue
 		}

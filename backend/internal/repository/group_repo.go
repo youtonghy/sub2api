@@ -475,7 +475,7 @@ func (r *groupRepository) ListWithFilters(ctx context.Context, params pagination
 }
 
 func (r *groupRepository) ListBindableWithFilters(ctx context.Context, params pagination.PaginationParams, platform, status, search string, isExclusive *bool) ([]service.Group, *pagination.PaginationResult, error) {
-	q := r.client.Group.Query().Where(group.PlatformNEQ(service.PlatformComposite))
+	q := r.client.Group.Query()
 	return r.listWithFiltersQuery(ctx, q, params, platform, status, search, isExclusive)
 }
 

@@ -48,23 +48,35 @@ describe("groupsReasoningEffort", () => {
       ).toEqual([...expected, reasoningEffortMappingDeny]);
       expect(supportsReasoningEffortPolicyPlatform(platform)).toBe(true);
     }
+    // 全平台分组统一使用 OpenAI 取值集合（Anthropic 集合是其去掉 minimal 的子集，
+    // 后端 anthropicCompatibleReasoningEffortPolicy 会把 minimal 降级为 low）。
     expect(
       reasoningEffortOptionsForPlatform("anthropic").map(
         (option) => option.value,
       ),
-    ).toEqual(["low", "medium", "high", "xhigh", "max"]);
+    ).toEqual(expected);
     expect(
       reasoningEffortTargetOptionsForPlatform("anthropic").map(
         (option) => option.value,
       ),
-    ).toEqual(["low", "medium", "high", "xhigh", "max", reasoningEffortMappingDeny]);
+    ).toEqual([...expected, reasoningEffortMappingDeny]);
     expect(supportsReasoningEffortPolicyPlatform("anthropic")).toBe(true);
 
-    for (const platform of ["gemini", "antigravity", "grok"] as const) {
-      expect(reasoningEffortOptionsForPlatform(platform)).toEqual([]);
-      expect(reasoningEffortSourceOptionsForPlatform(platform)).toEqual([]);
-      expect(reasoningEffortTargetOptionsForPlatform(platform)).toEqual([]);
-      expect(supportsReasoningEffortPolicyPlatform(platform)).toBe(false);
+    // 全平台分组：推理强度策略对所有分组可用，取值统一。
+    for (const platform of [
+      "gemini",
+      "antigravity",
+      "grok",
+      "kimi",
+      "composite",
+    ] as const) {
+      expect(
+        reasoningEffortOptionsForPlatform(platform).map((option) => option.value),
+      ).toEqual(["minimal", "low", "medium", "high", "xhigh", "max"]);
+      expect(
+        reasoningEffortSourceOptionsForPlatform(platform).map((option) => option.value),
+      ).toEqual(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+      expect(supportsReasoningEffortPolicyPlatform(platform)).toBe(true);
     }
   });
 
@@ -201,11 +213,14 @@ describe("groupsReasoningEffort", () => {
     expect(normalizeReasoningEffortForPlatform("anthropic", "xhigh")).toBe(
       "xhigh",
     );
+    // minimal 在 Anthropic 侧由后端降级为 low，前端仍保留该值以便切换平台不丢配置。
     expect(normalizeReasoningEffortForPlatform("anthropic", "minimal")).toBe(
-      "",
+      "minimal",
     );
-    expect(normalizeReasoningEffortForPlatform("grok", "max")).toBe("");
+    // 全平台分组下所有平台共用同一取值集合，"max" 在所有分组上都保留。
+    expect(normalizeReasoningEffortForPlatform("grok", "max")).toBe("max");
     expect(normalizeReasoningEffortForPlatform("openai", "none")).toBe("");
+    expect(normalizeReasoningEffortForPlatform("kimi", "bogus")).toBe("");
   });
 
   it("normalizes match type to exact, prefix, suffix, or empty", () => {

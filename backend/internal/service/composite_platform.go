@@ -204,6 +204,23 @@ func (s *GatewayService) resolveCompositeRouteDecision(ctx context.Context, grou
 	return decision, decision.Matched, nil
 }
 
+// GroupNeedsPlatformResolution 报告该分组是否需要在请求期解析目标平台。
+//
+// 全平台分组（composite，迁移后所有分组都是）必须逐请求解析；迁移前的单平台
+// 历史数据仍然直接用自身平台，保持旧行为不变。handler 层的 composite helper
+// 用它代替 `group.Platform == PlatformComposite` 的直接比较，使解析链在部分迁移
+// 的部署里也能工作。
+func GroupNeedsPlatformResolution(group *Group) bool {
+	if group == nil {
+		return true
+	}
+	platform := strings.TrimSpace(group.Platform)
+	if platform == "" || platform == PlatformComposite {
+		return true
+	}
+	return !isConcreteRequestPlatform(platform)
+}
+
 func isConcreteRequestPlatform(platform string) bool {
 	return domain.IsConcretePlatform(platform)
 }

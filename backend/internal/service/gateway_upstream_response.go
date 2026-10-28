@@ -535,6 +535,10 @@ func (s *GatewayService) handleRetryExhaustedSideEffects(ctx context.Context, re
 
 	// OAuth/Setup Token 账号的 403：标记账号异常
 	if account.IsOAuth() && statusCode == 403 {
+		if s.rateLimitService == nil {
+			logger.LegacyPrintf("service.gateway", "Account %d: upstream error %d after %d retries not marked (rate limit service unavailable)", account.ID, statusCode, maxRetryAttempts)
+			return
+		}
 		if len(requestedModel) > 0 {
 			s.rateLimitService.HandleUpstreamError(ctx, account, statusCode, resp.Header, body, requestedModel[0])
 		} else {
@@ -549,6 +553,12 @@ func (s *GatewayService) handleRetryExhaustedSideEffects(ctx context.Context, re
 
 func (s *GatewayService) handleFailoverSideEffects(ctx context.Context, resp *http.Response, account *Account, requestedModel ...string) {
 	body, _ := s.readUpstreamErrorBody(resp)
+	// rateLimitService 是可选依赖（部分测试/嵌入场景不装配）。缺失时只跳过账号健康
+	// 观测，不能让 nil 解引用把整个进程打挂。
+	if s.rateLimitService == nil {
+		logger.LegacyPrintf("service.gateway", "Account %d: upstream error %d not marked (rate limit service unavailable)", account.ID, resp.StatusCode)
+		return
+	}
 	if len(requestedModel) > 0 {
 		s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, requestedModel[0])
 		return
@@ -712,7 +722,9 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 		observer = beginUpstreamResponseModelObservation(c)
 	}
 	// 更新5h窗口状态
-	s.rateLimitService.UpdateSessionWindow(ctx, account, resp.Header)
+	if s.rateLimitService != nil {
+		s.rateLimitService.UpdateSessionWindow(ctx, account, resp.Header)
+	}
 
 	if s.responseHeaderFilter != nil {
 		responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
@@ -1406,7 +1418,9 @@ func (s *GatewayService) resolveCacheTTLUsageOverrideTarget(ctx context.Context,
 
 func (s *GatewayService) handleNonStreamingResponse(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, originalModel, mappedModel string) (*ClaudeUsage, error) {
 	// 更新5h窗口状态
-	s.rateLimitService.UpdateSessionWindow(ctx, account, resp.Header)
+	if s.rateLimitService != nil {
+		s.rateLimitService.UpdateSessionWindow(ctx, account, resp.Header)
+	}
 
 	body, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, anthropicTooLargeError)
 	if err != nil {
