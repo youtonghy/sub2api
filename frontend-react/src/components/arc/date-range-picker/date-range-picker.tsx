@@ -28,7 +28,12 @@ export interface DateRangePreset {
  * formatted label flies back into the trigger as the surface shrinks around it.
  * Use it for reports, filters, and bookings where a start and end date are chosen together.
  */
+/** Visible text, so the picker can be translated. Defaults are English. */
+export interface DateRangePickerLabels { noDates: string; dayCount: (days: number) => string; presets: string; previousMonth: string; nextMonth: string; pickEndDate: string; cancel: string; apply: string }
+const defaultLabels: DateRangePickerLabels = { noDates: "No dates", dayCount: days => `${days} ${days === 1 ? "day" : "days"}`, presets: "Presets", previousMonth: "Previous month", nextMonth: "Next month", pickEndDate: "Pick an end date", cancel: "Cancel", apply: "Apply" };
+
 export interface DateRangePickerProps {
+  labels?: Partial<DateRangePickerLabels>;
   /** Controlled value. Pass `null` for no selection. */
   value?: DateRange | null;
   /** Uncontrolled starting value. */
@@ -263,7 +268,8 @@ function Months({ children, direction, reduced }: { children: ReactNode; directi
     variants={reduced ? fade : slide} initial="enter" animate="center" exit="exit">{children}</motion.div>;
 }
 
-export function DateRangePicker({ value, defaultValue = null, onChange, label = "Date range", placeholder = "Select dates", presets = defaultDateRangePresets, minDate, maxDate, weekStartsOn = 0, locale = "en-US", months = "auto", boundary, className }: DateRangePickerProps) {
+export function DateRangePicker({ labels, value, defaultValue = null, onChange, label = "Date range", placeholder = "Select dates", presets = defaultDateRangePresets, minDate, maxDate, weekStartsOn = 0, locale = "en-US", months = "auto", boundary, className }: DateRangePickerProps) {
+  const text = useMemo(() => ({ ...defaultLabels, ...labels }), [labels]);
   const reduced = useReducedFlag();
   const today = useToday();
   const uid = useId();
@@ -560,8 +566,8 @@ export function DateRangePicker({ value, defaultValue = null, onChange, label = 
 
   /* ---------- Copy ---------- */
   const committedText = format(committed);
-  const shownText = shown ? format(shown) : "No dates";
-  const countText = shown ? `${days} ${days === 1 ? "day" : "days"}` : "";
+  const shownText = shown ? format(shown) : text.noDates;
+  const countText = shown ? text.dayCount(days) : "";
   const status = !open ? "" : anchor ? `Start ${formatters.label.format(anchor)}. Choose an end date.` : shown ? `${shownText}, ${countText}` : "";
   const layoutId = reduced ? undefined : `${uid}-value`;
 
@@ -590,16 +596,16 @@ export function DateRangePicker({ value, defaultValue = null, onChange, label = 
         {open && today && <motion.div key="panel" ref={panelRef} id={`${uid}-panel`} className={styles.panel} role="dialog" aria-label={label} data-compact={compact || undefined}
           style={{ "--cell": `${cellSize}px`, width: compact && panelWidth ? panelWidth : undefined } as CSSProperties} exit={{ opacity: 1, transition: { duration: .14 } }}>
           <motion.div className={styles.body} variants={reduced ? faceFade : faceIn} initial="hidden" animate="shown" exit="gone">
-            <div ref={railRef} className={styles.rail} role="group" aria-label="Presets" onKeyDown={onRailKey}>
+            <div ref={railRef} className={styles.rail} role="group" aria-label={text.presets} onKeyDown={onRailKey}>
               <motion.span className={styles.railHighlight} style={{ x: gx, y: gy, width: gw, height: gh, opacity: go }} aria-hidden="true" />
               {presets.map((preset, index) => <button key={preset.label} type="button" className={styles.preset} data-preset={index} aria-pressed={index === activePreset}
                 onClick={() => choosePreset(preset)}>{preset.label}</button>)}
             </div>
 
             <div className={styles.calendars} onPointerLeave={() => { if (anchor) setHover(null); }}>
-              <button type="button" className={styles.navButton} data-side="prev" aria-label="Previous month" onClick={() => goTo(addMonths(view, -1))}
+              <button type="button" className={styles.navButton} data-side="prev" aria-label={text.previousMonth} onClick={() => goTo(addMonths(view, -1))}
                 disabled={Boolean(minDate && monthDiff(view, minDate) <= 0)}><ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" /></button>
-              <button type="button" className={styles.navButton} data-side="next" aria-label="Next month" onClick={() => goTo(addMonths(view, 1))}
+              <button type="button" className={styles.navButton} data-side="next" aria-label={text.nextMonth} onClick={() => goTo(addMonths(view, 1))}
                 disabled={Boolean(maxDate && monthDiff(addMonths(view, count - 1), maxDate) >= 0)}><ChevronRight size={16} strokeWidth={1.75} aria-hidden="true" /></button>
               {/* The viewport keeps a fixed six-week height and stacks the leaving and arriving months in one cell, so the panel never resizes mid-slide. */}
               <div className={styles.viewport}>
@@ -621,12 +627,12 @@ export function DateRangePicker({ value, defaultValue = null, onChange, label = 
                 <Rolling text={shownText} direction={shownDirection} reduced={reduced} />
               </motion.span>
               <motion.span className={styles.summaryCount} variants={reduced ? faceFade : faceIn} initial="hidden" animate="shown" exit="gone">
-                {countText && <Rolling text={anchor && sameDay(anchor, hover) ? "Pick an end date" : countText} direction={shownDirection} reduced={reduced} />}
+                {countText && <Rolling text={anchor && sameDay(anchor, hover) ? text.pickEndDate : countText} direction={shownDirection} reduced={reduced} />}
               </motion.span>
             </div>
             <motion.div className={styles.actions} variants={reduced ? faceFade : faceIn} initial="hidden" animate="shown" exit="gone">
-              <button type="button" className={styles.ghost} onClick={() => close(true)}>Cancel</button>
-              <button type="button" className={styles.primary} onClick={apply} disabled={!shown}>Apply</button>
+              <button type="button" className={styles.ghost} onClick={() => close(true)}>{text.cancel}</button>
+              <button type="button" className={styles.primary} onClick={apply} disabled={!shown}>{text.apply}</button>
             </motion.div>
           </div>
           <p className={styles.srOnly} aria-live="polite">{status}</p>
