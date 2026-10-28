@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="assets/logo.svg" alt="Sub2API Logo" width="128" />
+<img src="assets/logo.svg" alt="RetooAi Logo" width="128" />
 
-# Sub2API
+# RetooAi
 
 [![Go](https://img.shields.io/badge/Go-1.27.0-00ADD8.svg)](https://golang.org/)
 [![Vue](https://img.shields.io/badge/Vue-3.4+-4FC08D.svg)](https://vuejs.org/)
@@ -13,6 +13,8 @@
 <a href="https://trendshift.io/repositories/21823" target="_blank"><img src="https://trendshift.io/api/badge/repositories/21823" alt="Wei-Shaw%2Fsub2api | Trendshift" width="250" height="55"/></a>
 
 **AI API Gateway Platform for Subscription Quota Distribution**
+
+RetooAi is based on the open-source [Sub2API](https://github.com/Wei-Shaw/sub2api) project (LGPL-3.0).
 
 English | [中文](README_CN.md) | [日本語](README_JA.md)
 
@@ -188,7 +190,7 @@ Please read the following carefully before using this project:
 
 ## Overview
 
-Sub2API is an AI API gateway platform designed to distribute and manage API quotas from AI product subscriptions. Users can access upstream AI services through platform-generated API Keys, while the platform handles authentication, billing, load balancing, and request forwarding.
+RetooAi is an AI API gateway platform designed to distribute and manage API quotas from AI product subscriptions. Users can access upstream AI services through platform-generated API Keys, while the platform handles authentication, billing, load balancing, and request forwarding.
 
 ## Features
 
@@ -205,11 +207,11 @@ Sub2API is an AI API gateway platform designed to distribute and manage API quot
 
 ## Ecosystem
 
-Community projects that extend or integrate with Sub2API:
+Community projects that extend or integrate with RetooAi:
 
 | Project | Description | Features |
 |---------|-------------|----------|
-| ~~[Sub2ApiPay](https://github.com/touwaeriol/sub2apipay)~~ | ~~Self-service payment system~~ | **Now Built-in** — Payment is now integrated into Sub2API, no separate deployment needed. See [Payment Configuration Guide](docs/PAYMENT.md) |
+| ~~[Sub2ApiPay](https://github.com/touwaeriol/sub2apipay)~~ | ~~Self-service payment system~~ | **Now Built-in** — Payment is now integrated into RetooAi, no separate deployment needed. See [Payment Configuration Guide](docs/PAYMENT.md) |
 | [sub2api-mobile](https://github.com/ckken/sub2api-mobile) | Mobile admin console | Cross-platform app (iOS/Android/Web) for user management, account management, monitoring dashboard, and multi-backend switching; built with Expo + React Native |
 
 ## Tech Stack
@@ -225,7 +227,7 @@ Community projects that extend or integrate with Sub2API:
 
 ## Nginx Reverse Proxy Note
 
-When using Nginx as a reverse proxy for Sub2API (or CRS) with Codex CLI, add the following to the `http` block in your Nginx configuration:
+When using Nginx as a reverse proxy for RetooAi (or CRS) with Codex CLI, add the following to the `http` block in your Nginx configuration:
 
 ```nginx
 underscores_in_headers on;
@@ -475,7 +477,7 @@ rm -rf data/ postgres_data/ redis_data/
 
 ### Method 3: Apple container (macOS)
 
-Apple-silicon Macs running macOS 26 can run the full Sub2API, PostgreSQL, and Redis stack with Apple `container` 1.1.0 or newer:
+Apple-silicon Macs running macOS 26 can run the full RetooAi, PostgreSQL, and Redis stack with Apple `container` 1.1.0 or newer:
 
 ```bash
 git clone https://github.com/Wei-Shaw/sub2api.git
@@ -572,7 +574,7 @@ Additional security-related options are available in `config.yaml`:
 - `security.response_headers.enabled` to enable configurable response header filtering (disabled uses default allowlist)
 - `security.csp` to control Content-Security-Policy headers
 - `billing.circuit_breaker` to fail closed on billing errors
-- `security.trust_forwarded_ip_for_api_key_acl` enables legacy raw forwarded-header takeover (enabled by default for upgrade compatibility); disable it to enforce `server.trusted_proxies`, which should contain only the exact proxy CIDRs that connect directly to Sub2API
+- `security.trust_forwarded_ip_for_api_key_acl` enables legacy raw forwarded-header takeover (enabled by default for upgrade compatibility); disable it to enforce `server.trusted_proxies`, which should contain only the exact proxy CIDRs that connect directly to RetooAi
 - `security.forwarded_client_ip_headers` configures up to 16 third-party CDN client-IP header names; they are checked in order before the built-in headers only while legacy takeover is enabled
 - `turnstile.required` to require Turnstile in release mode
 
@@ -759,7 +761,7 @@ Long-running OpenAI/Grok image generation and editing can be submitted through `
 
 ## Grok / xAI Support
 
-Sub2API supports both Grok subscription accounts through xAI OAuth and standard xAI API-key accounts. Both account types forward OpenAI-compatible Responses traffic to xAI.
+RetooAi supports both Grok subscription accounts through xAI OAuth and standard xAI API-key accounts. Both account types forward OpenAI-compatible Responses traffic to xAI.
 
 ### Supported Scope
 
@@ -804,8 +806,8 @@ For API-key accounts, select **Grok → API Key** in the create-account dialog. 
 
 ### Grok Build CLI Configuration
 
-1. In the Sub2API admin dashboard, add either a `grok` OAuth account and complete xAI authorization, or add a Grok API-key account.
-2. Create a Grok group, attach the account to it, then create a Sub2API API key assigned to that group.
+1. In the RetooAi admin dashboard, add either a `grok` OAuth account and complete xAI authorization, or add a Grok API-key account.
+2. Create a Grok group, attach the account to it, then create a RetooAi API key assigned to that group.
 3. In the user API-key page, click **Use Key** and select **Grok CLI**. The modal generates the correct file and base URL for macOS/Linux or Windows. It also provides an OpenCode configuration on the **OpenCode** tab.
 4. If configuring manually, save the following as `~/.grok/config.toml` (Windows: `%USERPROFILE%\.grok\config.toml`):
 
@@ -824,18 +826,18 @@ context_window = 1000000
 supports_backend_search = true
 ```
 
-Back up an existing `config.toml` before merging the entry. The file contains a Sub2API API key, so keep it private and restrict its permissions where supported. Verify the effective configuration and make a smoke request:
+Back up an existing `config.toml` before merging the entry. The file contains a RetooAi API key, so keep it private and restrict its permissions where supported. Verify the effective configuration and make a smoke request:
 
 ```bash
 grok inspect
 grok -p "Reply with sub2api-ok" -m grok
 ```
 
-The `base_url` above is the public Sub2API URL ending in `/v1`, not `api.x.ai` or the internal xAI OAuth proxy URL.
+The `base_url` above is the public RetooAi URL ending in `/v1`, not `api.x.ai` or the internal xAI OAuth proxy URL.
 
 ### Usage And Quota Display
 
-xAI quota is passive. Sub2API does not invent subscription quota values; it records whitelisted xAI rate-limit headers from successful or rate-limited upstream responses when xAI sends them. Before the first usable upstream response, the dashboard shows quota as unknown and still displays local Sub2API usage stats.
+xAI quota is passive. RetooAi does not invent subscription quota values; it records whitelisted xAI rate-limit headers from successful or rate-limited upstream responses when xAI sends them. Before the first usable upstream response, the dashboard shows quota as unknown and still displays local RetooAi usage stats.
 
 `401` responses temporarily remove accounts with invalid credentials from scheduling. `403` responses are treated as access or entitlement failures instead of token-refresh loops. `429` responses use `Retry-After` or a short cooldown to temporarily remove the account from scheduling.
 
@@ -847,7 +849,7 @@ Administrators can override automatic media eligibility through the account crea
 
 ## TypeSafe / Jev Support
 
-Sub2API supports TypeSafe API-key accounts through Jev's native, non-streaming System One protocol.
+RetooAi supports TypeSafe API-key accounts through Jev's native, non-streaming System One protocol.
 
 - Platform: `typesafe`; account type: API Key
 - Default upstream: `https://api.typesafe.ai`
@@ -872,7 +874,7 @@ The built-in `jev-latest` price is `$0.042` per million input tokens and `$0` fo
 
 ## Antigravity Support
 
-Sub2API supports [Antigravity](https://antigravity.so/) accounts. After authorization, dedicated endpoints are available for Claude and Gemini models.
+RetooAi supports [Antigravity](https://antigravity.so/) accounts. After authorization, dedicated endpoints are available for Claude and Gemini models.
 
 ### Dedicated Endpoints
 

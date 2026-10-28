@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="assets/logo.svg" alt="Sub2API Logo" width="128" />
+<img src="assets/logo.svg" alt="RetooAi Logo" width="128" />
 
-# Sub2API
+# RetooAi
 
 [![Go](https://img.shields.io/badge/Go-1.27.0-00ADD8.svg)](https://golang.org/)
 [![Vue](https://img.shields.io/badge/Vue-3.4+-4FC08D.svg)](https://vuejs.org/)
@@ -13,6 +13,8 @@
 <a href="https://trendshift.io/repositories/21823" target="_blank"><img src="https://trendshift.io/api/badge/repositories/21823" alt="Wei-Shaw%2Fsub2api | Trendshift" width="250" height="55"/></a>
 
 **サブスクリプションクォータ配分のための AI API ゲートウェイプラットフォーム**
+
+RetooAi はオープンソースプロジェクト [Sub2API](https://github.com/Wei-Shaw/sub2api)（LGPL-3.0）をベースにしています。
 
 [English](README.md) | [中文](README_CN.md) | 日本語
 
@@ -190,7 +192,7 @@
 
 ## 概要
 
-Sub2API は、AI 製品のサブスクリプションから API クォータを配分・管理するために設計された AI API ゲートウェイプラットフォームです。ユーザーはプラットフォームが生成した API キーを通じて上流の AI サービスにアクセスでき、プラットフォームは認証、課金、負荷分散、リクエスト転送を処理します。
+RetooAi は、AI 製品のサブスクリプションから API クォータを配分・管理するために設計された AI API ゲートウェイプラットフォームです。ユーザーはプラットフォームが生成した API キーを通じて上流の AI サービスにアクセスでき、プラットフォームは認証、課金、負荷分散、リクエスト転送を処理します。
 
 ## 機能
 
@@ -206,11 +208,11 @@ Sub2API は、AI 製品のサブスクリプションから API クォータを�
 
 ## エコシステム
 
-Sub2API を拡張・統合するコミュニティプロジェクト:
+RetooAi を拡張・統合するコミュニティプロジェクト:
 
 | プロジェクト | 説明 | 機能 |
 |---------|-------------|----------|
-| ~~[Sub2ApiPay](https://github.com/touwaeriol/sub2apipay)~~ | ~~セルフサービス決済システム~~ | **内蔵済み** — 決済機能は Sub2API に統合されました。別途デプロイは不要です。[決済設定ガイド](docs/PAYMENT.md)をご参照ください |
+| ~~[Sub2ApiPay](https://github.com/touwaeriol/sub2apipay)~~ | ~~セルフサービス決済システム~~ | **内蔵済み** — 決済機能は RetooAi に統合されました。別途デプロイは不要です。[決済設定ガイド](docs/PAYMENT.md)をご参照ください |
 | [sub2api-mobile](https://github.com/ckken/sub2api-mobile) | モバイル管理コンソール | ユーザー管理、アカウント管理、監視ダッシュボード、マルチバックエンド切り替えが可能なクロスプラットフォームアプリ（iOS/Android/Web）。Expo + React Native で構築 |
 
 ## 技術スタック
@@ -226,7 +228,7 @@ Sub2API を拡張・統合するコミュニティプロジェクト:
 
 ## Nginx リバースプロキシに関する注意
 
-Sub2API（または CRS）を Nginx でリバースプロキシし、Codex CLI と組み合わせて使用する場合、Nginx の `http` ブロックに以下の設定を追加してください:
+RetooAi（または CRS）を Nginx でリバースプロキシし、Codex CLI と組み合わせて使用する場合、Nginx の `http` ブロックに以下の設定を追加してください:
 
 ```nginx
 underscores_in_headers on;
@@ -476,7 +478,7 @@ rm -rf data/ postgres_data/ redis_data/
 
 ### 方法3: Apple container（macOS）
 
-Apple シリコン搭載 Mac と macOS 26 では、Apple `container` 1.1.0 以降を使用して Sub2API、PostgreSQL、Redis の完全なスタックを実行できます:
+Apple シリコン搭載 Mac と macOS 26 では、Apple `container` 1.1.0 以降を使用して RetooAi、PostgreSQL、Redis の完全なスタックを実行できます:
 
 ```bash
 git clone https://github.com/Wei-Shaw/sub2api.git
@@ -572,7 +574,7 @@ default:
 - `security.response_headers.enabled` - 設定可能なレスポンスヘッダーフィルタリングを有効化（無効時はデフォルトの許可リストを使用）
 - `security.csp` - Content-Security-Policy ヘッダーの制御
 - `billing.circuit_breaker` - 課金エラー時にフェイルクローズ
-- `security.trust_forwarded_ip_for_api_key_acl` - 従来の生転送ヘッダーによる上書きを制御（アップグレード互換性のため既定で有効）。無効にすると `server.trusted_proxies` を厳格に使用し、Sub2API に直接接続するプロキシの正確な CIDR のみを指定
+- `security.trust_forwarded_ip_for_api_key_acl` - 従来の生転送ヘッダーによる上書きを制御（アップグレード互換性のため既定で有効）。無効にすると `server.trusted_proxies` を厳格に使用し、RetooAi に直接接続するプロキシの正確な CIDR のみを指定
 - `security.forwarded_client_ip_headers` - サードパーティ CDN のクライアント IP ヘッダーを最大 16 個指定。従来モードが有効な場合のみ、設定順で組み込みヘッダーより先に評価
 - `turnstile.required` - リリースモードでの Turnstile 必須化
 
@@ -684,7 +686,7 @@ go generate ./cmd/server
 
 ## Antigravity サポート
 
-Sub2API は [Antigravity](https://antigravity.so/) アカウントをサポートしています。認証後、Claude および Gemini モデル用の専用エンドポイントが利用可能になります。
+RetooAi は [Antigravity](https://antigravity.so/) アカウントをサポートしています。認証後、Claude および Gemini モデル用の専用エンドポイントが利用可能になります。
 
 ### 専用エンドポイント
 

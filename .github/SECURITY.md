@@ -26,7 +26,7 @@ A useful report includes:
 
 ### Supported Versions
 
-Sub2API releases frequently, and fixes ship in a new release rather than being backported.
+RetooAi releases frequently, and fixes ship in a new release rather than being backported.
 
 | Version | Supported |
 | ------- | --------- |
@@ -37,13 +37,13 @@ Please confirm that the issue reproduces on the latest release or on `main` befo
 
 ### Scope
 
-In scope: the Sub2API backend, frontend, official Docker images, and deployment files in this repository.
+In scope: the RetooAi backend, frontend, official Docker images, and deployment files in this repository.
 
 Usually out of scope:
 
 - Issues that require already-compromised admin credentials or server access
 - Risks arising from explicitly weakening documented security settings (for example, disabling `security.url_allowlist`)
-- Vulnerabilities in upstream AI providers or third-party dependencies with no Sub2API-specific impact (please report those upstream)
+- Vulnerabilities in upstream AI providers or third-party dependencies with no RetooAi-specific impact (please report those upstream)
 - Missing best-practice headers or scanner output without a demonstrated impact
 
 ### Disclosure Process
@@ -78,7 +78,7 @@ Please keep details private until the advisory is published. This is a volunteer
 
 ### 支持的版本
 
-Sub2API 发版频繁，安全修复随新版本发布，不向旧版本回移。
+RetooAi 发版频繁，安全修复随新版本发布，不向旧版本回移。
 
 | 版本 | 是否支持 |
 | ---- | -------- |
@@ -89,13 +89,13 @@ Sub2API 发版频繁，安全修复随新版本发布，不向旧版本回移。
 
 ### 范围
 
-范围内：本仓库中的 Sub2API 后端、前端、官方 Docker 镜像与部署文件。
+范围内：本仓库中的 RetooAi 后端、前端、官方 Docker 镜像与部署文件。
 
 通常不在范围内：
 
 - 需要事先已掌握管理员凭据或服务器权限才能利用的问题
 - 因主动关闭文档中的安全配置（如关闭 `security.url_allowlist`）而产生的风险
-- 上游 AI 服务商或第三方依赖自身的漏洞，且对 Sub2API 无特定影响（请向上游报告）
+- 上游 AI 服务商或第三方依赖自身的漏洞，且对 RetooAi 无特定影响（请向上游报告）
 - 仅缺少最佳实践响应头或扫描器输出，但未证明实际影响
 
 ### 披露流程

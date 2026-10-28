@@ -1,8 +1,8 @@
 #!/bin/bash
 # =============================================================================
-# Sub2API Docker Deployment Preparation Script
+# RetooAi Docker Deployment Preparation Script
 # =============================================================================
-# This script prepares deployment files for Sub2API:
+# This script prepares deployment files for RetooAi:
 #   - Downloads docker-compose.local.yml and .env.example
 #   - Generates secure secrets (JWT_SECRET, TOTP_ENCRYPTION_KEY, POSTGRES_PASSWORD)
 #   - Generates a random admin login email (ADMIN_EMAIL)
@@ -63,7 +63,7 @@ command_exists() {
 main() {
     echo ""
     echo "=========================================="
-    echo "  Sub2API Deployment Preparation"
+    echo "  RetooAi Deployment Preparation"
     echo "=========================================="
     echo ""
 
