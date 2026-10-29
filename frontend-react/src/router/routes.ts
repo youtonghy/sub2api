@@ -334,14 +334,14 @@ export const appRoutes: AppRouteDef[] = [
     name: 'AdminAccounts',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: true, title: 'Account Management', titleKey: 'admin.accounts.title', descriptionKey: 'admin.accounts.description' },
-    view: pending('views/admin/AccountsView.vue'),
+    view: () => import('@/views/admin/AccountsView'),
   },
   {
     path: '/admin/accounts/model-verification',
     name: 'AdminModelVerification',
     layout: 'app',
-    meta: {  },
-    view: pending('views/admin/ModelVerificationView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, title: 'Model Fingerprint', titleKey: 'admin.accounts.modelFingerprint.title', descriptionKey: 'admin.accounts.modelFingerprint.description' },
+    view: () => import('@/views/admin/ModelVerificationView'),
   },
   {
     path: '/admin/plugins',
