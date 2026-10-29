@@ -1,0 +1,79 @@
+/* 面板与菜单项沿用 Arc dropdown-menu 的 token */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+}
+
+.menu {
+  position: fixed;
+  z-index: 9999;
+  width: 13rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+}
+
+.item {
+  display: flex;
+  width: 100%;
+  min-height: 36px;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: calc(var(--radius-panel) - 6px);
+  padding: 0 11px;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.item:focus-visible {
+  outline: none;
+  background: var(--surface-muted);
+}
+
+.icon {
+  display: inline-flex;
+  width: 17px;
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.item[data-tone='success'] .icon {
+  color: var(--success);
+}
+
+.item[data-tone='accent'] .icon {
+  color: var(--accent);
+}
+
+.item[data-tone='warning'] .icon {
+  color: var(--warning);
+}
+
+.separator {
+  height: 1px;
+  margin: var(--space-1) calc(var(--space-1) * -1);
+  background: var(--border-subtle);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .item:hover {
+    background: var(--surface-muted);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item {
+    transition: none;
+  }
+}

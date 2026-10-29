@@ -1,0 +1,234 @@
+/*
+ * 账号列表「用量」列各子单元格共用的样式：紧凑操作按钮、统计小标签、徽章、骨架与提示文本。
+ * 只使用 Arc token；语义色按含义取 --accent / --success / --warning / --danger。
+ */
+
+.stack {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.stackLoose {
+  display: grid;
+  gap: 6px;
+}
+
+.actionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.wrapRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* 紧凑文字按钮（查询 / 重置 / 探测 等） */
+.action {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 2px;
+  border: 0;
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--duration-fast, 150ms) var(--ease-standard);
+}
+
+.action:hover:not(:disabled) {
+  background: var(--accent-subtle);
+}
+
+.action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.action[data-tone='warning'] { color: var(--warning); }
+.action[data-tone='warning']:hover:not(:disabled) { background: color-mix(in oklab, var(--warning) 12%, transparent); }
+.action[data-tone='success'] { color: var(--success); }
+.action[data-tone='success']:hover:not(:disabled) { background: color-mix(in oklab, var(--success) 12%, transparent); }
+
+.actionIcon {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+}
+
+.spin {
+  animation: usage-cell-spin 1s linear infinite;
+}
+
+@keyframes usage-cell-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 用量窗口上方的 req / tokens / A$ / U$ 统计小标签 */
+.statsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+  color: var(--text-secondary);
+  font-size: 9px;
+}
+
+.statChip {
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: var(--surface-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 等级 / 状态小徽章；data-tone: neutral | info | accent | warning | danger | success */
+.tag {
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 14px;
+}
+
+.tag[data-tone='info'] { background: var(--accent-subtle); color: var(--accent-strong); }
+.tag[data-tone='accent'] { background: color-mix(in oklab, var(--accent) 18%, var(--surface)); color: var(--accent-strong); }
+.tag[data-tone='warning'] { background: color-mix(in oklab, var(--warning) 14%, var(--surface)); color: var(--warning); }
+.tag[data-tone='danger'] { background: color-mix(in oklab, var(--danger) 14%, var(--surface)); color: var(--danger); }
+.tag[data-tone='success'] { background: color-mix(in oklab, var(--success) 14%, var(--surface)); color: var(--success); }
+
+.tagRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-1);
+}
+
+/* 骨架：标签 + 条 + 百分比 */
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.skeletonBlock {
+  height: 12px;
+  border-radius: 4px;
+  background: var(--surface-muted);
+  animation: usage-cell-pulse 1.6s var(--ease-in-out, ease-in-out) infinite;
+}
+
+.skeletonBar {
+  width: 32px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  animation: usage-cell-pulse 1.6s var(--ease-in-out, ease-in-out) infinite;
+}
+
+@keyframes usage-cell-pulse {
+  50% { opacity: 0.45; }
+}
+
+.dash {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.mutedLine {
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.noteLine {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.errorLine {
+  color: var(--danger);
+  font-size: var(--text-xs);
+}
+
+.errorTiny {
+  overflow: hidden;
+  color: var(--danger);
+  font-size: 10px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.warningTiny {
+  color: var(--warning);
+  font-size: 10px;
+}
+
+.successTiny {
+  color: var(--success);
+  font-size: 10px;
+}
+
+.warningTruncate {
+  max-width: 200px;
+  overflow: hidden;
+  color: var(--warning);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.passive {
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.link {
+  color: var(--accent);
+  font-size: 10px;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.plainButton {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.plainButton:hover {
+  color: var(--foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin,
+  .skeletonBlock,
+  .skeletonBar {
+    animation: none;
+  }
+}

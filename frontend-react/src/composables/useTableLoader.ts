@@ -132,6 +132,8 @@ export function useTableLoader<T, P extends Record<string, any>>(options: TableL
 
   return {
     items,
+    /** 本地改写当前页的行（Vue 版直接给 items.value 赋值） */
+    setItems,
     loading,
     params,
     setParams,

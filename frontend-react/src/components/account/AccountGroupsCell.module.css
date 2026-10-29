@@ -1,0 +1,86 @@
+.cell {
+  position: relative;
+  max-width: 14rem;
+}
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.badge {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.more {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: 2px 6px;
+  color: var(--text-secondary);
+  background: var(--surface-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.more:hover {
+  background: color-mix(in oklab, var(--foreground) 8%, var(--surface-muted));
+}
+
+.empty {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.popover {
+  min-width: 12rem;
+  max-width: 24rem;
+  padding: var(--space-3, 12px);
+}
+
+.popoverHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.popoverTitle {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.close {
+  display: inline-flex;
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: 2px;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.close:hover {
+  color: var(--foreground);
+  background: var(--surface-muted);
+}
+
+.close svg {
+  width: 14px;
+  height: 14px;
+}
+
+.popoverList {
+  display: flex;
+  max-height: 16rem;
+  flex-wrap: wrap;
+  gap: 6px;
+  overflow-y: auto;
+}

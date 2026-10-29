@@ -1,0 +1,245 @@
+.root { display: flex; flex-direction: column; gap: var(--space-4); }
+
+.accountCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-muted);
+  padding: var(--space-3);
+}
+
+.accountMain { display: flex; align-items: center; gap: var(--space-3); }
+
+.accountIcon {
+  display: flex;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.accountName { color: var(--foreground); font-weight: 500; }
+.accountMeta { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: var(--text-xs); }
+
+.typeTag {
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  padding: 2px 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.label { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }
+.hint { margin: 0; color: var(--text-secondary); font-size: var(--text-xs); }
+
+.uploadRow { display: flex; align-items: center; gap: var(--space-3); }
+
+.fileName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hidden { display: none; }
+
+.uploadPreview {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.uploadPreview img {
+  display: block;
+  width: 100%;
+  max-height: 10rem;
+  background: var(--surface-muted);
+  object-fit: contain;
+}
+
+.terminalWrap { position: relative; }
+
+.terminal {
+  min-height: 120px;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-muted);
+  padding: var(--space-4);
+  color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-sm);
+}
+
+.statusLine { display: flex; align-items: center; gap: var(--space-2); }
+
+.line { min-height: 1.25em; white-space: pre-wrap; word-break: break-word; }
+
+.statusLine[data-tone='muted'],
+.line[data-tone='muted'] { color: var(--text-secondary); }
+.statusLine[data-tone='warning'],
+.line[data-tone='warning'] { color: var(--warning); }
+.line[data-tone='info'],
+.line[data-tone='accent'],
+.line[data-tone='media'] { color: var(--accent); }
+.line[data-tone='success'],
+.line[data-tone='successSoft'] { color: var(--success); }
+.line[data-tone='danger'] { color: var(--danger); }
+
+.cursor { animation: blink 1s steps(2, start) infinite; }
+
+.result {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+}
+
+.result[data-tone='success'] { color: var(--success); }
+.result[data-tone='danger'] { color: var(--danger); }
+
+.copyButton {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  padding: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+
+.terminalWrap:hover .copyButton,
+.copyButton:focus-visible { opacity: 1; }
+.copyButton:hover { color: var(--foreground); }
+
+@media (hover: none) {
+  .copyButton { opacity: 1; }
+}
+
+.mediaSection { display: flex; flex-direction: column; gap: var(--space-2); }
+.mediaTitle { color: var(--text-secondary); font-size: var(--text-xs); font-weight: 500; }
+
+.imageGrid { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-3); }
+
+.imageCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  padding: 0;
+  font: inherit;
+  cursor: zoom-in;
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+.imageCard:hover { border-color: var(--accent); }
+
+.imageCard img { display: block; width: 100%; max-height: 360px; object-fit: contain; }
+
+.imageOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--background);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.imageCard:hover .imageOverlay { opacity: 1; background: color-mix(in oklab, var(--foreground) 20%, transparent); }
+
+.mediaMeta {
+  border-top: 1px solid var(--border-subtle);
+  padding: 6px var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  text-align: left;
+}
+
+.audioCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  padding: var(--space-3);
+}
+
+.fullWidth { width: 100%; }
+.mediaMetaPlain { margin-top: var(--space-1); color: var(--text-secondary); font-size: var(--text-xs); }
+
+.videoCard {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.video { display: block; width: 100%; max-height: 360px; background: var(--foreground); }
+
+.videoMeta {
+  border-top: 1px solid var(--border-subtle);
+  padding: 6px var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.testInfo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.testInfoItem { display: inline-flex; align-items: center; gap: var(--space-1); }
+
+.footer { display: flex; justify-content: flex-end; gap: var(--space-3); }
+
+.lightbox { display: flex; align-items: center; justify-content: center; }
+
+.lightbox img {
+  max-width: 100%;
+  max-height: 80vh;
+  border-radius: var(--radius-control);
+  object-fit: contain;
+}
+
+.spin { animation: spin 1s linear infinite; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes blink {
+  to { visibility: hidden; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin,
+  .cursor { animation: none; }
+}

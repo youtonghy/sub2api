@@ -1,0 +1,432 @@
+/* ===== 工具栏 ===== */
+.filters {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap-reverse;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.pendingSync {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in oklab, var(--warning) 35%, var(--border));
+  border-radius: var(--radius-control);
+  background: color-mix(in oklab, var(--warning) 8%, var(--surface));
+  color: var(--foreground);
+  font-size: var(--text-sm);
+}
+
+.desktopOnly {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .desktopOnly {
+    display: inline;
+  }
+}
+
+.spinning {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== 下拉面板（Arc popover 内容） ===== */
+.menuPanel {
+  min-width: 14rem;
+  padding: 5px;
+}
+
+.toolsPanel {
+  width: 20rem;
+  max-height: min(70vh, 36rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.menuList {
+  display: grid;
+  gap: 1px;
+}
+
+.menuHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 11px var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.menuItem {
+  display: flex;
+  width: 100%;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border: 0;
+  border-radius: calc(var(--radius-panel) - 6px);
+  padding: 0 11px;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.menuItem:focus-visible {
+  outline: none;
+  background: var(--surface-muted);
+}
+
+.menuItemLabel {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.menuIcon {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.check {
+  flex: none;
+  color: var(--accent);
+}
+
+.menuSeparator {
+  height: 1px;
+  margin: var(--space-1) -5px;
+  background: var(--border-subtle);
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .menuItem:hover {
+    background: var(--surface-muted);
+  }
+}
+
+/* ===== 表格区域 ===== */
+.region {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.tableArea {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dataTable {
+  flex: 1;
+}
+
+/* 表头附带帮助提示 */
+.headerHint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* ===== 单元格 ===== */
+.mono {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.nameCell {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.dragHandle {
+  display: inline-flex;
+  flex: none;
+  margin-top: 2px;
+  margin-left: -4px;
+  border: 0;
+  border-radius: calc(var(--radius-control) - 2px);
+  padding: 2px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: grab;
+  opacity: 0;
+  touch-action: none;
+  transition: opacity var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+tr:hover .dragHandle,
+.dragHandle:focus-visible,
+.dragHandle[data-active] {
+  opacity: 1;
+}
+
+.dragHandle[data-active] {
+  color: var(--accent);
+}
+
+@media (hover: none) {
+  .dragHandle {
+    opacity: 1;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dragHandle:hover {
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+  }
+}
+
+.nameStack {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.name {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.homepageTooltip {
+  align-self: flex-start;
+  margin-left: -4px;
+}
+
+.homepageLink {
+  border-bottom: 1px dotted var(--border);
+  color: var(--foreground);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.email {
+  max-width: 200px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notes {
+  display: block;
+  max-width: 20rem;
+  overflow: hidden;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash {
+  color: var(--text-muted);
+}
+
+.text {
+  color: var(--foreground);
+}
+
+.secondary {
+  color: var(--text-secondary);
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.inlineWrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stackStart {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.platformCell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.compactMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 2px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1rem;
+}
+
+.compactMeta[data-tone='success'] {
+  color: var(--success);
+}
+
+.compactMeta[data-tone='danger'] {
+  color: var(--danger);
+}
+
+.compactDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.rate {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+}
+
+.rateSync {
+  display: inline-flex;
+  color: var(--success);
+  cursor: help;
+}
+
+.scores {
+  display: flex;
+  min-width: 7rem;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1rem;
+}
+
+.scoreRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--foreground);
+  white-space: nowrap;
+}
+
+.scoreGroup {
+  max-width: 4.75rem;
+  overflow: hidden;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+}
+
+.scoreSep {
+  color: var(--text-muted);
+}
+
+.scoreSticky {
+  color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.actionButton {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .actionButton:hover {
+    background: var(--surface-muted);
+    color: var(--foreground);
+  }
+
+  .actionButton[data-tone='danger']:hover {
+    background: color-mix(in oklab, var(--danger) 9%, var(--surface));
+    color: var(--danger);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation-duration: 2.4s;
+  }
+
+  .dragHandle,
+  .menuItem,
+  .actionButton {
+    transition: none;
+  }
+}

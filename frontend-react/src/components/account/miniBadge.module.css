@@ -1,0 +1,78 @@
+/* 账号表格内的紧凑计数徽章（并发 / 窗口费用 / 会话 / RPM / 配额 / 模型限流），按阈值着色。 */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  border: 1px solid var(--tone-border);
+  border-radius: var(--radius-control);
+  padding: 0 6px;
+  color: var(--tone-foreground);
+  background: var(--tone-background);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.badge svg {
+  width: 10px;
+  height: 10px;
+  flex: none;
+}
+
+.mono {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+}
+
+.separator {
+  color: var(--text-muted);
+}
+
+.suffix {
+  font-size: 9px;
+  opacity: 0.6;
+}
+
+.label {
+  opacity: 0.7;
+}
+
+.neutral {
+  --tone-foreground: var(--text-secondary);
+  --tone-background: var(--surface-muted);
+  --tone-border: var(--border-subtle);
+}
+
+.success {
+  --tone-foreground: var(--success);
+  --tone-background: color-mix(in oklab, var(--success) 10%, var(--surface));
+  --tone-border: color-mix(in oklab, var(--success) 22%, var(--border));
+}
+
+.info {
+  --tone-foreground: var(--accent);
+  --tone-background: var(--accent-subtle);
+  --tone-border: color-mix(in oklab, var(--accent) 24%, var(--border));
+}
+
+.warning {
+  --tone-foreground: var(--warning);
+  --tone-background: color-mix(in oklab, var(--warning) 11%, var(--surface));
+  --tone-border: color-mix(in oklab, var(--warning) 24%, var(--border));
+}
+
+/* Vue 版的橙色档（超出基线但仍允许粘性会话），介于 warning 与 danger 之间 */
+.orange {
+  --tone-mix: color-mix(in oklab, var(--warning) 55%, var(--danger));
+  --tone-foreground: var(--tone-mix);
+  --tone-background: color-mix(in oklab, var(--tone-mix) 11%, var(--surface));
+  --tone-border: color-mix(in oklab, var(--tone-mix) 24%, var(--border));
+}
+
+.danger {
+  --tone-foreground: var(--danger);
+  --tone-background: color-mix(in oklab, var(--danger) 10%, var(--surface));
+  --tone-border: color-mix(in oklab, var(--danger) 24%, var(--border));
+}

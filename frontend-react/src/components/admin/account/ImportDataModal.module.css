@@ -1,0 +1,78 @@
+.form { display: flex; flex-direction: column; gap: var(--space-4); }
+
+.hint { color: var(--text-secondary); font-size: var(--text-sm); }
+
+.warning {
+  border: 1px solid color-mix(in oklab, var(--warning) 35%, var(--border));
+  border-radius: var(--radius-control);
+  background: color-mix(in oklab, var(--warning) 8%, var(--surface));
+  padding: var(--space-3);
+  color: var(--warning);
+  font-size: var(--text-xs);
+}
+
+.label {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  padding: var(--space-3) var(--space-4);
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+
+.dropzone[data-active='true'] { border-color: var(--accent); background: var(--accent-subtle); }
+
+.fileInfo { min-width: 0; }
+
+.fileName {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileMeta { color: var(--text-secondary); font-size: var(--text-xs); }
+
+.hidden { display: none; }
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-4);
+}
+
+.resultTitle { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }
+.resultSummary { color: var(--text-secondary); font-size: var(--text-sm); }
+
+.errors { margin-top: var(--space-2); }
+.errorsTitle { color: var(--danger); font-size: var(--text-sm); font-weight: 500; }
+
+.errorList {
+  max-height: 12rem;
+  margin-top: var(--space-2);
+  overflow: auto;
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  padding: var(--space-3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-xs);
+}
+
+.errorItem { white-space: pre-wrap; }
+
+.footer { display: flex; justify-content: flex-end; gap: var(--space-3); }

@@ -1,0 +1,15 @@
+.cell {
+  display: inline-flex;
+  min-width: 2.25rem;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  padding: 0 6px;
+  color: var(--foreground);
+  background: var(--surface-muted);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}

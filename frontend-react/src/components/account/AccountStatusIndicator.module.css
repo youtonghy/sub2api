@@ -1,0 +1,92 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.twoLine {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.caption {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.recovery {
+  max-width: 180px;
+  color: var(--text-secondary);
+  line-height: 16px;
+  text-align: center;
+}
+
+.badgeButton {
+  display: inline-flex;
+  border: 0;
+  border-radius: var(--radius-pill, 999px);
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.errorIcon {
+  display: inline-flex;
+  color: var(--danger);
+  cursor: help;
+}
+
+.errorIcon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.errorMessage {
+  min-width: 200px;
+  max-width: 300px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 429 / 529 / 模型限流的紧凑徽章，比表格计数徽章略大 */
+.code {
+  font-size: var(--text-xs);
+  line-height: 18px;
+  cursor: default;
+}
+
+.countdown {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.columns2,
+.columns3 {
+  column-gap: 8px;
+}
+
+.columns2 {
+  columns: 2;
+}
+
+.columns3 {
+  columns: 3;
+}
+
+.modelItem {
+  margin-bottom: 4px;
+  break-inside: avoid;
+}
+
+.stack .modelItem {
+  margin-bottom: 0;
+}

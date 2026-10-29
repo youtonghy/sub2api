@@ -1,0 +1,148 @@
+/* 参照 Arc Pro selection-toolbar：计数、分隔线、紧凑操作按钮；吸顶在表格区域上方 */
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  min-height: 46px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  padding: 5px 6px 5px 14px;
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+.bar[data-has-selection] {
+  background: color-mix(in oklab, var(--accent) 5%, var(--surface));
+}
+
+.summary {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.count {
+  color: var(--foreground);
+  font-weight: 500;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.dot {
+  color: var(--text-muted);
+}
+
+.link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.link:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  flex: 0 0 auto;
+  background: var(--border);
+  margin-left: auto;
+}
+
+.actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+
+.actions button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: calc(var(--radius-panel) - 6px);
+  padding: 0 10px;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--duration-fast) var(--ease-standard), transform var(--duration-spring) var(--ease-spring);
+}
+
+.actions button:active {
+  background: var(--surface-muted);
+  transform: scale(0.97);
+}
+
+.actions .primary {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.actions .success {
+  color: var(--success);
+}
+
+.actions .warning {
+  color: var(--warning);
+}
+
+.actions .destructive {
+  color: var(--danger);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .link:hover:not(:disabled) {
+    text-decoration: underline;
+  }
+
+  .actions button:hover {
+    background: var(--surface-muted);
+  }
+
+  .actions .destructive:hover {
+    background: color-mix(in oklab, var(--danger) 9%, var(--surface));
+  }
+}
+
+@media (max-width: 520px) {
+  .divider {
+    display: none;
+  }
+
+  .actions {
+    flex: 1 0 100%;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .actions button {
+    transition: none;
+  }
+
+  .actions button:active {
+    transform: none;
+  }
+}

@@ -1,0 +1,8 @@
+/* 提示框为反色底（前景色底、背景色字），这里只用透明度区分层级 */
+.text { margin: 0; }
+.title { margin: var(--space-2) 0 0; font-weight: 500; }
+.list { display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-1) 0 0; padding: 0; list-style: none; }
+.item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.itemLabel { opacity: .8; }
+.code { border-radius: calc(var(--radius-control) / 2); background: color-mix(in oklab, currentColor 14%, transparent); font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: var(--text-xs); padding: 1px var(--space-1); user-select: all; }
+.note { margin: 2px 0 0; opacity: .7; }

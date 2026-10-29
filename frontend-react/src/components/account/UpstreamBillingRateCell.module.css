@@ -1,0 +1,130 @@
+.cell {
+  display: flex;
+  height: 24px;
+  min-width: 7rem;
+  align-items: center;
+  gap: 4px;
+}
+
+.details {
+  display: inline-flex;
+  margin-left: -4px;
+}
+
+.tooltipTrigger {
+  display: inline-flex;
+}
+
+.primary {
+  border-bottom: 1px dotted var(--border);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: help;
+}
+
+.rate {
+  color: var(--foreground);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.primary[data-tone='secondary'],
+.status[data-tone='secondary'] {
+  color: var(--text-secondary);
+}
+
+.primary[data-tone='warning'],
+.status[data-tone='warning'] {
+  color: var(--warning);
+}
+
+.primary[data-tone='danger'],
+.status[data-tone='danger'] {
+  color: var(--danger);
+}
+
+.status {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tooltipBody {
+  display: flex;
+  max-width: calc(100vw - 2rem);
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tooltipBody p {
+  margin: 0;
+}
+
+.probeState {
+  margin-top: 4px;
+  border-top: 1px solid color-mix(in oklab, currentColor 15%, transparent);
+  padding-top: 8px;
+}
+
+.globalState {
+  margin-top: 0;
+}
+
+.tooltipBody span[data-state='enabled'] {
+  color: var(--success);
+}
+
+.tooltipBody span[data-state='disabled'] {
+  color: var(--danger);
+}
+
+.probe {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.probe:hover:not(:disabled) {
+  background: var(--accent-subtle);
+}
+
+.probe:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.probe svg {
+  width: 12px;
+  height: 12px;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+.empty {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation-duration: 2s;
+  }
+}

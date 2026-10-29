@@ -1,0 +1,158 @@
+/* 账号表单共用样式（Create / Edit / BulkEdit / ReAuth 与共享表单组件），只用 Arc token */
+
+/* 抽屉宽度：覆盖 Arc drawer 的 --drawer-size（双类选择器优先于 .content） */
+.drawerNormal.drawerNormal { --drawer-size: min(36rem, calc(100vw - var(--space-4))); }
+.drawerWide.drawerWide { --drawer-size: min(56rem, calc(100vw - var(--space-4))); }
+.drawerExtraWide.drawerExtraWide { --drawer-size: min(72rem, calc(100vw - var(--space-4))); }
+
+/* 底部操作区固定在抽屉滚动区底部 */
+.drawerInner { display: flex; flex-direction: column; min-height: 100%; }
+.drawerBody { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--space-6); }
+.drawerFooter {
+  position: sticky;
+  bottom: calc(var(--space-6) * -1);
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin: var(--space-6) calc(var(--space-6) * -1) calc(var(--space-6) * -1);
+  border-top: 1px solid var(--border);
+  padding: var(--space-4) var(--space-6);
+  background: var(--surface-raised);
+}
+
+/* 分组 */
+.section { display: flex; flex-direction: column; gap: var(--space-4); }
+.section + .section { padding-top: var(--space-6); border-top: 1px solid var(--border-subtle); }
+.sectionHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.sectionHeading { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); }
+.sectionTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; line-height: var(--leading-body); }
+.sectionDescription { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.sectionAction { flex: 0 0 auto; }
+.sectionBody { display: flex; flex-direction: column; gap: var(--space-4); }
+
+/* 字段 */
+.field { display: flex; min-width: 0; flex-direction: column; gap: var(--space-2); }
+.labelRow { display: flex; align-items: center; gap: var(--space-2); }
+.label { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
+.required { color: var(--danger); }
+.hint { margin: 0; color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); }
+.error { margin: 0; color: var(--danger); font-size: var(--text-xs); line-height: var(--leading-body); }
+
+/* 开关行 */
+.toggleRow { display: flex; flex-direction: column; gap: var(--space-3); }
+.toggleHead { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.toggleText { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); }
+.toggleBody { display: flex; flex-direction: column; gap: var(--space-3); padding-left: var(--space-4); border-left: 2px solid var(--border-subtle); }
+
+/* 网格与行 */
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.rowEnd { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+.stack { display: flex; flex-direction: column; gap: var(--space-3); }
+.stackTight { display: flex; flex-direction: column; gap: var(--space-2); }
+@media (max-width: 40rem) {
+  .grid2, .grid3 { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* 原生输入控件（与 Arc input 视觉一致的轻量版本，用于表格行内、数字等紧凑场景） */
+.input, .select, .textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  padding: var(--space-2) var(--space-3);
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+.textarea { resize: vertical; }
+.mono { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: var(--text-xs); }
+.input:focus-visible, .select:focus-visible, .textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.input:disabled, .select:disabled, .textarea:disabled { opacity: .6; cursor: not-allowed; }
+.input[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--danger); }
+
+/* 选项按钮（类型 / 模式等互斥选择的紧凑按钮） */
+.choiceGroup { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+.choice[aria-pressed="true"], .choice[aria-checked="true"], .choice[data-active="true"] { border-color: var(--accent); background: var(--accent-subtle); }
+.choice:disabled { opacity: .5; cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) { .choice:not(:disabled):hover { border-color: var(--border-strong); } }
+
+/* 标签片（模型、错误码等） */
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  padding: 2px var(--space-2);
+}
+.chipRemove { display: inline-grid; place-items: center; border: 0; background: transparent; color: var(--text-secondary); cursor: pointer; padding: 0; }
+
+/* 提示块 */
+.notice { display: flex; flex-direction: column; gap: var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-muted); color: var(--foreground); font-size: var(--text-sm); padding: var(--space-3) var(--space-4); }
+.notice[data-tone="info"] { border-color: color-mix(in oklab, var(--accent) 35%, var(--border)); background: var(--accent-subtle); }
+.notice[data-tone="success"] { border-color: color-mix(in oklab, var(--success) 40%, var(--border)); background: color-mix(in oklab, var(--success) 8%, var(--surface)); }
+.notice[data-tone="warning"] { border-color: color-mix(in oklab, var(--warning) 45%, var(--border)); background: color-mix(in oklab, var(--warning) 9%, var(--surface)); }
+.notice[data-tone="danger"] { border-color: color-mix(in oklab, var(--danger) 40%, var(--border)); background: color-mix(in oklab, var(--danger) 8%, var(--surface)); }
+.noticeTitle { margin: 0; font-weight: 500; }
+.noticeBody { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); }
+.noticeBody p { margin: 0; }
+
+/* 代码与链接 */
+.code { border-radius: calc(var(--radius-control) / 2); background: var(--surface-muted); font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: var(--text-xs); padding: 1px var(--space-1); }
+.link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.muted { color: var(--text-secondary); }
+.textXs { font-size: var(--text-xs); }
+
+/* 步骤指示 */
+.steps { display: flex; align-items: center; justify-content: center; gap: var(--space-4); }
+.step { display: flex; align-items: center; gap: var(--space-2); color: var(--text-secondary); font-size: var(--text-sm); }
+.stepDot { display: grid; width: var(--space-8); height: var(--space-8); place-items: center; border: 1px solid var(--border); border-radius: var(--radius-pill); font-weight: 500; }
+.step[data-active="true"] { color: var(--foreground); }
+.step[data-active="true"] .stepDot { border-color: var(--accent); background: var(--accent); color: var(--background); }
+.stepLine { width: var(--space-8); height: 1px; background: var(--border); }
+
+/* 可编辑行表格（模型映射、请求头、协议规则等） */
+.editRows { display: flex; flex-direction: column; gap: var(--space-2); }
+.editRow { display: flex; align-items: center; gap: var(--space-2); }
+.editRow > * { min-width: 0; }
+.iconButton {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: var(--space-8);
+  height: var(--space-8);
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.iconButton:disabled { opacity: .5; cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) { .iconButton:not(:disabled):hover { color: var(--foreground); border-color: var(--border-strong); } }
+.iconButton[data-tone="danger"] { color: var(--danger); }

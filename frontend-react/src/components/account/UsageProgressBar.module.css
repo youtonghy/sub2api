@@ -1,0 +1,103 @@
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+  color: var(--text-secondary);
+  font-size: 9px;
+}
+
+.chip {
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: var(--surface-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* 标签徽章：fixed 定宽居中保证账号页纵向对齐；auto 限宽截断左对齐 */
+.label {
+  flex-shrink: 0;
+  border-radius: 4px;
+  padding: 0 var(--space-1);
+  font-size: 10px;
+  font-weight: 500;
+  background: var(--accent-subtle);
+  color: var(--accent-strong);
+}
+
+.label[data-label-width='fixed'] {
+  width: 32px;
+  text-align: center;
+}
+
+.label[data-label-width='auto'] {
+  max-width: 72px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label[data-color='emerald'] {
+  background: color-mix(in oklab, var(--success) 12%, var(--surface));
+  color: var(--success);
+}
+
+.label[data-color='purple'] {
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface-muted));
+  color: var(--text-secondary);
+}
+
+.label[data-color='amber'] {
+  background: color-mix(in oklab, var(--warning) 12%, var(--surface));
+  color: var(--warning);
+}
+
+.track {
+  width: 32px;
+  height: 6px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+}
+
+.fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width var(--duration-standard) var(--ease-standard);
+}
+
+.fill[data-level='success'] { background: var(--success); }
+.fill[data-level='warning'] { background: var(--warning); }
+.fill[data-level='danger'] { background: var(--danger); }
+
+.percent {
+  width: 32px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.percent[data-level='warning'] { color: var(--warning); }
+.percent[data-level='danger'] { color: var(--danger); }
+
+.reset {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill { transition: none; }
+}

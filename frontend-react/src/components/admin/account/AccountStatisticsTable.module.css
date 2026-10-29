@@ -1,0 +1,80 @@
+.root {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  background: var(--surface);
+}
+
+.error {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 44px;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--foreground);
+}
+
+.table [data-align='right'] {
+  text-align: right;
+}
+
+.name {
+  max-width: 280px;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.realCost {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.empty {
+  padding: 56px var(--space-4) !important;
+  color: var(--text-secondary) !important;
+  text-align: center;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .table tbody tr:hover td {
+    background: var(--surface-muted);
+  }
+}

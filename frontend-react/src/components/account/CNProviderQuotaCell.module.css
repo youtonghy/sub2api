@@ -1,0 +1,5 @@
+.root {
+  display: grid;
+  min-width: 220px;
+  gap: var(--space-1);
+}
