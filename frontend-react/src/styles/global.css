@@ -40,3 +40,20 @@ body {
 #app {
   min-height: 100vh;
 }
+
+/*
+ * 图表分类色（最多 12 个系列，例如用户用量趋势 Top 12）。Arc 的 --series-1..4 随强调色变化，
+ * 超过 4 个系列时使用这组固定色相；浅色与深色主题分别调整明度以保证对比度。
+ */
+:root {
+  --chart-cat-1: oklch(58% .15 250); --chart-cat-2: oklch(60% .14 160); --chart-cat-3: oklch(68% .15 70);
+  --chart-cat-4: oklch(60% .19 25); --chart-cat-5: oklch(56% .17 300); --chart-cat-6: oklch(62% .17 350);
+  --chart-cat-7: oklch(62% .11 195); --chart-cat-8: oklch(64% .16 45); --chart-cat-9: oklch(52% .15 275);
+  --chart-cat-10: oklch(64% .15 130); --chart-cat-11: oklch(64% .12 220); --chart-cat-12: oklch(58% .16 325);
+}
+:root[data-theme="dark"] {
+  --chart-cat-1: oklch(72% .14 250); --chart-cat-2: oklch(74% .13 160); --chart-cat-3: oklch(80% .14 75);
+  --chart-cat-4: oklch(72% .17 25); --chart-cat-5: oklch(72% .15 300); --chart-cat-6: oklch(74% .15 350);
+  --chart-cat-7: oklch(76% .10 195); --chart-cat-8: oklch(76% .14 50); --chart-cat-9: oklch(70% .13 275);
+  --chart-cat-10: oklch(78% .14 130); --chart-cat-11: oklch(76% .11 220); --chart-cat-12: oklch(72% .14 325);
+}
