@@ -46,8 +46,17 @@ export interface DonutChartProps {
   /** The synced legend beside or below the ring. */
   legend?: boolean;
   emptyLabel?: string;
+  /** Visible copy around the share in the center readout, for translation. Defaults to "45% of total". */
+  labels?: DonutChartLabels;
   ref?: Ref<HTMLElement>;
   className?: string;
+}
+
+export interface DonutChartLabels {
+  /** Text before the share, such as "Share " in "Share 45%". */
+  sharePrefix?: string;
+  /** Text after the share, such as " of total". */
+  shareSuffix?: string;
 }
 
 type Slice = { key: string; label: string; value: number; color?: string; members?: DonutChartDatum[] };
@@ -170,7 +179,7 @@ function useReducedMotionSafe() {
   return !!useReducedMotion() && hydrated;
 }
 
-export function DonutChart({ data, label, unit = "", formatValue = value => grouped.format(value), totalLabel = "Total", size = 208, thickness = 24, groupBelow = .04, maxSegments = 6, otherLabel = "Other", activeKey, defaultActiveKey = null, onActiveChange, hiddenKeys, defaultHiddenKeys, onHiddenKeysChange, legendAction = "toggle", legend = true, emptyLabel = "No data yet", ref, className }: DonutChartProps) {
+export function DonutChart({ data, label, unit = "", formatValue = value => grouped.format(value), totalLabel = "Total", size = 208, thickness = 24, groupBelow = .04, maxSegments = 6, otherLabel = "Other", activeKey, defaultActiveKey = null, onActiveChange, hiddenKeys, defaultHiddenKeys, onHiddenKeysChange, legendAction = "toggle", legend = true, emptyLabel = "No data yet", labels, ref, className }: DonutChartProps) {
   const reduced = useReducedMotionSafe();
   const figure = useRef<HTMLElement>(null);
   useImperativeHandle(ref, () => figure.current as HTMLElement);
@@ -389,7 +398,7 @@ export function DonutChart({ data, label, unit = "", formatValue = value => grou
         {readouts.map((item, index) => <motion.span key={item.key} className={styles.readout} initial={false} {...drum(index - activeIndex, reduced)}>
           <span className={styles.centerLabel}>{item.label}</span>
           <span className={styles.centerValue}>{item.value || item.meta ? <Count value={item.value} format={formatValue} reduced={reduced} /> : " "}</span>
-          <span className={styles.centerMeta}>{item.meta ? <><Count value={total && !hidden.has(item.key) ? item.value / total : 0} format={shareText} reduced={reduced} /> of {totalLabel.toLowerCase()}</> : unit || " "}</span>
+          <span className={styles.centerMeta}>{item.meta ? <>{labels?.sharePrefix}<Count value={total && !hidden.has(item.key) ? item.value / total : 0} format={shareText} reduced={reduced} />{labels ? labels.shareSuffix : ` of ${totalLabel.toLowerCase()}`}</> : unit || " "}</span>
         </motion.span>)}
       </div>
     </div>

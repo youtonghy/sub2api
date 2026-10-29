@@ -8,6 +8,7 @@ import admin from './admin'
 import misc from './misc'
 import shell from './shell'
 import authUi from './authUi'
+import chartsUi from './chartsUi'
 
 export default {
   adminAccessKeys,
@@ -20,4 +21,5 @@ export default {
   ...misc,
   ...shell,
   ...authUi,
+  ...chartsUi,
 }

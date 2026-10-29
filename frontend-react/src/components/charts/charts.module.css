@@ -1,0 +1,278 @@
+/* 图表区域共用样式：分布图（环形图 + 明细表）、用量趋势、行内用户明细 */
+
+.panel {
+  container-type: inline-size;
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: var(--leading-body);
+}
+
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* 环形图在左、明细表在右；区域变窄时上下排列 */
+.distribution {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-6);
+}
+
+.donut {
+  width: 176px;
+}
+
+@container (max-width: 520px) {
+  .distribution {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+
+  .distribution > .tableScroll {
+    justify-self: stretch;
+  }
+}
+
+.tableScroll {
+  min-width: 0;
+  max-height: 240px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.tableScrollTall {
+  max-height: 320px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.tableComfortable {
+  font-size: var(--text-sm);
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0 var(--space-2) var(--space-2);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-weight: 400;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 6px var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.table th:first-child,
+.table td:first-child {
+  padding-left: 0;
+  text-align: left;
+}
+
+.table th:last-child,
+.table td:last-child {
+  padding-right: 0;
+}
+
+.tableComfortable td {
+  padding-block: var(--space-2);
+}
+
+.name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 180px;
+  min-width: 0;
+  color: var(--foreground);
+  font-weight: 500;
+  vertical-align: middle;
+}
+
+.nameText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 可展开行：名称本身是按钮，整行可点击 */
+.toggleButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chevron {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.swatch {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--swatch);
+}
+
+.rank {
+  flex: 0 0 auto;
+  min-width: 22px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.interactive {
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.rowActive {
+  background: var(--surface-muted);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .interactive:hover {
+    background: var(--surface-muted);
+  }
+}
+
+.otherRow {
+  background: color-mix(in oklab, var(--surface-muted) 60%, transparent);
+}
+
+.table .actual {
+  color: var(--success);
+}
+
+.table .accountCost {
+  color: var(--warning);
+}
+
+.table .standard {
+  color: var(--text-muted);
+}
+
+.table td.expandCell {
+  padding: 0;
+}
+
+.message {
+  display: grid;
+  place-items: center;
+  min-height: 192px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/* 行内用户明细 */
+.breakdown {
+  background: var(--surface-muted);
+}
+
+.breakdownMessage {
+  margin: 0;
+  padding: var(--space-2) 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+.breakdownLoading {
+  padding: var(--space-2) var(--space-3);
+}
+
+.breakdown .table td {
+  padding-block: 4px;
+  border-top-color: var(--border-subtle);
+}
+
+.breakdown .table td:first-child {
+  max-width: 160px;
+  padding-left: var(--space-6);
+  overflow: hidden;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+}
+
+.breakdown .table td:last-child {
+  padding-right: var(--space-1);
+}
+
+/* 用量趋势 */
+.trend {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.caption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.captionDate {
+  color: var(--text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interactive {
+    transition: none;
+  }
+}

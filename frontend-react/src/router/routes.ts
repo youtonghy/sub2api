@@ -271,7 +271,7 @@ export const appRoutes: AppRouteDef[] = [
     name: 'AdminDashboard',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: true, title: 'Admin Dashboard', titleKey: 'admin.dashboard.title', descriptionKey: 'admin.dashboard.description' },
-    view: pending('views/admin/DashboardView.vue'),
+    view: () => import('@/views/admin/DashboardView'),
   },
   {
     path: '/admin/ops',

@@ -1,0 +1,167 @@
+/* 管理员仪表盘：KPI 两行、快捷操作、工具栏、图表网格、账号排行、用户趋势 */
+
+.page {
+  display: grid;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.page > * {
+  min-width: 0;
+}
+
+.kpis {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* 每行 4 张卡片，空间不足时按 200px 最小宽度换行 */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  align-items: stretch;
+  gap: var(--space-4);
+}
+
+.kpiCell {
+  display: grid;
+  min-width: 0;
+}
+
+.kpiSkeleton {
+  min-height: 132px;
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+
+.panel {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+/* 快捷操作：链接行，宽屏两列 */
+.actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-2);
+}
+
+.action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  color: var(--foreground);
+  text-decoration: none;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .action:hover {
+    background: var(--surface-muted);
+  }
+
+  .action:hover .actionChevron {
+    color: var(--foreground);
+    transform: translateX(2px);
+  }
+}
+
+.actionIcon {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-control);
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.actionText {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.actionTitle {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.actionDescription {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actionChevron {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+/* 工具栏：时间范围、刷新与粒度 */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+.toolbarGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.toolbarLabel {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.chartsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+}
+
+@media (min-width: 1100px) {
+  .chartsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action,
+  .actionChevron {
+    transition: none;
+  }
+
+  .action:hover .actionChevron {
+    transform: none;
+  }
+}
+
+/* 手机两列时 KPI 数值缩小一档，避免 "1.52K RPM" 等较长数值溢出卡片 */
+@media (max-width: 520px) {
+  .kpiRow {
+    --text-3xl: var(--text-xl);
+  }
+}
