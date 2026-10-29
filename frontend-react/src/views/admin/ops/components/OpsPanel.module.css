@@ -1,0 +1,85 @@
+/* Ops 页各区域共用的面板样式：带边框的分组区域、标题行、工具栏与提示文字。 */
+.panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-5);
+  background: var(--surface);
+}
+
+.fill { height: 100%; }
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: var(--leading-body);
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.muted {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.caption {
+  min-height: 1.25rem;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  display: flex;
+  min-height: 160px;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.linkButton {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.linkButton:hover { text-decoration: underline; }
+.linkButton:disabled { color: var(--text-muted); cursor: not-allowed; text-decoration: none; }
+
+.danger { color: var(--danger); }
+.warning { color: var(--warning); }
+.success { color: var(--success); }

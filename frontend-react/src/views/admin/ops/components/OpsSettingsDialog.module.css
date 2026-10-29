@@ -1,0 +1,18 @@
+/* 设置表单较长，抽屉比 Arc 默认的 30rem 稍宽 */
+.drawer { --drawer-size: min(40rem, calc(100vw - var(--space-4))); }
+
+/* 底部操作区贴在抽屉滚动区域底部，长表单滚动时仍可保存 */
+.footer {
+  position: sticky;
+  bottom: calc(var(--space-6) * -1);
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin: var(--space-6) calc(var(--space-6) * -1) calc(var(--space-6) * -1);
+  border-top: 1px solid var(--border);
+  padding: var(--space-4) var(--space-6);
+  background: var(--surface-raised);
+}
+
+.addButton { flex-shrink: 0; }

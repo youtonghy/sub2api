@@ -1,0 +1,49 @@
+.root { display: flex; flex-direction: column; gap: var(--space-6); }
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+
+.block {
+  display: block;
+  border-radius: var(--radius-control);
+  background: color-mix(in oklab, var(--border-strong) 38%, var(--surface));
+  animation: ops-skeleton-pulse 1.8s var(--ease-in-out) 11 both;
+}
+
+.block[data-size='title'] { width: 11rem; height: var(--space-5); }
+.block[data-size='control'] { width: 8rem; height: var(--control-height-md); }
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.kpi {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-5);
+  background: var(--surface);
+}
+
+.rowQuad, .rowTriple { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
+.rowQuad > * { min-height: 360px; }
+
+@media (min-width: 768px) {
+  .rowTriple { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+  .rowQuad { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .span2 { grid-column: span 2; }
+}
+
+@keyframes ops-skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .52; } }
+@media (prefers-reduced-motion: reduce) { .block { animation: none; } }

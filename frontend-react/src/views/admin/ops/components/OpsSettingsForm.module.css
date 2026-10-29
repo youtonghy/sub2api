@@ -1,0 +1,175 @@
+/* 运维设置、告警规则、邮件通知等表单共用的布局样式。 */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-5);
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: var(--leading-body);
+}
+
+.subTitle {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+}
+
+.label {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.grid2,
+.grid3 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.span2 { grid-column: 1 / -1; }
+
+@media (min-width: 768px) {
+  .grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* 开关行：左侧标签与说明，右侧开关 */
+.switchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.switchText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+}
+
+.inline {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.inline > :first-child { flex: 1; min-width: 0; }
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  background: var(--accent-subtle);
+  color: var(--foreground);
+  font-size: var(--text-xs);
+}
+
+.chipRemove {
+  display: inline-flex;
+  width: 1.25rem;
+  height: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.chipRemove:hover { background: var(--surface-muted); color: var(--foreground); }
+
+.errorList {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+.details {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+}
+
+.details > summary {
+  padding: var(--space-4) var(--space-5);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.detailsBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+@media (min-width: 768px) {
+  .summaryGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.summaryValue {
+  margin-left: var(--space-1);
+  color: var(--foreground);
+  font-weight: 500;
+}

@@ -1,0 +1,86 @@
+.selectWide { width: 9rem; }
+.selectMedium { width: 7rem; }
+.selectNarrow { width: 6rem; }
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.frame {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+}
+
+/* 固定高度滚动容器，避免纵向无限增长 */
+.scroll {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.table {
+  min-width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+.table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+
+.table th {
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-2);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.table td {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.table tbody tr:last-child td { border-bottom: 0; }
+
+.model { font-weight: 500; }
+
+.cards > * + * { border-top: 1px solid var(--border-subtle); }
+
+.cardItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.cardModel {
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.cardPair {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--foreground);
+}
+
+.pairLabel { color: var(--text-secondary); }

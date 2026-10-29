@@ -278,7 +278,7 @@ export const appRoutes: AppRouteDef[] = [
     name: 'AdminOps',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: true, title: 'Ops Monitoring', titleKey: 'admin.ops.title', descriptionKey: 'admin.ops.description' },
-    view: pending('views/admin/ops/OpsDashboard.vue'),
+    view: () => import('@/views/admin/ops/OpsDashboard'),
   },
   {
     path: '/admin/audit-logs',

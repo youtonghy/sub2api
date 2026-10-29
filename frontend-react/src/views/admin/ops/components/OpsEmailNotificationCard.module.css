@@ -1,0 +1,21 @@
+.spin { animation: ops-email-spin 1s linear infinite; }
+@keyframes ops-email-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+.addButton { flex-shrink: 0; }
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+}
+
+.schedule {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.schedule > :last-child { flex: 1; min-width: 0; }

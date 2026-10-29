@@ -1,0 +1,97 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.empty {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-8);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/* 列表最高 520px，表格在内部滚动（表头固定） */
+.tableFrame {
+  display: flex;
+  max-height: 520px;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+}
+
+@media (max-width: 767px) {
+  .tableFrame { max-height: none; overflow: visible; border: 0; }
+}
+
+.nameCell {
+  display: flex;
+  min-width: 0;
+  max-width: 28rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) 0;
+  white-space: normal;
+}
+
+.name {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.description {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.updated {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.metric { white-space: nowrap; }
+
+.operator {
+  margin: 0 var(--space-1);
+  color: var(--text-muted);
+}
+
+.severity { font-weight: 500; }
+
+.actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.metricHint {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.fieldHint { margin-top: var(--space-2); }
+
+.checkRow {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: var(--space-3) var(--space-4);
+}
+
+.spin { animation: spin 1s linear infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+}
