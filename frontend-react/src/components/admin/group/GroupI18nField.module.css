@@ -1,0 +1,68 @@
+.field { display: flex; min-width: 0; flex-direction: column; gap: var(--space-2); }
+.labelRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.label { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
+.menuAnchor { position: relative; }
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: 2px var(--space-2);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.trigger[data-active='true'] { background: var(--accent-subtle); color: var(--accent); }
+.chevron { transition: transform var(--duration-fast) var(--ease-standard); }
+.chevron[data-open='true'] { transform: rotate(180deg); }
+
+.menu {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 10rem;
+  gap: 1px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: 5px;
+  background: var(--surface-raised, var(--surface));
+}
+
+.menuItem {
+  display: flex;
+  width: 100%;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border: 0;
+  border-radius: calc(var(--radius-panel) - 6px);
+  padding: 0 var(--space-3);
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.menuItem[aria-checked='true'] { color: var(--accent); }
+.menuItem:focus-visible { outline: none; background: var(--surface-muted); }
+.check { flex: none; color: var(--accent); }
+
+@media (hover: hover) and (pointer: fine) {
+  .trigger:hover:not([data-active='true']) { background: var(--surface-muted); color: var(--foreground); }
+  .menuItem:hover { background: var(--surface-muted); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trigger, .chevron { transition: none; }
+}

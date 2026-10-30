@@ -1,0 +1,175 @@
+.content,
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.list {
+  display: flex;
+  max-height: 24rem;
+  flex-direction: column;
+  margin: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: 0;
+  list-style: none;
+  overscroll-behavior: contain;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-3);
+}
+
+.item:last-child {
+  border-bottom: 0;
+}
+
+.handle {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-muted);
+  cursor: move;
+}
+
+.info {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.titleRow,
+.metaRow {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.metaRow {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.name {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.key {
+  border-radius: calc(var(--radius-control) / 2);
+  background: var(--surface-muted);
+  padding: 1px 6px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--text-xs);
+}
+
+.truncate {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.iconButton {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: calc(var(--radius-control) - 2px);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .iconButton:hover {
+    background: var(--surface-muted);
+    color: var(--accent);
+  }
+
+  .iconButton[data-tone='danger']:hover {
+    color: var(--danger);
+  }
+}
+
+.field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.optionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.optionRow > :not(button) {
+  min-width: 0;
+  flex: 1;
+}
+
+.monoInput {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iconButton {
+    transition: none;
+  }
+}

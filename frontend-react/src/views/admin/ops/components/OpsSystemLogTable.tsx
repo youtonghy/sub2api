@@ -8,6 +8,7 @@ import DataTable, { type DataTableCellContext } from '@/components/common/DataTa
 import Input from '@/components/common/Input'
 import Pagination from '@/components/common/Pagination'
 import Select, { type SelectValue } from '@/components/common/Select'
+import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import { useMountOnce } from '@/composables/useMountOnce'
 import type { Column } from '@/components/common/types'
 import { useI18n } from '@/i18n/useI18n'
@@ -180,6 +181,7 @@ function pickRuntimeConfig(cfg: OpsRuntimeLogConfig): OpsRuntimeLogConfig {
 
 export default function OpsSystemLogTable({ platformFilter = '', refreshToken = 0 }: OpsSystemLogTableProps) {
   const { t } = useI18n()
+  const { confirm, confirmDialog } = useConfirmDialog()
 
   const [loading, setLoading] = useState(false)
   const [logs, setLogs] = useState<OpsSystemLog[]>([])
@@ -336,7 +338,7 @@ export default function OpsSystemLogTable({ platformFilter = '', refreshToken = 
   }
 
   const resetRuntimeConfig = async () => {
-    const ok = window.confirm(t('admin.ops.systemLogs.resetRuntimeConfigConfirm'))
+    const ok = await confirm(t('admin.ops.systemLogs.resetRuntimeConfigConfirm'), { danger: true })
     if (!ok) return
 
     setRuntimeSaving(true)
@@ -354,7 +356,7 @@ export default function OpsSystemLogTable({ platformFilter = '', refreshToken = 
   }
 
   const cleanupCurrentFilter = async () => {
-    const ok = window.confirm(t('admin.ops.systemLogs.cleanupConfirm'))
+    const ok = await confirm(t('admin.ops.systemLogs.cleanupConfirm'), { danger: true })
     if (!ok) return
     try {
       const f = filtersRef.current
@@ -655,6 +657,7 @@ export default function OpsSystemLogTable({ platformFilter = '', refreshToken = 
           onPageSizeChange={onPageSizeChange}
         />
       </div>
+      {confirmDialog}
     </section>
   )
 }

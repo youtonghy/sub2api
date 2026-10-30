@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import AccountsView from '../AccountsView'
-import { app, captured, resetCaptured } from './accountsViewHarness'
+import { app, captured, confirmDialogs, resetCaptured } from './accountsViewHarness'
 
 const { listAccounts, listWithEtag, batchRefresh, getBatchTodayStats, getUpstreamBillingProbeSettings, getAllProxies, getAllGroups } =
   vi.hoisted(() => ({
@@ -87,6 +87,15 @@ const mountView = async () => {
   return view
 }
 
+// Vue 版用原生 window.confirm()；React 版改用应用内 ConfirmDialog（按标题记录的替身），确认后才调用批量刷新
+const acceptConfirm = async () => {
+  expect(confirmDialogs['common.confirm']?.show).toBe(true)
+  await act(async () => {
+    confirmDialogs['common.confirm'].onConfirm()
+  })
+  await flushPromises()
+}
+
 const click = async (element: Element) => {
   await act(async () => {
     fireEvent.click(element)
@@ -145,11 +154,11 @@ describe('admin AccountsView select all filtered results', () => {
   ])('$name after a batch token refresh and table reload', async ({ result, expectedIds }) => {
     listAccounts.mockResolvedValue({ items: makeAccounts(3), total: 3, page: 1, page_size: 20, pages: 1 })
     batchRefresh.mockResolvedValue(result)
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     const { container } = await mountView()
     await click(container.querySelector('[data-test="select-page"]')!)
     await click(container.querySelector('[data-test="refresh-token"]')!)
-    await flushPromises()
+    expect(batchRefresh).not.toHaveBeenCalled()
+    await acceptConfirm()
 
     expect(batchRefresh).toHaveBeenCalledWith([1, 2, 3])
     expect(listAccounts).toHaveBeenCalledTimes(2)
@@ -163,7 +172,7 @@ describe('admin AccountsView select all filtered results', () => {
     if (result.failed > 0) {
       expect(app.showError).toHaveBeenCalledWith('admin.accounts.bulkActions.partialSuccess')
       await click(container.querySelector('[data-test="refresh-token"]')!)
-      await flushPromises()
+      await acceptConfirm()
       expect(batchRefresh).toHaveBeenLastCalledWith(expectedIds)
     }
   })

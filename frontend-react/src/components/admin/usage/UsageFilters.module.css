@@ -1,0 +1,164 @@
+.root {
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.flat {
+  padding: var(--space-4);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* 左侧筛选可多行折行，右侧为操作按钮 */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.fields {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+
+.field {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+}
+
+.label {
+  margin-bottom: var(--space-2);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: var(--leading-body);
+}
+
+.search {
+  position: relative;
+}
+
+.searchInput {
+  padding-right: var(--space-8);
+}
+
+.clear {
+  position: absolute;
+  right: var(--space-2);
+  bottom: 0;
+  display: inline-flex;
+  height: var(--control-height-md);
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-1);
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.clear:focus-visible {
+  outline: none;
+  color: var(--foreground);
+}
+
+.dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  z-index: 50;
+  max-height: 15rem;
+  margin-top: var(--space-1);
+  overflow: auto;
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+}
+
+.option {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.option:focus-visible {
+  outline: none;
+  background: var(--surface-muted);
+}
+
+.optionName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.muted {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.actions {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .option:hover {
+    background: var(--surface-muted);
+  }
+
+  .clear:hover {
+    color: var(--foreground);
+  }
+}
+
+@media (min-width: 640px) {
+  .field {
+    width: auto;
+    min-width: 11rem;
+  }
+
+  .fieldWide {
+    min-width: 15rem;
+  }
+
+  .fieldMedium {
+    min-width: 13.75rem;
+  }
+
+  .fieldNarrow {
+    min-width: 12.5rem;
+  }
+
+  .actions {
+    width: auto;
+  }
+}

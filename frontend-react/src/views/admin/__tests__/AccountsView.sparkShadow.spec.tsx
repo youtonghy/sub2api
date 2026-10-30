@@ -218,7 +218,6 @@ describe('admin AccountsView — 账号行展示', () => {
     getBatchTodayStats.mockResolvedValue({ stats: {} })
     getAllProxies.mockResolvedValue([])
     getAllGroups.mockResolvedValue([])
-    vi.stubGlobal('confirm', vi.fn(() => true))
   })
 
   afterEach(() => {

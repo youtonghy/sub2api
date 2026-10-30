@@ -1,0 +1,139 @@
+/* 管理员支付组件：订单表格、退款 / 详情对话框与支付看板 */
+
+.stack { display: flex; flex-direction: column; gap: var(--space-4); }
+.form { display: flex; flex-direction: column; gap: var(--space-4); }
+
+/* 文本 */
+.mono { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: var(--text-sm); }
+.strong { color: var(--foreground); font-weight: 500; }
+.secondary { color: var(--text-secondary); font-size: var(--text-sm); }
+.muted { color: var(--text-secondary); font-size: var(--text-xs); }
+.cellText { color: var(--foreground); font-size: var(--text-sm); }
+.aside { margin-left: var(--space-1); color: var(--text-muted); font-size: var(--text-xs); }
+.sub { color: var(--text-secondary); font-size: var(--text-xs); }
+.bonusInline { margin-left: var(--space-1); color: var(--warning); }
+.bonus { color: var(--warning); font-weight: 500; }
+.danger { color: var(--danger); font-weight: 500; }
+.hint { color: var(--text-secondary); font-size: var(--text-xs); }
+
+/* 工具栏：搜索与筛选在同一行 */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.search { width: 100%; max-width: 16rem; }
+.filterSelect { width: 10rem; }
+.toolbarEnd { display: flex; flex: 1; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+@media (max-width: 640px) { .search { max-width: none; } }
+
+.region {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.rowActions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+
+/* 详情：两列字段 */
+.detailGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); margin: 0; }
+.detailGrid dt { margin: 0 0 2px; color: var(--text-secondary); font-size: var(--text-xs); }
+.detailGrid dd { margin: 0; color: var(--foreground); font-size: var(--text-sm); }
+.footerActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* 退款：订单摘要与余额 */
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+}
+.summaryRow { display: flex; justify-content: space-between; gap: var(--space-3); font-size: var(--text-sm); }
+.summaryRow dt { color: var(--text-secondary); }
+.summaryRow dd { margin: 0; color: var(--foreground); }
+.infoRow { display: flex; justify-content: space-between; gap: var(--space-3); }
+.checkRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.balanceGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.balanceCell { padding: var(--space-3); border-radius: var(--radius-control); background: var(--surface-muted); font-size: var(--text-sm); }
+.balanceLabel { color: var(--text-secondary); }
+.balanceValue { margin-top: var(--space-1); color: var(--foreground); font-weight: 500; }
+
+/* 看板 */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); }
+.panel {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+.panelTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; line-height: var(--leading-body); }
+.emptyLine { margin: 0; padding: var(--space-8) 0; color: var(--text-secondary); font-size: var(--text-sm); text-align: center; }
+.trend { display: grid; gap: var(--space-3); min-width: 0; }
+
+.methodList { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.methodItem { display: flex; flex-direction: column; gap: var(--space-1); }
+.methodRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.methodName { display: flex; align-items: center; gap: var(--space-2); color: var(--text-secondary); font-size: var(--text-sm); }
+.dot { display: inline-block; width: 12px; height: 12px; flex-shrink: 0; border-radius: var(--radius-pill, 999px); }
+.methodAmounts { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); }
+.methodAmount { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }
+.methodCount { color: var(--text-secondary); font-size: var(--text-xs); }
+.barRow { display: flex; align-items: center; gap: var(--space-2); }
+.barCurrency { width: 2.5rem; color: var(--text-secondary); font-size: var(--text-xs); }
+.barTrack { height: 8px; flex: 1; overflow: hidden; border-radius: var(--radius-pill, 999px); background: var(--surface-muted); }
+.barFill { height: 100%; border-radius: inherit; }
+
+.leaderboard { display: flex; flex-direction: column; gap: var(--space-2); }
+.leaderGroup { display: flex; flex-direction: column; gap: var(--space-2); }
+.leaderCurrency { margin: 0; color: var(--text-secondary); font-size: var(--text-xs); font-weight: 500; }
+.leaderList { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.leaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+}
+.leaderRow:hover { background: var(--surface-muted); }
+.leaderUser { display: flex; min-width: 0; align-items: center; gap: var(--space-3); }
+.leaderEmail { overflow: hidden; color: var(--text-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.rank {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+.rank[data-rank='1'] { background: color-mix(in oklab, var(--warning) 18%, transparent); color: var(--warning); }
+.rank[data-rank='2'] { background: color-mix(in oklab, var(--text-muted) 22%, transparent); color: var(--foreground); }
+.rank[data-rank='3'] { background: color-mix(in oklab, var(--chart-cat-8) 18%, transparent); color: var(--chart-cat-8); }
+
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 640px) {
+  .detailGrid, .balanceGrid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+}

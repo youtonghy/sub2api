@@ -1,0 +1,183 @@
+/* 系统设置页共用样式：区域（带边框的分组）、设置行、字段与原生控件，只用 Arc token */
+
+/* 区域：一个带边框的分组，标题 h2 + 说明，主体内的行之间用 --border-subtle 分隔 */
+.region {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+.regionHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-4) var(--space-5);
+}
+.regionHeading { display: flex; min-width: 0; flex: 1 1 16rem; flex-direction: column; gap: var(--space-1); }
+.regionTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; line-height: var(--leading-body); }
+.regionDescription { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.regionActions { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.regionBody { display: flex; min-width: 0; flex-direction: column; }
+.regionBody > * { padding: var(--space-4) var(--space-5); }
+.regionBody > * + * { border-top: 1px solid var(--border-subtle); }
+.regionBody > .flush { padding: 0; }
+
+/* 区域之间 24px */
+.stack { display: flex; min-width: 0; flex-direction: column; gap: var(--space-6); }
+
+/* 设置行：标签与说明在左，控件在右；打开后的细节在下方 */
+.row { display: flex; min-width: 0; flex-direction: column; gap: var(--space-3); }
+.rowHead { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.rowText { display: flex; min-width: 0; flex: 1 1 auto; flex-direction: column; gap: var(--space-1); }
+.rowLabel { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
+.rowDescription { margin: 0; color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); }
+.rowControl { display: flex; flex: 0 0 auto; align-items: center; gap: var(--space-2); }
+.rowBody { display: flex; min-width: 0; flex-direction: column; gap: var(--space-4); padding-left: var(--space-4); border-left: 2px solid var(--border-subtle); }
+
+/* 纵向字段 */
+.field { display: flex; min-width: 0; flex-direction: column; gap: var(--space-2); }
+.label { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
+.labelRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.hint { margin: 0; color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); }
+.muted { color: var(--text-muted); }
+.error { margin: 0; color: var(--danger); font-size: var(--text-xs); line-height: var(--leading-body); }
+.success { margin: 0; color: var(--success); font-size: var(--text-xs); line-height: var(--leading-body); }
+.warningText { margin: 0; color: var(--warning); font-size: var(--text-xs); line-height: var(--leading-body); }
+
+/* 网格 */
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); }
+.full { grid-column: 1 / -1; }
+@media (max-width: 48rem) {
+  .grid3, .grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 40rem) {
+  .grid2, .grid3, .grid4 { grid-template-columns: minmax(0, 1fr); }
+}
+.inline { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.inlineEnd { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+.column { display: flex; min-width: 0; flex-direction: column; gap: var(--space-3); }
+.columnTight { display: flex; min-width: 0; flex-direction: column; gap: var(--space-2); }
+.grow { min-width: 0; flex: 1 1 auto; }
+
+/* 原生控件（与 Arc input 视觉一致的轻量版本，用于行内、数字与表格场景） */
+.input, .select, .textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  padding: var(--space-2) var(--space-3);
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+.input::placeholder, .textarea::placeholder { color: var(--text-muted); }
+.textarea { resize: vertical; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--text-xs); }
+.input:focus-visible, .select:focus-visible, .textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.input:disabled, .select:disabled, .textarea:disabled { opacity: .6; cursor: not-allowed; }
+.input[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--danger); }
+.inputNarrow { width: 8rem; flex: 0 0 auto; }
+.inputMedium { width: 14rem; max-width: 100%; flex: 0 0 auto; }
+.inputWithSuffix { position: relative; display: flex; align-items: center; }
+.inputWithSuffix > .input { padding-right: var(--space-10); }
+.inputSuffix { position: absolute; right: var(--space-3); color: var(--text-muted); font-size: var(--text-xs); pointer-events: none; }
+.inputSuffixButton { position: absolute; right: var(--space-1); display: inline-grid; place-items: center; width: 2rem; height: 2rem; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-secondary); cursor: pointer; }
+@media (hover: hover) and (pointer: fine) { .inputSuffixButton:hover { color: var(--foreground); background: var(--surface-muted); } }
+
+/* 互斥选择的紧凑按钮（服务商、站点等） */
+.choiceGroup { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+.choice[aria-pressed="true"], .choice[aria-checked="true"], .choice[data-active="true"] { border-color: var(--accent); background: var(--accent-subtle); }
+.choice:disabled { opacity: .5; cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) { .choice:not(:disabled):hover { border-color: var(--border-strong); } }
+
+/* 标签片 */
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  padding: 2px var(--space-2);
+}
+.chipButton { cursor: pointer; font: inherit; font-size: var(--text-xs); }
+@media (hover: hover) and (pointer: fine) { .chipButton:hover { border-color: var(--border-strong); } }
+.chipRemove { display: inline-grid; place-items: center; border: 0; background: transparent; color: var(--text-secondary); cursor: pointer; padding: 0; }
+.tagInput {
+  display: flex;
+  min-height: 2.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  padding: var(--space-1) var(--space-2);
+}
+.tagInput:focus-within { border-color: var(--accent); }
+.tagInputField { min-width: 8rem; flex: 1 1 8rem; border: 0; background: transparent; color: var(--foreground); font: inherit; font-size: var(--text-sm); padding: var(--space-1); outline: none; }
+
+/* 提示块 */
+.notice { display: flex; flex-direction: column; gap: var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-muted); color: var(--foreground); font-size: var(--text-sm); line-height: var(--leading-body); padding: var(--space-3) var(--space-4); }
+.notice p { margin: 0; }
+.notice[data-tone="info"] { border-color: color-mix(in oklab, var(--accent) 35%, var(--border)); background: var(--accent-subtle); }
+.notice[data-tone="success"] { border-color: color-mix(in oklab, var(--success) 40%, var(--border)); background: color-mix(in oklab, var(--success) 8%, var(--surface)); }
+.notice[data-tone="warning"] { border-color: color-mix(in oklab, var(--warning) 45%, var(--border)); background: color-mix(in oklab, var(--warning) 9%, var(--surface)); }
+.notice[data-tone="danger"] { border-color: color-mix(in oklab, var(--danger) 40%, var(--border)); background: color-mix(in oklab, var(--danger) 7%, var(--surface)); }
+
+/* 列表项（可重复的条目，例如菜单项、规则、文档） */
+.item { display: flex; min-width: 0; flex-direction: column; gap: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); padding: var(--space-3) var(--space-4); }
+.itemHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.itemTitle { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }
+.empty { margin: 0; border: 1px dashed var(--border); border-radius: var(--radius-control); color: var(--text-secondary); font-size: var(--text-sm); padding: var(--space-3) var(--space-4); }
+
+/* 表格 */
+.tableWrap { min-width: 0; overflow-x: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-control); }
+.table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.table th { color: var(--text-secondary); font-size: var(--text-xs); font-weight: 500; text-align: left; background: var(--surface-muted); padding: var(--space-2) var(--space-3); }
+.table td { border-top: 1px solid var(--border-subtle); color: var(--foreground); padding: var(--space-2) var(--space-3); vertical-align: middle; }
+
+/* 链接与代码 */
+.link { color: var(--accent); text-decoration: none; }
+@media (hover: hover) and (pointer: fine) { .link:hover { text-decoration: underline; } }
+.code { border-radius: var(--radius-control); background: var(--surface-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--text-xs); padding: 1px var(--space-1); word-break: break-all; }
+.codeBlock { display: block; margin: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-control); background: var(--surface-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--text-xs); line-height: var(--leading-body); padding: var(--space-3); white-space: pre-wrap; word-break: break-all; }
+
+/* 图标按钮 */
+.iconButton { display: inline-grid; place-items: center; width: 2rem; height: 2rem; flex: 0 0 auto; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-secondary); cursor: pointer; }
+.iconButton:disabled { opacity: .4; cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) {
+  .iconButton:not(:disabled):hover { background: var(--surface-muted); color: var(--foreground); }
+  .iconButtonDanger:not(:disabled):hover { color: var(--danger); }
+}
+
+.checkboxLabel { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--foreground); font-size: var(--text-sm); cursor: pointer; }
+.checkboxLabel input { accent-color: var(--accent); }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

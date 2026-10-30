@@ -115,7 +115,7 @@ import OllamaCloudUsageSettings from './OllamaCloudUsageSettings'
 import OpenCodeGoProtocolRulesEditor from './OpenCodeGoProtocolRulesEditor'
 import QuotaLimitCard, { type QuotaLimitCardValues } from './QuotaLimitCard'
 import UpstreamRequestIdHeaderField from './UpstreamRequestIdHeaderField'
-import { useConfirmDialog } from './useConfirmDialog'
+import { useConfirmDialog } from '@/composables/useConfirmDialog'
 
 export interface EditAccountModalProps {
   show: boolean

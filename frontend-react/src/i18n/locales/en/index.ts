@@ -10,6 +10,7 @@ import shell from './shell'
 import authUi from './authUi'
 import chartsUi from './chartsUi'
 import opsUi from './opsUi'
+import settingsUi from './settingsUi'
 
 export default {
   adminAccessKeys,
@@ -24,4 +25,5 @@ export default {
   ...authUi,
   ...chartsUi,
   ...opsUi,
+  ...settingsUi,
 }

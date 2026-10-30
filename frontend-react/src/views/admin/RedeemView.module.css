@@ -1,0 +1,258 @@
+/* ===== 工具栏 ===== */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.search {
+  min-width: 0;
+  flex: 1;
+}
+
+.filter {
+  width: 9rem;
+}
+
+.toolbarActions {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+@media (min-width: 640px) {
+  .search {
+    max-width: 16rem;
+  }
+}
+
+.spinning {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== 表格区域 ===== */
+.region {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.dataTable {
+  flex: 1;
+}
+
+/* 选择栏：参照 Arc Pro selection-toolbar，吸顶在表格上方 */
+.selectionBar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  min-height: 46px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  padding: 5px 6px 5px 14px;
+  background: color-mix(in oklab, var(--accent) 5%, var(--surface));
+}
+
+.selectionCount {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.selectionActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.selectionLink {
+  border: 0;
+  padding: 0 var(--space-2);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* ===== 单元格 ===== */
+.codeCell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.code {
+  color: var(--foreground);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--text-sm);
+}
+
+.copyButton {
+  display: inline-flex;
+  border: 0;
+  border-radius: calc(var(--radius-control) - 2px);
+  padding: 2px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+.copyButton[data-copied] {
+  color: var(--success);
+}
+
+.value {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.valueGroup {
+  margin-left: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 400;
+}
+
+.secondary {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.secondary[data-expired] {
+  color: var(--danger);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.actionButton {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+
+/* ===== 分页与批量删除 ===== */
+.footer {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.footerActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ===== 对话框表单 ===== */
+.form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.field {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.label {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.customExpiry {
+  margin-top: var(--space-1);
+}
+
+.batchField {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.result {
+  display: grid;
+}
+
+.resultCodes {
+  width: 100%;
+  resize: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: var(--space-3);
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  outline: none;
+}
+
+.copiedIcon {
+  color: var(--success);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .copyButton:not([data-copied]):hover {
+    color: var(--foreground);
+  }
+
+  .selectionLink:hover {
+    text-decoration: underline;
+  }
+
+  .actionButton:hover {
+    background: var(--surface-muted);
+    color: var(--foreground);
+  }
+
+  .actionButton[data-tone='danger']:hover {
+    background: color-mix(in oklab, var(--danger) 9%, var(--surface));
+    color: var(--danger);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation: none;
+  }
+
+  .copyButton,
+  .actionButton {
+    transition: none;
+  }
+}

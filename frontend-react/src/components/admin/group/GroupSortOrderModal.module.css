@@ -1,0 +1,29 @@
+.stack { display: flex; flex-direction: column; gap: var(--space-4); }
+.hint { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); }
+.scroller { max-height: 60vh; overflow-y: auto; padding-right: var(--space-1); }
+.list { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-3);
+  background: var(--surface);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+.item[data-dragging] { z-index: 1; border-color: var(--accent); cursor: grabbing; opacity: .85; }
+.grip { width: 18px; height: 18px; flex: none; color: var(--text-muted); }
+.itemText { display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+.itemName { overflow: hidden; max-width: 100%; color: var(--foreground); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.itemId { color: var(--text-muted); font-size: var(--text-sm); }
+
+@media (hover: hover) and (pointer: fine) {
+  .item:hover { border-color: var(--border-strong); }
+}
+@media (prefers-reduced-motion: reduce) { .item { transition: none; } }

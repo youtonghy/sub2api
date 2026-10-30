@@ -1,0 +1,11 @@
+.root { position: relative; display: flex; min-width: 0; flex-direction: column; gap: var(--space-2); }
+.selected { display: inline-flex; max-width: 100%; align-items: center; gap: var(--space-2); border-radius: var(--radius-control); background: var(--surface-muted); color: var(--foreground); font-size: var(--text-xs); padding: var(--space-1) var(--space-2); }
+.selectedLabel { max-width: 16rem; overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.searchBox { position: relative; display: flex; align-items: center; }
+.searchIcon { position: absolute; left: var(--space-3); color: var(--text-muted); pointer-events: none; }
+.searchInput.searchInput { padding-left: 2rem; }
+.dropdown { position: absolute; top: 100%; z-index: 50; width: 100%; max-height: 15rem; overflow: auto; margin-top: var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-raised); box-shadow: var(--shadow-floating); }
+.dropdownMessage { color: var(--text-secondary); font-size: var(--text-sm); padding: var(--space-3) var(--space-4); }
+.option { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: var(--space-3); border: 0; background: transparent; color: var(--foreground); font: inherit; font-size: var(--text-sm); text-align: left; padding: var(--space-2) var(--space-4); cursor: pointer; }
+@media (hover: hover) and (pointer: fine) { .option:hover { background: var(--surface-muted); } }
+.optionLabel { min-width: 0; overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }

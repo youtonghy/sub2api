@@ -1,0 +1,32 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.cell {
+  display: grid;
+  min-width: 0;
+  border-radius: var(--radius-surface);
+}
+
+.breakdown {
+  display: grid;
+  min-width: 12rem;
+  gap: var(--space-1);
+}
+
+.breakdownTitle {
+  font-weight: 500;
+}
+
+.breakdownRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.breakdownValue {
+  font-variant-numeric: tabular-nums;
+}

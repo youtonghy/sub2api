@@ -1,0 +1,102 @@
+/* 邀请返利记录与线下提现登记 */
+
+/* 工具栏：搜索、日期与操作在同一行 */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.search { width: 100%; max-width: 20rem; }
+.dateField { width: 100%; max-width: 11rem; }
+.pushEnd { margin-left: auto; }
+@media (max-width: 640px) { .search, .dateField { max-width: none; } }
+
+/* 单元格 */
+.text { color: var(--text-secondary); font-size: var(--text-sm); }
+.dash { color: var(--text-muted); font-size: var(--text-sm); }
+.mono { color: var(--text-secondary); font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: var(--text-sm); }
+.monoStrong { color: var(--foreground); font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: var(--text-sm); }
+.amount { color: var(--foreground); font-size: var(--text-sm); }
+.amountStrong { color: var(--success); font-size: var(--text-sm); font-weight: 500; }
+.userCell { display: flex; flex-direction: column; gap: 2px; }
+.userLink {
+  max-width: 14rem;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.userLink:hover { text-decoration: underline; }
+.userEmail { max-width: 14rem; overflow: hidden; color: var(--text-secondary); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
+.userName { max-width: 14rem; overflow: hidden; color: var(--text-muted); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
+
+/* 用户概览 */
+.overview { display: flex; flex-direction: column; gap: var(--space-4); }
+.overviewUser { padding: var(--space-4); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); background: var(--surface-muted); }
+.overviewEmail { margin-top: var(--space-1); color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.stat { padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); }
+.statLabel { color: var(--text-secondary); font-size: var(--text-sm); }
+.statValue { margin-top: var(--space-1); color: var(--foreground); font-size: var(--text-base); font-weight: 500; }
+.statValueMono { margin-top: var(--space-1); color: var(--foreground); font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: var(--text-base); font-weight: 500; }
+@media (max-width: 640px) { .stats { grid-template-columns: minmax(0, 1fr); } }
+
+/* 提现登记表单 */
+.form { display: flex; flex-direction: column; gap: var(--space-4); }
+.field { display: flex; flex-direction: column; gap: var(--space-2); }
+.label { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }
+.hint { margin: 0; color: var(--text-secondary); font-size: var(--text-xs); }
+.error { margin: 0; color: var(--danger); font-size: var(--text-xs); }
+.muted { color: var(--text-secondary); font-size: var(--text-xs); }
+.secondary { color: var(--text-secondary); }
+.strong { color: var(--foreground); font-weight: 500; }
+.selectedUser {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in oklab, var(--accent) 35%, var(--border));
+  border-radius: var(--radius-control);
+  background: var(--accent-subtle);
+}
+.selectedUserText { display: flex; min-width: 0; align-items: baseline; gap: var(--space-2); overflow: hidden; font-size: var(--text-sm); white-space: nowrap; }
+.selectedEmail { overflow: hidden; color: var(--foreground); font-weight: 500; text-overflow: ellipsis; }
+.clearUser {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  border-radius: calc(var(--radius-control) / 2);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.clearUser:hover:not(:disabled) { color: var(--danger); }
+.clearUser:disabled { cursor: not-allowed; opacity: 0.5; }
+.userResults { display: flex; max-height: 10rem; flex-direction: column; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-control); }
+.userOption {
+  padding: 6px var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.userOption:hover { background: var(--surface-muted); }
+.quotaBox { padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); background: var(--surface-muted); }
+.quotaRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); font-size: var(--text-sm); }
+.amountRow { display: flex; align-items: flex-start; gap: var(--space-2); }
+.amountRow > :first-child { min-width: 0; flex: 1; }
+
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+}

@@ -1,0 +1,14 @@
+/* 月度归档设置 */
+.root { display: flex; min-width: 0; flex-direction: column; gap: var(--space-3); border-top: 1px solid var(--border-subtle); padding-top: var(--space-4); }
+.head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.head h4 { margin: 0; }
+.picker { position: relative; }
+.trigger.trigger { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); text-align: left; cursor: pointer; }
+.popover { position: absolute; top: 100%; left: 0; z-index: 30; width: 100%; margin-top: var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface-raised); box-shadow: var(--shadow-floating); padding: var(--space-2); }
+.popoverHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); color: var(--text-secondary); font-size: var(--text-xs); padding: 0 var(--space-1) var(--space-1); }
+.done { min-height: 2.25rem; border: 0; background: transparent; color: var(--accent); font: inherit; font-size: var(--text-xs); padding: 0 var(--space-2); cursor: pointer; }
+.days { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-1); }
+.day { display: flex; min-height: 2.5rem; align-items: center; gap: var(--space-2); border-radius: var(--radius-control); color: var(--foreground); font-size: var(--text-xs); padding: 0 var(--space-1); cursor: pointer; }
+.day input { accent-color: var(--accent); }
+@media (hover: hover) and (pointer: fine) { .day:hover { background: var(--surface-muted); } }
+.suffix { flex: 0 0 auto; color: var(--foreground); font-size: var(--text-sm); }

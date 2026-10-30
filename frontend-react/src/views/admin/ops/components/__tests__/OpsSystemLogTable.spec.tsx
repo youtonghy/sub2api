@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import OpsSystemLogTable from '../OpsSystemLogTable'
 import type { LogRetentionSelectProps } from '../LogRetentionSelect'
 import enLocale from '@/i18n/locales/en'
@@ -80,7 +80,6 @@ async function mountTable() {
 describe('OpsSystemLogTable host support', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     mocks.listSystemLogs.mockResolvedValue({
       items: [
         {
@@ -115,6 +114,11 @@ describe('OpsSystemLogTable host support', () => {
     expect(mocks.listSystemLogs).toHaveBeenLastCalledWith(expect.objectContaining({ host: 'api-node-2' }))
 
     fireEvent.click(screen.getByRole('button', { name: 'admin.ops.systemLogs.cleanCurrentFilters' }))
+    // Vue 版用原生 window.confirm()；React 版改用应用内 ConfirmDialog，确认后才清理
+    const dialog = await screen.findByRole('dialog', { name: 'common.confirm' })
+    expect(dialog.textContent).toContain('admin.ops.systemLogs.cleanupConfirm')
+    expect(mocks.cleanupSystemLogs).not.toHaveBeenCalled()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'common.confirm' }))
     await act(async () => {})
 
     expect(mocks.cleanupSystemLogs).toHaveBeenCalledWith(expect.objectContaining({ host: 'api-node-2' }))

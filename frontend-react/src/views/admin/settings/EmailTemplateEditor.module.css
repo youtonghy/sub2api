@@ -1,0 +1,9 @@
+/* 邮件模板编辑器 */
+.editorGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6); }
+@media (max-width: 80rem) { .editorGrid { grid-template-columns: minmax(0, 1fr); } }
+.htmlInput.htmlInput { min-height: 28rem; }
+.placeholders { display: flex; flex-direction: column; gap: var(--space-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); background: var(--surface-muted); padding: var(--space-4); }
+.preview { overflow: hidden; border: 1px solid var(--border-subtle); border-radius: var(--radius-control); }
+.previewHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); border-bottom: 1px solid var(--border-subtle); padding: var(--space-3) var(--space-4); }
+.previewBody { background: var(--surface-muted); padding: var(--space-3); }
+.previewFrame { display: block; width: 100%; height: 36rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-control); color-scheme: light; background: Canvas; }

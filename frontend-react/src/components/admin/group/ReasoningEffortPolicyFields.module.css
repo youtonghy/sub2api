@@ -1,0 +1,55 @@
+.root { display: flex; flex-direction: column; gap: var(--space-4); }
+.field { display: flex; min-width: 0; flex-direction: column; gap: var(--space-2); }
+.label { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
+.hint { margin: 0; color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); }
+.error { margin: 0; color: var(--danger); font-size: var(--text-xs); line-height: var(--leading-body); }
+
+.mappings { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
+.mappingsHeader { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.mappingsHeading { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); }
+
+.groups { display: flex; flex-direction: column; gap: var(--space-2); }
+.group { display: flex; flex-direction: column; gap: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); padding: var(--space-3); }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) 1.25rem minmax(0, 1fr) 2.75rem; align-items: start; gap: var(--space-3); }
+.spacer { display: block; }
+.arrow { display: flex; height: var(--control-height-md); align-items: center; justify-content: center; align-self: end; color: var(--text-muted); }
+
+.removeButton {
+  display: inline-grid;
+  width: 2.75rem;
+  height: var(--control-height-md);
+  place-items: center;
+  align-self: end;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.addButton, .addPairButton {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: var(--space-2);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+.addPairButton { align-self: flex-start; padding: 0; }
+
+@media (hover: hover) and (pointer: fine) {
+  .removeButton:hover { background: color-mix(in oklab, var(--danger) 9%, var(--surface)); color: var(--danger); }
+  .addButton:hover { background: var(--accent-subtle); }
+}
+
+@media (max-width: 48rem) {
+  .row { grid-template-columns: minmax(0, 1fr); }
+  .spacer, .arrow { display: none; }
+}

@@ -1,0 +1,4 @@
+.grokRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(16rem, auto); align-items: end; gap: var(--space-5); }
+@media (max-width: 48rem) { .grokRow { grid-template-columns: minmax(0, 1fr); } }
+.cacheRow { display: grid; grid-template-columns: minmax(0, 1fr) 10rem; align-items: center; gap: var(--space-3); }
+.ttlSelect { min-width: 0; }

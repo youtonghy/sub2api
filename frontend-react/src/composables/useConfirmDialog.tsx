@@ -16,7 +16,7 @@ export interface ConfirmOptions {
 }
 
 /**
- * 以 ConfirmDialog 替代原生 window.confirm()：`await confirm(message)` 返回 true（继续）或 false（取消）。
+ * 以 ConfirmDialog 替代浏览器原生确认框（window 的 confirm 方法）：`await confirm(message)` 返回 true（继续）或 false（取消）。
  * 返回的 confirmDialog 需要渲染到组件树中。
  */
 export function useConfirmDialog(): {

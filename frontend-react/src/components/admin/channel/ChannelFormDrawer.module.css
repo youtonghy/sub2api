@@ -1,0 +1,130 @@
+.tabs { position: sticky; top: calc(var(--space-6) * -1); z-index: 1; background: var(--surface-raised, var(--surface)); }
+.tabLabel { display: inline-flex; align-items: center; gap: var(--space-1); }
+
+.form { display: flex; flex-direction: column; }
+.panel { display: flex; flex-direction: column; gap: var(--space-6); }
+.panel[hidden] { display: none; }
+
+/* 可选择的小标签（平台、分组、账号） */
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+
+.platformChip,
+.groupChip {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+
+.platformChip { padding: var(--space-1) var(--space-3); font-size: var(--text-sm); }
+.groupChip { padding: var(--space-1) var(--space-2); color: var(--foreground); font-size: var(--text-xs); }
+.groupChip:disabled { cursor: not-allowed; opacity: .4; }
+
+@media (hover: hover) and (pointer: fine) {
+  .platformChip:hover,
+  .groupChip:hover:not(:disabled) { background: var(--surface-muted); }
+}
+
+.chipSelected { border-color: color-mix(in oklab, var(--accent) 55%, var(--border)); background: var(--accent-subtle); }
+@media (hover: hover) and (pointer: fine) { .chipSelected:hover:not(:disabled) { background: var(--accent-subtle); } }
+
+.chipName { font-weight: 500; }
+.rate { border-radius: 999px; padding: 0 var(--space-1); font-size: 10px; }
+.chipMeta { color: var(--text-muted); font-size: 10px; }
+
+.chipRemove {
+  display: inline-flex;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) { .chipRemove:hover { color: var(--danger); } }
+
+.groupBox {
+  max-height: 10rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: var(--space-2);
+  background: var(--surface-muted);
+}
+.groupBoxHint { margin: 0; padding: var(--space-2) 0; color: var(--text-secondary); font-size: var(--text-xs); text-align: center; }
+
+.dangerHint { color: var(--danger); }
+.warningHint { color: var(--warning); }
+
+.mappingRow { display: flex; align-items: center; gap: var(--space-2); }
+.mappingRow > input { min-width: 0; flex: 1; }
+.arrow { color: var(--text-muted); font-size: var(--text-xs); }
+
+.headerActions { display: flex; align-items: center; gap: var(--space-3); }
+
+/* 账号统计定价规则：同一层级的分组块，用分隔线而非嵌套卡片 */
+.rule {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border-left: 2px solid var(--border-subtle);
+  padding-left: var(--space-4);
+}
+.rule + .rule { margin-top: var(--space-2); }
+
+.ruleName {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-1) 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  outline: none;
+}
+.ruleName::placeholder { color: var(--text-muted); }
+.ruleName:focus-visible { border-bottom-color: var(--foreground); }
+
+.accountSearch { position: relative; }
+.accountDropdown {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  left: 0;
+  max-height: 12rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised, var(--surface));
+  box-shadow: var(--shadow-popover, 0 8px 24px color-mix(in oklab, var(--foreground) 12%, transparent));
+}
+.accountOption {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--space-2);
+  border: 0;
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.accountOption:disabled { cursor: default; opacity: .5; }
+@media (hover: hover) and (pointer: fine) { .accountOption:hover:not(:disabled) { background: var(--surface-muted); } }
+.accountId { color: var(--text-muted); font-size: var(--text-xs); }
+
+@media (prefers-reduced-motion: reduce) {
+  .platformChip, .groupChip { transition-duration: .01ms; }
+}

@@ -1,0 +1,129 @@
+/* 用户列表单元格（用量、平台用量、平台配额、并发）共用样式 */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-sm);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.label {
+  color: var(--text-secondary);
+}
+
+.value {
+  color: var(--foreground);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.mutedXs {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.infoIcon {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.trigger {
+  cursor: default;
+  border-radius: calc(var(--radius-control) / 2);
+}
+
+/* ===== 平台用量明细（tooltip 内容） ===== */
+.breakdown {
+  display: flex;
+  min-width: 220px;
+  flex-direction: column;
+  gap: 2px;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+}
+
+.breakdownHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid color-mix(in oklab, currentColor 18%, transparent);
+  opacity: 0.8;
+}
+
+.breakdownRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.breakdownOther {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.mono {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-variant-numeric: tabular-nums;
+}
+
+.separator {
+  opacity: 0.5;
+}
+
+/* ===== 平台配额 ===== */
+.quotaList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-xs);
+}
+
+.quotaRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.quotaPlatform {
+  width: 5rem;
+  flex: none;
+  color: var(--text-secondary);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+.quotaWindow {
+  color: var(--text-secondary);
+}
+
+.quotaValue {
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== 并发 ===== */
+.concurrency {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-variant-numeric: tabular-nums;
+}
+
+.concurrencySlash {
+  opacity: 0.6;
+}

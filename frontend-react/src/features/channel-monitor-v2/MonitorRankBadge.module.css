@@ -1,0 +1,10 @@
+.badge { display: inline-flex; align-items: center; gap: var(--space-1); font-variant-numeric: tabular-nums; }
+.trophy { flex: none; }
+.label { color: var(--text-secondary); font-size: var(--text-xs); font-weight: 500; }
+
+/* 前三名文字跟随奖牌色调（金 = 警示色、银 = 次要文字、铜 = 警示色加深） */
+.badge[data-medal='1'] .label { color: var(--warning); }
+.badge[data-medal='2'] .label { color: var(--text-secondary); }
+.badge[data-medal='3'] .label { color: color-mix(in oklab, var(--warning) 70%, var(--foreground)); }
+
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

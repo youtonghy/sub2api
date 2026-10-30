@@ -1,0 +1,38 @@
+/* 系统设置页外壳与各 Tab 共用的少量样式 */
+.page { display: flex; width: 100%; max-width: 72rem; flex-direction: column; gap: var(--space-6); margin: 0 auto; }
+.form { display: flex; min-width: 0; flex-direction: column; gap: var(--space-6); }
+.tabs { display: flex; min-width: 0; flex-direction: column; gap: var(--space-6); }
+.tabBar { position: sticky; top: var(--space-2); z-index: 20; border-radius: var(--radius-panel); background: var(--background); }
+.tabLabel { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+/* 与 Vue 版 v-show 一致：所有面板保持挂载，未激活的隐藏 */
+.panel[data-state="inactive"] { display: none; }
+.panel { display: flex; min-width: 0; flex-direction: column; gap: var(--space-6); }
+
+.saveBar {
+  position: sticky;
+  bottom: var(--space-3);
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-raised);
+  padding: var(--space-3) var(--space-4);
+}
+.saveStatus { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-secondary); font-size: var(--text-sm); }
+.saveStatus[data-dirty] { color: var(--warning); }
+
+/* 已有全权 Admin API Key 的折叠区 */
+.details { border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.summary { cursor: pointer; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; padding: var(--space-4) var(--space-5); }
+.detailsHeader { display: flex; flex-direction: column; gap: var(--space-1); border-top: 1px solid var(--border-subtle); padding: var(--space-4) var(--space-5); }
+.detailsTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 500; }
+.detailsBody { display: flex; flex-direction: column; gap: var(--space-4); border-top: 1px solid var(--border-subtle); padding: var(--space-4) var(--space-5); }
+
+/* 规则摘要（目标模型 → 动作） */
+.summaryLine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); color: var(--text-secondary); font-size: var(--text-xs); }
+.summaryStrong { color: var(--foreground); font-weight: 500; }

@@ -82,6 +82,7 @@ import PlatformTypeBadge from '@/components/common/PlatformTypeBadge'
 import type { SelectOption } from '@/components/common/Select'
 import TablePageLayout from '@/components/common/TablePageLayout'
 import type { Column } from '@/components/common/types'
+import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import { usePriorityDrag } from '@/composables/usePriorityDrag'
 import { isStepUpBlocked, isStepUpCancelled, stepUpBlockReason, useStepUp } from '@/composables/useStepUp'
 import { useSwipeSelect, type SwipeSelectVirtualContext } from '@/composables/useSwipeSelect'
@@ -654,6 +655,7 @@ const currentTime = () => Date.now()
 
 export default function AccountsView() {
   const { t } = useI18n()
+  const { confirm, confirmDialog } = useConfirmDialog()
   const isSimpleMode = useAuthStore((s) => s.isSimpleMode)
 
   const [proxies, setProxies] = useState<AccountProxy[]>([])
@@ -1708,7 +1710,7 @@ export default function AccountsView() {
 
   const handleBulkDelete = async () => {
     const accountIds = [...selIds]
-    if (!confirm(t('admin.accounts.bulkActions.confirmDelete', { count: accountIds.length }))) return
+    if (!(await confirm(t('admin.accounts.bulkActions.confirmDelete', { count: accountIds.length }), { danger: true }))) return
     try {
       const result = await adminAPI.accounts.batchDelete(accountIds)
       if (result.failed > 0) {
@@ -1731,7 +1733,7 @@ export default function AccountsView() {
   }
 
   const handleBulkResetStatus = async () => {
-    if (!confirm(t('common.confirm'))) return
+    if (!(await confirm(t('common.confirm'), { danger: true }))) return
     try {
       const result = await adminAPI.accounts.batchClearError(selIds)
       if (result.failed > 0) {
@@ -1748,7 +1750,7 @@ export default function AccountsView() {
   }
 
   const handleBulkRefreshToken = async () => {
-    if (!confirm(t('common.confirm'))) return
+    if (!(await confirm(t('common.confirm')))) return
     const accountIds = [...selIds]
     try {
       const result = await adminAPI.accounts.batchRefresh(accountIds)
@@ -3120,6 +3122,7 @@ export default function AccountsView() {
       <TLSFingerprintProfilesModal show={showTLSFingerprintProfiles} onClose={() => setShowTLSFingerprintProfiles(false)} />
       <AccountSortOrderModal show={showSortOrderModal} onClose={() => setShowSortOrderModal(false)} onSaved={reloadQuietly} />
       <TotpStepUpDialog controller={accountExportStepUp} />
+      {confirmDialog}
     </>
   )
 }

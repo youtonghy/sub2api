@@ -1,0 +1,46 @@
+.stack { display: flex; flex-direction: column; gap: var(--space-4); }
+.rows { display: flex; flex-direction: column; gap: var(--space-2); }
+.headerRow { display: flex; align-items: center; gap: var(--space-2); }
+.headerName { width: 13rem; flex: none; }
+.headerValue { min-width: 0; flex: 1; }
+
+.remove {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) { .remove:hover { background: var(--surface-muted); color: var(--danger); } }
+
+.addRow {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-control);
+  padding: var(--space-1) var(--space-2);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) { .addRow:hover { border-color: var(--accent); color: var(--accent); } }
+
+.format { margin-left: auto; border: 0; padding: 0; background: none; color: var(--accent); font: inherit; font-size: var(--text-xs); cursor: pointer; }
+.format:disabled { color: var(--text-muted); cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) { .format:hover:not(:disabled) { text-decoration: underline; } }
+
+.body { min-height: 12rem; padding: var(--space-2) var(--space-3); overflow-x: auto; overflow-wrap: normal; resize: vertical; white-space: pre; }
+
+@media (max-width: 40rem) {
+  .headerName { width: 40%; }
+}

@@ -1,0 +1,98 @@
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-3);
+  background: var(--surface-muted);
+}
+
+.header { display: flex; align-items: center; gap: var(--space-2); }
+
+.toggle {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-2);
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.chevron { flex: none; color: var(--text-muted); }
+
+.summary { display: flex; min-width: 0; flex: 1; align-items: center; gap: var(--space-2); overflow: hidden; }
+.summaryTags { display: flex; min-width: 0; flex: 1; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.summaryTag {
+  display: inline-flex;
+  flex: none;
+  border-radius: var(--radius-control);
+  padding: 2px var(--space-2);
+  font-size: var(--text-xs);
+}
+.more { color: var(--text-muted); font-size: var(--text-xs); white-space: nowrap; }
+.noModels { color: var(--text-muted); font-size: var(--text-xs); }
+
+.modeBadge {
+  flex: none;
+  border-radius: 999px;
+  padding: 2px var(--space-2);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.expandedLabel { flex: 1; color: var(--text-secondary); font-size: var(--text-xs); font-weight: 500; }
+
+/* 折叠动画：grid 行高从 1fr 过渡到 0fr，内容保留在 DOM 中 */
+.collapsible {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--duration-standard, .25s) var(--ease-standard, ease);
+}
+.collapsible[data-collapsed] { grid-template-rows: 0fr; }
+.collapsibleInner { min-height: 0; overflow: hidden; }
+
+.topRow { display: flex; align-items: flex-start; gap: var(--space-2); margin-top: var(--space-3); }
+.models { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: var(--space-1); }
+.billingMode { display: flex; width: 10rem; flex: none; flex-direction: column; gap: var(--space-1); }
+
+.modeBody { display: flex; flex-direction: column; gap: var(--space-1); margin-top: var(--space-3); }
+.block { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
+
+.priceGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: var(--space-2); }
+.multiplierGrid { display: grid; max-width: 28rem; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); margin-top: var(--space-3); }
+.singlePrice { width: 12rem; }
+
+.reasoning {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-3);
+}
+.reasoningGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-1); }
+
+@media (min-width: 40rem) {
+  .multiplierGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .reasoningGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (min-width: 64rem) {
+  .reasoningGrid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+}
+
+@media (max-width: 40rem) {
+  .topRow { flex-direction: column; }
+  .billingMode { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .collapsible { transition-duration: .01ms; }
+}

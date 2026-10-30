@@ -1,0 +1,30 @@
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  padding: var(--space-2);
+  background: var(--surface);
+}
+
+/* 所有价格为空：整行用危险色提示 */
+.row[data-empty] {
+  border-color: color-mix(in oklab, var(--danger) 55%, var(--border));
+  background: color-mix(in oklab, var(--danger) 5%, var(--surface));
+}
+
+.tokenGrid {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: var(--space-2);
+}
+
+.tierRow { display: flex; min-width: 0; flex: 1; flex-wrap: wrap; gap: var(--space-2); }
+.tierLabel { width: 6rem; }
+.tierRange { width: 5rem; }
+.tierPrice { min-width: 6rem; flex: 1; }
+
+.remove { margin-top: var(--space-4); }

@@ -1,0 +1,382 @@
+.root {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.flat {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.ipToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ipPending {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.scroll {
+  overflow: auto;
+}
+
+.cellText {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+}
+
+.cellMuted {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.inlineRow {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.userButton {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: underline dashed;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.userId {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.stack {
+  display: grid;
+  gap: 2px;
+  font-size: var(--text-xs);
+}
+
+.primary {
+  color: var(--foreground);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.secondary {
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.arrow {
+  margin-right: 2px;
+}
+
+.audit {
+  padding-left: var(--space-3);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.auditVariant {
+  color: var(--warning);
+}
+
+.auditMismatch {
+  color: color-mix(in oklab, var(--warning) 50%, var(--danger));
+}
+
+.endpoint {
+  display: grid;
+  max-width: 320px;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+.endpointRow {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.endpointLabel {
+  margin-right: var(--space-1);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.tokens {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tokenLines {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.tokenLine {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tokenItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--foreground);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.iconIn {
+  color: var(--success);
+}
+
+.iconOut,
+.iconCacheRead {
+  color: var(--accent);
+}
+
+.iconCacheWrite {
+  color: var(--warning);
+}
+
+.iconImage {
+  color: var(--text-secondary);
+}
+
+.imageCount {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.infoTrigger {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  cursor: help;
+}
+
+.infoTrigger:focus-visible {
+  outline: none;
+  color: var(--foreground);
+}
+
+.cost {
+  display: grid;
+  gap: 2px;
+  font-size: var(--text-sm);
+}
+
+.costMain {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.costValue {
+  color: var(--success);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.accountCost {
+  color: var(--warning);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 合并首字/总耗时的健康度列：左侧色条上端随首字档、下端随总耗时档 */
+.latency {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.latencyBar {
+  width: 4px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: linear-gradient(to bottom, var(--bar-from) 40%, var(--bar-to) 60%);
+}
+
+.latencyGrid {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  align-items: baseline;
+  gap: 2px var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.latencyLabel {
+  color: var(--text-muted);
+}
+
+.latencyValue {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.sev-good {
+  color: var(--success);
+}
+
+.sev-warn {
+  color: var(--warning);
+}
+
+.sev-slow {
+  color: color-mix(in oklab, var(--warning) 50%, var(--danger));
+}
+
+.sev-critical {
+  color: var(--danger);
+}
+
+.tps {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.time {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.idCell {
+  display: flex;
+  max-width: 160px;
+  align-items: center;
+  gap: 6px;
+}
+
+.idText {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copyButton {
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.copied {
+  color: var(--success);
+}
+
+.userAgent {
+  display: block;
+  max-width: 320px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ip {
+  color: var(--text-secondary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-sm);
+}
+
+/* 悬停明细浮层（Portal 到 body，固定定位在触发点右侧） */
+.tooltip {
+  position: fixed;
+  z-index: 9999;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.tooltipBody {
+  padding: var(--space-3);
+  border: 1px solid color-mix(in oklab, var(--background) 14%, var(--foreground));
+  border-radius: var(--radius-control);
+  background: var(--foreground);
+  box-shadow: var(--shadow-raised);
+  color: var(--background);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.tooltipSection {
+  display: grid;
+  gap: 6px;
+}
+
+.tooltipDivided {
+  margin-bottom: var(--space-2);
+  padding-bottom: 6px;
+  border-bottom: 1px solid color-mix(in oklab, var(--background) 20%, var(--foreground));
+}
+
+.tooltipTitle {
+  margin-bottom: var(--space-1);
+  font-weight: 500;
+}
+
+.tooltipRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.tooltipTotal {
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in oklab, var(--background) 20%, var(--foreground));
+}
+
+.tooltipLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: color-mix(in oklab, var(--background) 65%, var(--foreground));
+}
+
+.tooltipValue {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .copyButton:hover,
+  .infoTrigger:hover {
+    color: var(--foreground);
+  }
+}

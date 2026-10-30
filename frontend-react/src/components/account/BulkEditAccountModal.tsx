@@ -48,7 +48,7 @@ import {
 import GrokBaseUrlPresets from './GrokBaseUrlPresets'
 import HeaderOverrideEditor from './HeaderOverrideEditor'
 import ModelWhitelistSelector from './ModelWhitelistSelector'
-import { useConfirmDialog } from './useConfirmDialog'
+import { useConfirmDialog } from '@/composables/useConfirmDialog'
 
 export interface BulkEditTarget {
   mode: 'selected' | 'filtered'

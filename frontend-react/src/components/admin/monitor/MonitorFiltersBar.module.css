@@ -1,0 +1,10 @@
+.toolbar { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.filters { display: flex; min-width: 0; flex: 1; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.search { width: 100%; }
+.provider { width: 11rem; }
+.enabled { width: 10rem; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-3); }
+
+@media (min-width: 40rem) {
+  .search { width: 16rem; }
+}

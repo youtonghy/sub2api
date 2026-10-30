@@ -1,0 +1,8 @@
+/* 订单表格单元格：主文本、次要说明与赠送金额 */
+.text { color: var(--foreground); font-size: var(--text-sm); }
+.mono { font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--text-sm); }
+.strong { color: var(--foreground); font-weight: 500; }
+.aside { margin-left: var(--space-1); color: var(--text-muted); font-size: var(--text-xs); }
+.sub { color: var(--text-secondary); font-size: var(--text-xs); }
+.bonus { margin-left: var(--space-1); color: var(--warning); }
+.muted { color: var(--text-secondary); font-size: var(--text-xs); }

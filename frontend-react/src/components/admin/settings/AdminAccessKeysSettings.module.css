@@ -1,0 +1,23 @@
+/* 管理员受限密钥：抽屉表单与权限网格 */
+.drawer.drawer { --drawer-size: min(44rem, calc(100vw - var(--space-4))); }
+.drawerInner { display: flex; flex-direction: column; min-height: 100%; }
+.drawerBody { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--space-4); }
+.drawerFooter {
+  position: sticky;
+  bottom: calc(var(--space-6) * -1);
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin: var(--space-6) calc(var(--space-6) * -1) calc(var(--space-6) * -1);
+  border-top: 1px solid var(--border);
+  padding: var(--space-4) var(--space-6);
+  background: var(--surface-raised);
+}
+.fieldset { display: flex; min-width: 0; flex-direction: column; gap: var(--space-3); margin: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-control); padding: var(--space-3) var(--space-4); }
+.legend { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; padding: 0 var(--space-1); }
+.multiSelect { min-height: 6rem; }
+.permissionGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+@media (max-width: 40rem) { .permissionGrid { grid-template-columns: minmax(0, 1fr); } }
+.itemName { margin: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }

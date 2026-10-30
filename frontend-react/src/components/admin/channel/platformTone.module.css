@@ -1,0 +1,30 @@
+/* 平台色调：替代 Vue 版 getPlatformTagClass / getPlatformTextClass 的 Tailwind 色板，只用 --chart-cat-* 与语义 token */
+.tone { --platform-tone: var(--text-secondary); }
+.tone[data-platform='anthropic'] { --platform-tone: var(--chart-cat-8); }
+.tone[data-platform='openai'] { --platform-tone: var(--chart-cat-2); }
+.tone[data-platform='gemini'] { --platform-tone: var(--chart-cat-1); }
+.tone[data-platform='antigravity'] { --platform-tone: var(--chart-cat-5); }
+.tone[data-platform='kimi'] { --platform-tone: var(--chart-cat-6); }
+.tone[data-platform='zhipu'] { --platform-tone: var(--chart-cat-9); }
+.tone[data-platform='deepseek'] { --platform-tone: var(--chart-cat-7); }
+.tone[data-platform='minimax'] { --platform-tone: var(--chart-cat-4); }
+.tone[data-platform='opencode_go'] { --platform-tone: var(--chart-cat-3); }
+.tone[data-platform='typesafe'] { --platform-tone: var(--chart-cat-11); }
+.tone[data-platform='cline'] { --platform-tone: var(--chart-cat-12); }
+.tone[data-platform='composite'] { --platform-tone: var(--chart-cat-10); }
+
+/* 标签：浅底 + 深色文字 */
+.tone.tag {
+  background: color-mix(in oklab, var(--platform-tone) 12%, var(--surface));
+  color: color-mix(in oklab, var(--platform-tone) 72%, var(--foreground));
+}
+
+/* 仅文字色（输入框、名称）；未知平台沿用默认前景色 */
+.tone.text { color: color-mix(in oklab, var(--platform-tone) 72%, var(--foreground)); }
+.tone.text[data-platform=''] { color: inherit; }
+
+/* 选中态的边框与底色（平台选择、分组选择） */
+.tone.selected {
+  border-color: color-mix(in oklab, var(--platform-tone) 55%, var(--border));
+  background: color-mix(in oklab, var(--platform-tone) 8%, var(--surface));
+}

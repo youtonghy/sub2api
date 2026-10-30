@@ -1,0 +1,92 @@
+/* 渠道监控管理端共用样式（行操作、选择卡片、表单块），只用 Arc token */
+
+.rowActions { display: flex; align-items: center; gap: var(--space-1); }
+.rowAction {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: var(--space-1) var(--space-2);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+.rowAction:disabled { cursor: not-allowed; opacity: .5; }
+@media (hover: hover) and (pointer: fine) {
+  .rowAction:hover:not(:disabled) { background: var(--surface-muted); color: var(--accent); }
+  .rowActionDanger:hover:not(:disabled) { color: var(--danger); }
+}
+
+.spinning { animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 选择卡片（检测模式、API 模式、请求体模式） */
+.choiceGrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+@media (min-width: 40rem) {
+  .choiceGrid[data-cols='2'] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .choiceGrid[data-cols='3'] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.choiceGrid[data-cols='3fixed'] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.choice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+.choice:disabled { cursor: not-allowed; opacity: .5; }
+.choice[aria-pressed='true'] { border-color: var(--accent); background: var(--accent-subtle); color: var(--foreground); }
+@media (hover: hover) and (pointer: fine) { .choice:hover:not(:disabled):not([aria-pressed='true']) { border-color: var(--foreground); } }
+.choiceTitle { font-size: var(--text-sm); font-weight: 500; }
+.choiceHint { font-size: var(--text-xs); }
+
+/* 服务商选择：两列起，宽屏四列 */
+.providerGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+@media (min-width: 40rem) { .providerGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.provider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+@media (hover: hover) and (pointer: fine) { .provider:hover:not([aria-pressed='true']) { border-color: var(--foreground); } }
+
+/* 嵌入块（OpenAI API 模式） */
+.inset { display: flex; flex-direction: column; gap: var(--space-2); border-left: 2px solid var(--border-subtle); padding-left: var(--space-4); }
+
+.inline { display: flex; align-items: center; gap: var(--space-2); }
+.inline > :first-child { min-width: 0; flex: 1; }
+
+.warningHint { margin: 0; color: var(--warning); font-size: var(--text-xs); }
+.mutedHint { margin: 0; color: var(--text-muted); font-size: var(--text-xs); }
+.dangerHint { margin: 0; color: var(--danger); font-size: var(--text-xs); }
+
+.mono { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: var(--text-xs); }
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning { animation-duration: 2.4s; }
+  .rowAction, .choice, .provider { transition-duration: .01ms; }
+}
