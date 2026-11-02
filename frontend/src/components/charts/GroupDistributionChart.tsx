@@ -9,14 +9,13 @@ import type { GroupStat } from '@/types'
 import {
   distributionColor,
   formatCost,
-  formatMetricValue,
   formatNumber,
   formatTokens,
   sortByMetric,
   toFiniteNumber,
   type DistributionMetric
 } from './chartUtils'
-import DistributionDonut from './DistributionDonut'
+import DistributionSplitBar from './DistributionSplitBar'
 import UserBreakdownSubTable from './UserBreakdownSubTable'
 import { useUserBreakdown } from './useUserBreakdown'
 import styles from './charts.module.css'
@@ -100,11 +99,11 @@ export default function GroupDistributionChart({
       {loading ? (
         <Skeleton lines={5} label={t('common.loading')} />
       ) : displayGroupStats.length > 0 ? (
-        <div className={styles.distribution}>
-          <DistributionDonut
+        <div className={styles.distributionStacked}>
+          <DistributionSplitBar
             data={chartData}
             label={t('admin.dashboard.groupDistribution')}
-            formatValue={(value) => formatMetricValue(value, metric)}
+            metric={metric}
             activeKey={hoveredKey}
             onActiveChange={setHoveredKey}
           />

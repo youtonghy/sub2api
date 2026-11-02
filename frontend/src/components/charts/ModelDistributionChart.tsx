@@ -6,6 +6,7 @@ import { Alert } from '@/components/arc/alert/alert'
 import { Skeleton } from '@/components/arc/skeleton/skeleton'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 import { useI18n } from '@/i18n/useI18n'
+import type { SunburstNode } from '@/components/arc/sunburst/sunburst'
 import type { ModelStat, UserSpendingRankingItem } from '@/types'
 import {
   OTHER_COLOR,
@@ -19,7 +20,7 @@ import {
   toFiniteNumber,
   type DistributionMetric
 } from './chartUtils'
-import DistributionDonut from './DistributionDonut'
+import DistributionSunburst from './DistributionSunburst'
 import UserBreakdownSubTable from './UserBreakdownSubTable'
 import { useUserBreakdown } from './useUserBreakdown'
 import styles from './charts.module.css'
@@ -105,15 +106,25 @@ export default function ModelDistributionChart({
     return sortByMetric(sourceStats, metric)
   }, [source, upstreamModelStats, mappingModelStats, modelStats, metric])
 
-  const chartData = useMemo(
+  // Token 指标时每个模型多一圈，按输入 / 输出 / 缓存写入 / 缓存读取拆分；费用指标只有一圈
+  const chartData = useMemo<SunburstNode[]>(
     () =>
-      displayModelStats.map((m, index) => ({
-        key: `model-${m.model}`,
-        label: m.model,
-        value: toFiniteNumber(metric === 'actual_cost' ? m.actual_cost : m.total_tokens),
-        color: distributionColor(index, displayModelStats.length)
-      })),
-    [displayModelStats, metric]
+      displayModelStats.map((m, index) => {
+        const id = `model-${m.model}`
+        const color = distributionColor(index, displayModelStats.length)
+        if (metric === 'actual_cost') return { id, label: m.model, value: toFiniteNumber(m.actual_cost), color }
+        const parts = [
+          { id: `${id}/input`, label: t('chartsUi.tokenTypes.input'), value: toFiniteNumber(m.input_tokens) },
+          { id: `${id}/output`, label: t('chartsUi.tokenTypes.output'), value: toFiniteNumber(m.output_tokens) },
+          { id: `${id}/cache-write`, label: t('chartsUi.tokenTypes.cacheWrite'), value: toFiniteNumber(m.cache_creation_tokens) },
+          { id: `${id}/cache-read`, label: t('chartsUi.tokenTypes.cacheRead'), value: toFiniteNumber(m.cache_read_tokens) }
+        ].filter((part) => part.value > 0)
+        const total = toFiniteNumber(m.total_tokens)
+        // 拆分之和与总量一致时才画第二圈，保证扇区大小与明细表的 Token 数相同
+        const consistent = parts.length > 0 && Math.abs(parts.reduce((sum, part) => sum + part.value, 0) - total) < 1
+        return consistent ? { id, label: m.model, color, children: parts } : { id, label: m.model, value: total, color }
+      }),
+    [displayModelStats, metric, t]
   )
 
   const otherRankingItem = useMemo<RankingDisplayItem | null>(() => {
@@ -153,10 +164,10 @@ export default function ModelDistributionChart({
     return getRankingUserLabel(item)
   }
 
-  const rankingChartData = useMemo(
+  const rankingChartData = useMemo<SunburstNode[]>(
     () =>
       rankingDisplayItems.map((item, index) => ({
-        key: rankingKeyOf(item, index),
+        id: rankingKeyOf(item, index),
         label: item.isOther ? t('admin.dashboard.spendingRankingOther') : `#${index + 1} ${getRankingUserLabel(item)}`,
         value: toFiniteNumber(item.actual_cost),
         color: item.isOther ? OTHER_COLOR : distributionColor(index, rankingItems.length)
@@ -198,12 +209,12 @@ export default function ModelDistributionChart({
     if (!displayModelStats.length) return <p className={styles.message}>{t('admin.dashboard.noDataAvailable')}</p>
     return (
       <div className={styles.distribution}>
-        <DistributionDonut
-          data={chartData}
+        <DistributionSunburst
+          items={chartData}
           label={t('admin.dashboard.modelDistribution')}
           formatValue={(value) => formatMetricValue(value, metric)}
           activeKey={hoveredKey}
-          onActiveChange={setHoveredKey}
+          onActiveChange={(key) => setHoveredKey(key?.split('/')[0] ?? null)}
         />
         <div className={styles.tableScroll}>
           <table className={styles.table}>
@@ -280,8 +291,8 @@ export default function ModelDistributionChart({
     if (!rankingDisplayItems.length) return <p className={styles.message}>{t('admin.dashboard.noDataAvailable')}</p>
     return (
       <div className={styles.distribution}>
-        <DistributionDonut
-          data={rankingChartData}
+        <DistributionSunburst
+          items={rankingChartData}
           label={t('admin.dashboard.spendingRankingTitle')}
           formatValue={(value) => `$${formatCost(value)}`}
           activeKey={hoveredKey}

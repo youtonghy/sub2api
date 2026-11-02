@@ -42,9 +42,20 @@ vi.mock('@/i18n', async (importOriginal) => ({
   t: translate
 }))
 
-// 对应 Vue spec 中对 vue-chartjs Doughnut 的桩：把传给环形图的数据输出为 JSON
-vi.mock('@/components/arc/donut-chart/donut-chart', () => ({
-  DonutChart: ({ data }: { data: unknown }) => <div data-testid="chart-data">{JSON.stringify(data)}</div>
+// 对应 Vue spec 中对 vue-chartjs Doughnut 的桩：把旭日图第一圈输出为 JSON（与环形图数据同形），第二圈单独输出
+interface Node { id: string; label: string; value?: number; color?: string; children?: Node[] }
+const nodeValue = (node: Node): number => node.children?.length ? node.children.reduce((sum, child) => sum + nodeValue(child), 0) : node.value ?? 0
+vi.mock('@/components/arc/sunburst/sunburst', () => ({
+  Sunburst: ({ data }: { data: Node }) => (
+    <>
+      <div data-testid="chart-data">
+        {JSON.stringify((data.children ?? []).map((node) => ({ key: node.id, label: node.label, value: nodeValue(node), color: node.color })))}
+      </div>
+      <div data-testid="chart-parts">
+        {JSON.stringify(Object.fromEntries((data.children ?? []).map((node) => [node.id, (node.children ?? []).map((child) => [child.label, child.value])])))}
+      </div>
+    </>
+  )
 }))
 
 interface Datum {
@@ -96,6 +107,30 @@ describe('ModelDistributionChart', () => {
 
     const label = formatShareLabel('model-a', 1000, data.map((item) => item.value), 'tokens')
     expect(label).toBe('model-a: 1.00K (66.7%)')
+  })
+
+  it('splits each model into token types when they add up to total_tokens', () => {
+    const consistent = [
+      { ...modelStats[0], input_tokens: 600, output_tokens: 300, cache_creation_tokens: 0, cache_read_tokens: 100, total_tokens: 1000 }
+    ]
+    render(<ModelDistributionChart modelStats={consistent} />)
+
+    expect(chartData().map((item) => item.value)).toEqual([1000])
+    const parts = JSON.parse(screen.getByTestId('chart-parts').textContent || '{}')
+    expect(parts['model-model-a']).toEqual([
+      ['chartsUi.tokenTypes.input', 600],
+      ['chartsUi.tokenTypes.output', 300],
+      ['chartsUi.tokenTypes.cacheRead', 100]
+    ])
+  })
+
+  it('keeps one ring for actual cost and for token parts that do not add up', () => {
+    const { unmount } = render(<ModelDistributionChart modelStats={modelStats} />)
+    expect(JSON.parse(screen.getByTestId('chart-parts').textContent || '{}')['model-model-a']).toEqual([])
+    unmount()
+
+    render(<ModelDistributionChart modelStats={modelStats} metric="actual_cost" />)
+    expect(Object.values(JSON.parse(screen.getByTestId('chart-parts').textContent || '{}'))).toEqual([[], []])
   })
 
   it('uses actual_cost and reorders rows in actual cost mode', () => {

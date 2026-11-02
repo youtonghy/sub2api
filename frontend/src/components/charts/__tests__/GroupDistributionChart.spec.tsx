@@ -26,8 +26,13 @@ vi.mock('@/i18n/useI18n', () => ({
 }))
 
 // 对应 Vue spec 中对 vue-chartjs Doughnut 的桩：把传给环形图的数据输出为 JSON
-vi.mock('@/components/arc/donut-chart/donut-chart', () => ({
-  DonutChart: ({ data }: { data: unknown }) => <div data-testid="chart-data">{JSON.stringify(data)}</div>
+// 把传给分段条的分段输出为 JSON（与原环形图数据同形）
+vi.mock('@/components/arc/split-bar/split-bar', () => ({
+  SplitBar: ({ segments }: { segments: { id: string; label: string; value: number; color?: string }[] }) => (
+    <div data-testid="chart-data">
+      {JSON.stringify(segments.map((segment) => ({ key: segment.id, label: segment.label, value: segment.value, color: segment.color })))}
+    </div>
+  )
 }))
 
 interface Datum {

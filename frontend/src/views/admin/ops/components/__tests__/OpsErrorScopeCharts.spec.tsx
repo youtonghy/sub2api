@@ -4,13 +4,13 @@ import { cleanup, render, screen } from '@testing-library/react'
 import OpsErrorDistributionChart from '../OpsErrorDistributionChart'
 import OpsErrorTrendChart from '../OpsErrorTrendChart'
 
-const charts = vi.hoisted(() => ({ donutProps: [] as any[], lineProps: [] as any[] }))
+const charts = vi.hoisted(() => ({ splitProps: [] as any[], lineProps: [] as any[] }))
 
 // Arc 图表桩：记录传入的 props，便于断言数据口径（对应 Vue 版对 vue-chartjs 的桩）
-vi.mock('@/components/arc/donut-chart/donut-chart', () => ({
-  DonutChart: (props: any) => {
-    charts.donutProps.push(props)
-    return <div className="doughnut-stub" data-testid="donut-chart-stub" />
+vi.mock('@/components/arc/split-bar/split-bar', () => ({
+  SplitBar: (props: any) => {
+    charts.splitProps.push(props)
+    return <div className="split-bar-stub" data-testid="split-bar-stub" />
   }
 }))
 vi.mock('@/components/arc/line-chart/line-chart', () => ({
@@ -34,7 +34,7 @@ vi.mock('@/components/common/HelpTooltip', () => ({
 
 afterEach(() => {
   cleanup()
-  charts.donutProps.length = 0
+  charts.splitProps.length = 0
   charts.lineProps.length = 0
 })
 
@@ -53,10 +53,10 @@ describe('Ops SLA-scoped error charts', () => {
       />
     )
 
-    expect(screen.getByTestId('donut-chart-stub')).toBeInTheDocument()
-    const props = charts.donutProps[charts.donutProps.length - 1]
-    expect(props.data).toHaveLength(1)
-    expect(props.data[0]).toMatchObject({ label: 'admin.ops.client', value: 2 })
+    expect(screen.getByTestId('split-bar-stub')).toBeInTheDocument()
+    const props = charts.splitProps[charts.splitProps.length - 1]
+    expect(props.segments).toHaveLength(1)
+    expect(props.segments[0]).toMatchObject({ label: 'admin.ops.client', value: 2 })
   })
 
   it('错误分布图在只有业务限制错误时显示为空态', () => {
@@ -70,7 +70,7 @@ describe('Ops SLA-scoped error charts', () => {
       />
     )
 
-    expect(screen.queryByTestId('donut-chart-stub')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('split-bar-stub')).not.toBeInTheDocument()
     expect(screen.getByTestId('ops-chart-empty')).toBeInTheDocument()
   })
 

@@ -14,6 +14,10 @@ See https://uiarc.dev/license.
 
   frontend/src/components/arc/blocks/sidebar-rail/   (adapted from the Arc Pro sidebar-rail block)
   frontend/src/layouts/AuthLayout.module.css         (frame styles derived from the Arc Pro login-split block)
+  frontend/src/components/arc/blocks/horizon-chart/  (Arc Pro horizon-chart block, with translatable labels)
+  frontend/src/components/arc/realtime-stream/       (Arc Pro realtime-stream, with translatable labels)
+  frontend/src/components/arc/split-bar/             (Arc Pro split-bar, with translatable labels and an external highlight)
+  frontend/src/components/arc/sunburst/              (Arc Pro sunburst, with translatable labels, node colors and an external highlight)
 
 Free Arc components under frontend/src/components/arc/ are distributed
 under their own license from https://uiarc.dev.

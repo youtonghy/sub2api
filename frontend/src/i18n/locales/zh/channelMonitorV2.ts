@@ -30,7 +30,8 @@ export default {
     groupBy: {
       label: '展示维度', platform: '平台', platformGroup: '平台 / 分组', platformModel: '平台 / 模型', platformGroupModel: '平台 / 分组 / 模型'
     },
-    trendView: { label: '趋势视图', pulse: '色块矩阵', line: '折线图' },
+    trendView: { label: '趋势视图', pulse: '色块矩阵', line: '折线图', horizon: '地平线' },
+    horizon: { title: '成功率波动', description: '每行是一种渠道组合，按统计区间显示成功率相对该行平均值的偏离；高于平均为强调色，低于平均为橙色，颜色越深偏离越大', baseline: '该行平均成功率' },
     healthMode: { label: '健康显示', overall: '综合', success: '错误率', ttft: '首 Token', cache: '缓存率' },
     tabs: { aria: '明细维度', models: '模型', errors: '错误原因', users: '用户排行' },
     metrics: {

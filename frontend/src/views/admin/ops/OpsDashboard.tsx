@@ -26,6 +26,7 @@ import { useI18n } from '@/i18n/useI18n'
 import { useAdminSettingsStore, useAppStore } from '@/stores'
 import OpsDashboardHeader from './components/OpsDashboardHeader'
 import OpsDashboardSkeleton from './components/OpsDashboardSkeleton'
+import OpsLiveTrafficStream from './components/OpsLiveTrafficStream'
 import OpsProviderRealtimeMonitor from './components/OpsProviderRealtimeMonitor'
 import OpsAccountTTFTCard from './components/OpsAccountTTFTCard'
 import OpsConcurrencyCard from './components/OpsConcurrencyCard'
@@ -848,6 +849,8 @@ export default function OpsDashboard() {
       {showPanels && <OpsProviderRealtimeMonitor platformFilter={platform} groupIdFilter={groupId} />}
 
       {showPanels && <OpsAccountTTFTCard platformFilter={platform} groupIdFilter={groupId} />}
+
+      {showPanels && <OpsLiveTrafficStream platformFilter={platform} groupIdFilter={groupId} />}
 
       {/* Row: Concurrency + Throughput */}
       {showPanels && (

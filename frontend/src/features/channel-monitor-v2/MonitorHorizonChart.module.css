@@ -1,0 +1,11 @@
+/* 与色块矩阵、折线图同宽，不限制 1180px 最大宽度 */
+.horizon.horizon {
+  width: 100%;
+}
+
+.empty {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-6);
+  background: var(--surface);
+}

@@ -3,15 +3,14 @@ import { useMemo } from 'react'
 
 import type { OpsErrorDistributionResponse } from '@/api/admin/ops'
 import { Button } from '@/components/arc/button/button'
-import { DonutChart, type DonutChartDatum } from '@/components/arc/donut-chart/donut-chart'
+import { SplitBar, type SplitSegment } from '@/components/arc/split-bar/split-bar'
 import { Skeleton } from '@/components/arc/skeleton/skeleton'
+import { useSplitBarLabels } from '@/components/charts/useArcChartLabels'
 import HelpTooltip from '@/components/common/HelpTooltip'
 import { useI18n } from '@/i18n/useI18n'
 import type { ChartState } from '../types'
 import panel from './OpsPanel.module.css'
 import styles from './OpsErrorDistributionChart.module.css'
-
-const SHARE_TOKEN = '__share__'
 
 export interface OpsErrorDistributionChartProps {
   data: OpsErrorDistributionResponse | null
@@ -36,8 +35,7 @@ const CATEGORY_COLORS = {
 
 export default function OpsErrorDistributionChart({ data, loading, onOpenDetails }: OpsErrorDistributionChartProps) {
   const { t } = useI18n()
-  // 环形图中心读数的占比文案（与 components/charts/DistributionDonut 相同的做法）
-  const [sharePrefix = '', shareSuffix = ''] = t('chartsUi.shareOfTotal', { share: SHARE_TOKEN }).split(SHARE_TOKEN)
+  const splitLabels = useSplitBarLabels()
 
   const totalSlaErrors = (data?.items ?? []).reduce((total, item) => total + Number(item.sla || 0), 0)
   const hasData = totalSlaErrors > 0
@@ -72,9 +70,9 @@ export default function OpsErrorDistributionChart({ data, loading, onOpenDetails
 
   const topReason = categories.length === 0 ? null : categories.reduce((prev, cur) => (cur.count > prev.count ? cur : prev))
 
-  const chartData = useMemo<DonutChartDatum[] | null>(() => {
+  const chartData = useMemo<SplitSegment[] | null>(() => {
     if (!hasData || categories.length === 0) return null
-    return categories.map((c) => ({ key: c.key, label: c.label, value: c.count, color: c.color }))
+    return categories.map((c) => ({ id: c.key, label: c.label, value: c.count, color: c.color }))
   }, [categories, hasData])
 
   return (
@@ -99,35 +97,19 @@ export default function OpsErrorDistributionChart({ data, loading, onOpenDetails
 
       {state === 'ready' && chartData ? (
         <div className={styles.ready}>
-          <DonutChart
-            data={chartData}
-            label={t('admin.ops.errorDistribution')}
-            totalLabel={t('common.total')}
-            otherLabel={t('admin.ops.other')}
-            labels={{ sharePrefix, shareSuffix }}
-            emptyLabel={t('admin.ops.charts.emptyError')}
-            groupBelow={0}
-            size={168}
-            thickness={20}
-            legend={false}
-          />
-          <div className={styles.summary}>
-            {topReason && (
-              <div className={styles.top}>
-                {t('admin.ops.top')}: <span style={{ color: topReason.color }}>{topReason.label}</span>
-              </div>
-            )}
-            <div className={styles.legend}>
-              {categories.map((item) => (
-                <div key={item.key} className={styles.legendItem}>
-                  <span className={styles.swatch} style={{ backgroundColor: item.color }} aria-hidden="true" />
-                  <span>
-                    {item.label} {item.count}
-                  </span>
-                </div>
-              ))}
+          {topReason && (
+            <div className={styles.top}>
+              {t('admin.ops.top')}: <span style={{ color: topReason.color }}>{topReason.label}</span>
             </div>
-          </div>
+          )}
+          {/* 分段条自带图例（可点击隐藏某类错误），悬停分段在右上角读出错误数 */}
+          <SplitBar
+            className={styles.bar}
+            segments={chartData}
+            label={t('admin.ops.errorDistribution')}
+            totalLabel={splitLabels.total}
+            labels={splitLabels}
+          />
         </div>
       ) : state === 'loading' ? (
         <Skeleton label={t('common.loading')} lines={4} />

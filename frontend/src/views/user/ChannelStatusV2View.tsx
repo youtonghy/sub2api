@@ -30,6 +30,7 @@ import {
   FilterMultiSelect,
   MetricCell,
   MonitorRankBadge,
+  MonitorHorizonChart,
   MonitorTrendChart,
   RelayPulseMatrix,
   formatLatencyKpiSecondary,
@@ -53,7 +54,7 @@ import styles from './ChannelStatusV2View.module.css'
 
 type Tab = 'models' | 'errors' | 'users'
 type HealthMode = 'overall' | 'success' | 'ttft' | 'cache'
-type TrendView = 'pulse' | 'line'
+type TrendView = 'pulse' | 'line' | 'horizon'
 
 function csv(value: string | null) {
   return typeof value === 'string' ? value.split(',').filter(Boolean) : []
@@ -74,7 +75,7 @@ function parseHealthMode(value: unknown): HealthMode {
   return allowed.includes(value as HealthMode) ? (value as HealthMode) : 'overall'
 }
 function parseTrendView(value: unknown): TrendView {
-  return value === 'line' ? 'line' : 'pulse'
+  return value === 'line' || value === 'horizon' ? value : 'pulse'
 }
 function filterKey(filter: MonitorFilter) {
   return JSON.stringify([filter.range, filter.platforms, filter.groupIds, filter.models])
@@ -187,7 +188,8 @@ export default function ChannelStatusV2View() {
   ]
   const trendViewOptions = [
     { value: 'pulse', label: t('channelMonitorV2.trendView.pulse') },
-    { value: 'line', label: t('channelMonitorV2.trendView.line') }
+    { value: 'line', label: t('channelMonitorV2.trendView.line') },
+    { value: 'horizon', label: t('channelMonitorV2.trendView.horizon') }
   ]
 
   const hasDimensionFilter = filter.platforms.length + filter.groupIds.length + filter.models.length > 0
@@ -402,7 +404,7 @@ export default function ChannelStatusV2View() {
     if (filter.models.length) next.set('model', filter.models.join(','))
     next.set('group_by', matrixGroupBy)
     next.set('health_mode', healthMode)
-    if (trendView === 'line') next.set('trend_view', 'line')
+    if (trendView !== 'pulse') next.set('trend_view', trendView)
     next.set('tab', activeTab)
     setSearchParams(next, { replace: true })
   }, [queryKey, filter, matrixGroupBy, healthMode, trendView, activeTab, setSearchParams])
@@ -631,6 +633,8 @@ export default function ChannelStatusV2View() {
       <div className={styles.chartArea}>
         {trendView === 'line' ? (
           <MonitorTrendChart trend={snapshot?.trend || []} coverage={snapshot?.coverage || null} loading={loading && !snapshot} />
+        ) : matrix && trendView === 'horizon' ? (
+          <MonitorHorizonChart rows={matrixRows} coverage={matrix.coverage} />
         ) : matrix ? (
           <RelayPulseMatrix
             rows={matrixRows}

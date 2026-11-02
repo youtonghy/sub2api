@@ -10,6 +10,7 @@ export {
   type MonitorTrendChartProps,
   type MonitorTrendPoint
 } from './MonitorTrendChart'
+export { default as MonitorHorizonChart, type MonitorHorizonChartProps } from './MonitorHorizonChart'
 export { default as RelayPulseMatrix, type RelayPulseMatrixProps } from './RelayPulseMatrix'
 export {
   defaultMonitorThresholds,

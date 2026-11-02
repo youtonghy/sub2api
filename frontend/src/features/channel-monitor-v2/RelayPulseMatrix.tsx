@@ -35,7 +35,7 @@ import {
 } from './monitorFormat'
 import { applyWheelZoom, clientXRatio, isZoomed, resetZoom, sliceByZoom, type ZoomState } from './monitorZoom'
 import { bucketSpanLabel } from './bucketLabel'
-import { healthAttr } from './monitorViewModel'
+import { coverageBucketStarts, healthAttr, monitorRowKey, monitorRowLabel } from './monitorViewModel'
 import styles from './RelayPulseMatrix.module.css'
 
 export interface RelayPulseMatrixProps {
@@ -76,22 +76,18 @@ export default function RelayPulseMatrix({ rows, coverage, healthMode, showThrou
     setZoom(resetZoom())
   }
 
-  const allBucketStarts = useMemo(() => {
-    // X-axis always spans the UI-selected range [requested_start, requested_end).
-    // Partial backfill leaves empty cells until coverage_start/data_through fill in.
-    const step = Math.max(60, coverage.bucket_seconds) * 1000
-    const requestedStart = new Date(coverage.requested_start).getTime()
-    const requestedEndRaw = coverage.requested_end ? new Date(coverage.requested_end).getTime() : NaN
-    // Fallback for older payloads without requested_end.
-    const dataThrough = new Date(coverage.data_through).getTime()
-    const end = Number.isFinite(requestedEndRaw) && requestedEndRaw > requestedStart ? requestedEndRaw : dataThrough
-    if (![requestedStart, end].every(Number.isFinite) || requestedStart >= end) return []
-    const starts: string[] = []
-    for (let cursor = Math.floor(requestedStart / step) * step; cursor < end; cursor += step) {
-      starts.push(new Date(cursor).toISOString())
-    }
-    return starts
-  }, [coverage.bucket_seconds, coverage.requested_start, coverage.requested_end, coverage.data_through])
+  // X-axis always spans the UI-selected range [requested_start, requested_end).
+  // Partial backfill leaves empty cells until coverage_start/data_through fill in.
+  const allBucketStarts = useMemo(
+    () =>
+      coverageBucketStarts({
+        bucket_seconds: coverage.bucket_seconds,
+        requested_start: coverage.requested_start,
+        requested_end: coverage.requested_end,
+        data_through: coverage.data_through
+      }),
+    [coverage.bucket_seconds, coverage.requested_start, coverage.requested_end, coverage.data_through]
+  )
 
   /** Visible bucket window after X zoom (cursor-centered), not always the tail. */
   const bucketStarts = useMemo(() => sliceByZoom(allBucketStarts, zoom), [allBucketStarts, zoom])
@@ -164,14 +160,8 @@ export default function RelayPulseMatrix({ rows, coverage, healthMode, showThrou
 
   const cellHealth = (health: MonitorHealth, requestCount: number) => healthAttr(healthScoreClass(health, healthMode, requestCount))
 
-  const rowLabel = (row: MonitorMatrixRow) => {
-    const parts = [row.platform]
-    if (row.group_name || row.group_id) parts.push(row.group_name || `#${row.group_id}`)
-    if (row.model) parts.push(row.model === '__other__' ? t('channelMonitorV2.otherModels') : row.model)
-    return parts.join(' / ')
-  }
-
-  const rowKey = (row: MonitorMatrixRow) => [row.platform, row.group_id || 0, row.model || ''].join(':')
+  const rowLabel = (row: MonitorMatrixRow) => monitorRowLabel(row, t('channelMonitorV2.otherModels'))
+  const rowKey = monitorRowKey
 
   const successRate = (metrics: MonitorMetric) => {
     // Empty traffic: no request count and no throughput signal.

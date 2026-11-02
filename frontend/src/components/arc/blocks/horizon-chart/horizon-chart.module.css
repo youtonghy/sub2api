@@ -1,0 +1,114 @@
+.root {
+  --above: var(--series-1);
+  --below: var(--series-3);
+  --pad: 24px;
+  --name-width: 116px;
+  --value-width: 52px;
+  --column-gap: 16px;
+  --row-height: 36px;
+  --plot-height: 28px;
+  position: relative; box-sizing: border-box; width: min(100%, 1180px); min-width: 0; margin-inline: auto; overflow: hidden; container-type: inline-size;
+  border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); color: var(--foreground);
+  font-family: var(--font-body); font-size: var(--text-sm); letter-spacing: var(--tracking-body); line-height: var(--leading-body);
+}
+.root *, .root *::before, .root *::after { box-sizing: border-box; }
+.srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+.empty { margin: 0; padding: 24px var(--pad); color: var(--text-secondary); }
+
+/* Header */
+.header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px 24px; padding: 20px var(--pad) 0; }
+.heading { flex: 1 1 260px; min-width: 0; }
+.title { margin: 0; font-size: var(--text-base); font-weight: 500; line-height: var(--leading-body); }
+.description { margin: 2px 0 0; color: var(--text-muted); font-size: var(--text-xs); }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; min-width: 0; }
+.control { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.controlLabel { color: var(--text-muted); font-size: var(--text-xs); white-space: nowrap; }
+.segment { min-width: 0; }
+
+/* Readout: the crosshair's day on the left, the legend that explains the folding on the right. */
+.readout { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 32px; padding: 20px var(--pad) 16px; border-bottom: 1px solid var(--border-subtle); }
+.when { display: flex; flex-direction: column; gap: 0; min-width: 0; margin: 0; }
+.date { min-width: 12em; font-size: var(--text-lg); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.state { color: var(--text-muted); font-size: var(--text-xs); }
+
+.legend { display: grid; gap: 8px; width: 300px; max-width: 100%; }
+.scale { display: grid; gap: 4px; }
+/* Four swatches per side are always drawn; unused ones fold to zero width, so a band count change resizes the ramp smoothly.
+   The 2px gaps come from each swatch's inset fill, so a folded swatch leaves no gap behind. */
+.ramp { display: flex; align-items: stretch; height: 10px; }
+.swatchAbove, .swatchBelow {
+  position: relative; flex: var(--grow, 1) 1 0; min-width: 0;
+  transition: flex-grow var(--duration-considered) var(--ease-in-out), opacity var(--duration-considered) var(--ease-in-out);
+}
+.swatchAbove::before, .swatchBelow::before { content: ""; position: absolute; inset: 0 1px; border-radius: 2px; }
+.swatchAbove::before { background: var(--above); }
+.swatchBelow::before { background: var(--below); }
+.zero { flex: 0 0 1px; margin: -2px 3px; background: var(--foreground); opacity: .5; }
+.scaleLabels { display: grid; grid-template-columns: auto 1fr auto 1fr auto; align-items: baseline; color: var(--text-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.scaleSide { text-align: center; }
+.scaleZero { color: var(--text-secondary); }
+.scaleEnd:last-child { text-align: right; }
+/* Two lines are reserved, so the rows below stay put when the caption changes with the band count. */
+.caption { min-height: calc(2em * 1.4); margin: 0; color: var(--text-secondary); font-size: var(--text-xs); line-height: 1.4; text-wrap: pretty; }
+
+/* Chart: rows, then the crosshair overlay on the plot column, then the shared axis. */
+.chart { position: relative; min-width: 0; padding: 8px 0 16px; -webkit-tap-highlight-color: transparent; }
+.body { position: relative; }
+.rows { margin: 0; padding: 0; list-style: none; }
+.row {
+  display: grid; grid-template-columns: var(--name-width) minmax(0, 1fr) var(--value-width); column-gap: var(--column-gap); align-items: center;
+  height: var(--row-height); padding: 0 var(--pad); background: var(--surface); box-shadow: inset 0 -1px 0 var(--border-subtle);
+}
+.row:last-child { box-shadow: none; }
+.name { min-width: 0; overflow: hidden; color: var(--text-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.value { color: var(--foreground); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+
+/* A faint track shows the row's full extent, so a quiet row still reads as a row with no change. */
+.plot { position: relative; display: block; height: var(--plot-height); overflow: hidden; border-radius: 4px; background: var(--surface-muted); }
+.svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+
+/* The horizon: each layer is the same unit area, pushed down one band and stretched by the band count, then clipped to the row.
+   Stacked layers share one opacity, so every band that a value passes adds a step of intensity. */
+.above, .below {
+  transform-box: view-box; transform-origin: 0 0;
+  transform: translateY(calc(var(--layer) * 1px)) scaleY(var(--bands));
+  fill-opacity: var(--alpha);
+}
+.above { fill: var(--above); }
+.below { fill: var(--below); }
+
+/* Crosshair: a full-width track slides by a share of its own width, so the line moves on transform alone. */
+.overlay { position: absolute; top: 0; bottom: 0; left: calc(var(--pad) + var(--name-width) + var(--column-gap)); right: calc(var(--pad) + var(--value-width) + var(--column-gap)); }
+.crossLayer { position: absolute; inset: -6px 0; pointer-events: none; opacity: 0; transition: opacity var(--duration-fast) var(--ease-standard); }
+.crossLayer[data-on] { opacity: 1; }
+.crossTrack { position: absolute; inset: 0; display: block; will-change: transform; }
+.crossLine { position: absolute; top: 0; bottom: 0; left: -.5px; width: 1px; background: var(--foreground); opacity: .55; }
+.hit { position: absolute; inset: 0; cursor: crosshair; touch-action: pan-y; }
+
+.axis { display: grid; grid-template-columns: var(--name-width) minmax(0, 1fr) var(--value-width); column-gap: var(--column-gap); padding: 10px var(--pad) 0; }
+.axisTrack { position: relative; grid-column: 2; height: 16px; }
+.tick { position: absolute; top: 0; padding-left: 4px; border-left: 1px solid var(--border); color: var(--text-muted); font-size: var(--text-xs); line-height: 16px; white-space: nowrap; }
+
+@container (min-width: 900px) {
+  .header, .readout, .chart, .empty { --name-width: 132px; --value-width: 60px; --column-gap: 20px; }
+}
+
+/* Phones: controls take the full width, rows tighten and the name column narrows. Container queries style descendants, so the sizes live on the regions. */
+@container (max-width: 560px) {
+  .header, .readout, .chart, .empty { --pad: 16px; --name-width: 84px; --value-width: 44px; --column-gap: 10px; --row-height: 34px; --plot-height: 26px; }
+  .header { padding-top: 16px; }
+  .controls { width: 100%; justify-content: space-between; }
+  .readout { padding-top: 16px; padding-bottom: 14px; }
+  .date { min-width: 0; font-size: var(--text-base); }
+  .legend { width: 100%; }
+  .name, .value { font-size: var(--text-xs); }
+}
+
+@media (pointer: coarse) {
+  .controls button { min-height: var(--control-height-md); }
+  .hit { cursor: default; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crossLayer, .swatchAbove, .swatchBelow { transition: none; }
+}

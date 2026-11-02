@@ -30,7 +30,8 @@ export default {
     groupBy: {
       label: 'Group by', platform: 'Platform', platformGroup: 'Platform / Group', platformModel: 'Platform / Model', platformGroupModel: 'Platform / Group / Model'
     },
-    trendView: { label: 'Trend view', pulse: 'Pulse matrix', line: 'Line chart' },
+    trendView: { label: 'Trend view', pulse: 'Pulse matrix', line: 'Line chart', horizon: 'Horizon' },
+    horizon: { title: 'Success rate swings', description: 'Each row is one channel combination. Each bucket shows how far its success rate is from the row average: above in the accent color, below in orange, darker means further away', baseline: 'row average success rate' },
     healthMode: { label: 'Health display', overall: 'Overall', success: 'Error rate', ttft: 'First token', cache: 'Cache rate' },
     tabs: { aria: 'Detail dimension', models: 'Models', errors: 'Error reasons', users: 'User ranking' },
     metrics: {

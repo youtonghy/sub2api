@@ -49,6 +49,22 @@
   width: 176px;
 }
 
+.sunburst {
+  width: 232px;
+  max-width: 100%;
+}
+
+/* 分段条横跨整行，明细表在下方 */
+.distributionStacked {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.splitBar {
+  min-width: 0;
+}
+
 @container (max-width: 520px) {
   .distribution {
     grid-template-columns: minmax(0, 1fr);
