@@ -45,9 +45,59 @@ export interface FunnelChartProps {
   activeIndex?: number | null;
   onActiveChange?: (index: number | null) => void;
   emptyLabel?: string;
+  /** BCP 47 locale for the built-in number formats. */
+  locale?: string;
+  /** Text shown or announced by the chart, for translation. */
+  labels?: Partial<FunnelChartLabels>;
   ref?: Ref<HTMLElement>;
   className?: string;
 }
+
+export interface FunnelChartLabels {
+  /** Rate line under the first step heading. */
+  start: string;
+  /** Rate line under later step headings, such as "42% of start". */
+  ofStart: (share: string) => string;
+  /** Tooltip row name in the total view. */
+  total: string;
+  /** Tooltip footnote for later steps. */
+  keptFrom: (share: string, previousStep: string) => string;
+  /** Tooltip footnote for the first step. */
+  entryStep: (unit: string) => string;
+  /** Live announcement when a step gains focus. */
+  announce: (step: string, value: string, fromPrevious: string, fromFirst: string) => string;
+  /** Accessible hint on the chart, after its name. */
+  keyboardHint: string;
+  roleDescription: string;
+  /** View names in the screen reader summary. */
+  viewAll: string;
+  viewSplit: string;
+  /** Last sentence of the screen reader summary. */
+  reachLast: (share: string) => string;
+  /** Screen reader table headers. */
+  stepHeader: string;
+  shownTotalHeader: string;
+  keptHeader: string;
+  ofFirstHeader: string;
+}
+
+const DEFAULT_LABELS: FunnelChartLabels = {
+  start: "Start",
+  ofStart: share => `${share} of start`,
+  total: "Total",
+  keptFrom: (share, previousStep) => `${share} kept from ${previousStep.toLowerCase()}`,
+  entryStep: unit => `Entry step${unit ? `, ${unit}` : ""}`,
+  announce: (step, value, fromPrevious, fromFirst) => `${step}, ${value}, ${fromPrevious} of the previous step, ${fromFirst} of the first`,
+  keyboardHint: "Use arrow keys to move between steps.",
+  roleDescription: "funnel chart",
+  viewAll: "all",
+  viewSplit: "by segment",
+  reachLast: share => `${share} reach the last step.`,
+  stepHeader: "Step",
+  shownTotalHeader: "Shown total",
+  keptHeader: "Kept from previous",
+  ofFirstHeader: "Of first step",
+};
 
 type Dot = { s: number; u: number; drop: number; speed: number; fall: number; fallSpeed: number; age: number };
 type Geometry = { length: number; cross: number; vertical: boolean };
@@ -59,8 +109,6 @@ const follow = { stiffness: 480, damping: 42, restDelta: .01 };
 const PAD = 8, GAP = 2, STEP = 3;
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 const smooth = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
-const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
-const full = new Intl.NumberFormat("en-US");
 const percent = (value: number) => `${value >= 10 || value === 0 ? Math.round(value) : value.toFixed(1)}%`;
 
 const subscribeNothing = () => () => {};
@@ -94,7 +142,10 @@ function Rolling({ value, format, reduced }: { value: number; format: (value: nu
   return <motion.span>{text}</motion.span>;
 }
 
-export function FunnelChart({ stages, segments, label, unit = "", view = "total", flow = true, orientation = "auto", height = 200, formatValue, activeIndex, onActiveChange, emptyLabel = "No data", ref, className }: FunnelChartProps) {
+export function FunnelChart({ stages, segments, label, unit = "", view = "total", flow = true, orientation = "auto", height = 200, formatValue, activeIndex, onActiveChange, emptyLabel = "No data", locale = "en-US", labels: labelOverrides, ref, className }: FunnelChartProps) {
+  const text = { ...DEFAULT_LABELS, ...labelOverrides };
+  const compact = useMemo(() => new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }), [locale]);
+  const full = useMemo(() => new Intl.NumberFormat(locale), [locale]);
   const reduced = useReducedMotionSafe();
   const clipId = `${useId().replace(/:/g, "")}-focus`;
   const figure = useRef<HTMLElement>(null);
@@ -331,9 +382,9 @@ export function FunnelChart({ stages, segments, label, unit = "", view = "total"
   const rateFrom = (k: number) => k === 0 ? 100 : totals[k - 1] > 0 ? totals[k] / totals[k - 1] * 100 : 0;
   const overall = (k: number) => totals[0] > 0 ? totals[k] / totals[0] * 100 : 0;
   const stage = current !== null ? stages[current] : null;
-  const announce = stage && current !== null ? `${stage.label}, ${withUnit(totals[current])}, ${percent(rateFrom(current))} of the previous step, ${percent(overall(current))} of the first` : "";
-  const viewName = isolated ? parts.find(part => part.key === isolated)?.label : split ? "by segment" : "all";
-  const summary = empty ? `${label}. ${emptyLabel}.` : `${label}, ${viewName}. ${stages.map((item, k) => `${item.label} ${withUnit(totals[k])}`).join(", ")}. ${percent(overall(last))} reach the last step.`;
+  const announce = stage && current !== null ? text.announce(stage.label, withUnit(totals[current]), percent(rateFrom(current)), percent(overall(current))) : "";
+  const viewName = isolated ? parts.find(part => part.key === isolated)?.label : split ? text.viewSplit : text.viewAll;
+  const summary = empty ? `${label}. ${emptyLabel}.` : `${label}, ${viewName}. ${stages.map((item, k) => `${item.label} ${withUnit(totals[k])}`).join(", ")}. ${text.reachLast(percent(overall(last)))}`;
   const colorIndex = (key: string) => parts.findIndex(part => part.key === key);
   const along = vertical ? { y: reduced ? slide : slideSpring } : { x: reduced ? slide : slideSpring };
   const svgWidth = vertical ? plotCross : plotLength, svgHeight = vertical ? plotLength : plotCross;
@@ -341,7 +392,7 @@ export function FunnelChart({ stages, segments, label, unit = "", view = "total"
 
   return <figure ref={figure} className={[styles.figure, className].filter(Boolean).join(" ")} aria-label={label} data-vertical={vertical || undefined}>
     <div ref={area} className={styles.area} data-active={current !== null || undefined} data-view={isolated ? "one" : split ? "split" : "total"}
-      role="group" tabIndex={empty ? -1 : 0} aria-roledescription="funnel chart" aria-label={`${label}. Use arrow keys to move between steps.`}
+      role="group" tabIndex={empty ? -1 : 0} aria-roledescription={text.roleDescription} aria-label={`${label}. ${text.keyboardHint}`}
       onPointerMove={onPointerMove} onPointerDown={onPointerDown} onPointerUp={event => { if (event.pointerType !== "mouse") setActive(null); }} onPointerCancel={() => setActive(null)} onPointerLeave={event => { if (event.pointerType === "mouse") setActive(null); }}
       onKeyDown={onKeyDown} onBlur={() => setActive(null)} onFocus={event => { if (event.currentTarget.matches(":focus-visible") && !empty && current === null) setActive(0); }}
       style={vertical ? { height: plotLength } : undefined}>
@@ -350,7 +401,7 @@ export function FunnelChart({ stages, segments, label, unit = "", view = "total"
         {stages.map((item, k) => <div key={item.key} className={styles.stage} data-on={current === k || undefined}>
           <span className={styles.stageLabel}>{item.label}</span>
           <span className={styles.stageValue}><Rolling value={totals[k] ?? 0} format={format} reduced={reduced} /></span>
-          <span className={styles.stageRate}>{k === 0 ? "Start" : <Rolling value={overall(k)} format={value => `${percent(value)} of start`} reduced={reduced} />}</span>
+          <span className={styles.stageRate}>{k === 0 ? text.start : <Rolling value={overall(k)} format={value => text.ofStart(percent(value))} reduced={reduced} />}</span>
         </div>)}
       </div>}
       <div className={styles.plotRow}>
@@ -382,12 +433,12 @@ export function FunnelChart({ stages, segments, label, unit = "", view = "total"
       </div>
       <motion.div ref={tip} className={styles.tooltip} style={{ x: reduced ? tipX : tipSpringX, y: reduced ? tipY : tipSpringY }} aria-hidden="true">
         <p className={styles.tipTitle}>{stage?.label ?? ""}</p>
-        {(split ? parts : [{ key: "__total", label: isolated ? parts.find(part => part.key === isolated)!.label : "Total" }]).map(part => <p key={part.key} className={styles.tipRow} data-index={split ? colorIndex(part.key) : undefined}>
+        {(split ? parts : [{ key: "__total", label: isolated ? parts.find(part => part.key === isolated)!.label : text.total }]).map(part => <p key={part.key} className={styles.tipRow} data-index={split ? colorIndex(part.key) : undefined}>
           {split && <span className={styles.tipKey} />}
           <span className={styles.tipName}>{part.label}</span>
           <span className={styles.tipValue}>{stage && current !== null ? full.format(part.key === "__total" ? totals[current] : countOf(stage, part.key)) : ""}</span>
         </p>)}
-        <p className={styles.tipMeta}>{current !== null && current > 0 ? `${percent(rateFrom(current))} kept from ${stages[current - 1].label.toLowerCase()}` : current === 0 ? `Entry step${unit ? `, ${unit}` : ""}` : ""}</p>
+        <p className={styles.tipMeta}>{current !== null && current > 0 ? text.keptFrom(percent(rateFrom(current)), stages[current - 1].label) : current === 0 ? text.entryStep(unit) : ""}</p>
       </motion.div>
       {empty && <p className={styles.message}>{emptyLabel}</p>}
     </div>
@@ -395,7 +446,7 @@ export function FunnelChart({ stages, segments, label, unit = "", view = "total"
     <p className={styles.srOnly}>{summary}</p>
     {!empty && <div className={styles.srOnly}><table>
       <caption>{label}</caption>
-      <thead><tr><th scope="col">Step</th>{segments?.length ? parts.map(part => <th key={part.key} scope="col">{part.label}</th>) : null}<th scope="col">Shown total</th><th scope="col">Kept from previous</th><th scope="col">Of first step</th></tr></thead>
+      <thead><tr><th scope="col">{text.stepHeader}</th>{segments?.length ? parts.map(part => <th key={part.key} scope="col">{part.label}</th>) : null}<th scope="col">{text.shownTotalHeader}</th><th scope="col">{text.keptHeader}</th><th scope="col">{text.ofFirstHeader}</th></tr></thead>
       <tbody>{stages.map((item, k) => <tr key={item.key}><th scope="row">{item.label}</th>{segments?.length ? parts.map(part => <td key={part.key}>{withUnit(countOf(item, part.key))}</td>) : null}<td>{withUnit(totals[k])}</td><td>{percent(rateFrom(k))}</td><td>{percent(overall(k))}</td></tr>)}</tbody>
     </table></div>}
   </figure>;

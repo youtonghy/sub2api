@@ -1,6 +1,6 @@
 /**
  * 支付看板，对应 Vue 版 views/admin/orders/AdminPaymentDashboardView.vue：
- * 7 / 30 / 90 天切换、KPI、每日收入趋势、支付方式分布与付费用户排行。
+ * 7 / 30 / 90 天切换、KPI、每日收入趋势、支付方式分布与付费用户排行，以及订单漏斗（React 版新增）。
  */
 import { RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -17,6 +17,7 @@ import { useI18n } from '@/i18n/useI18n'
 import { useAppStore } from '@/stores/app'
 import type { DashboardStats } from '@/types/payment'
 import { extractI18nErrorMessage } from '@/utils/apiError'
+import OrderFunnelPanel from './OrderFunnelPanel'
 import styles from './Orders.module.css'
 
 const DAYS_OPTIONS = [7, 30, 90] as const
@@ -26,6 +27,8 @@ export default function AdminPaymentDashboardView() {
   const [days, setDays] = useState<number>(30)
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState<DashboardStats | null>(null)
+  // 刷新按钮同时让订单漏斗重新加载
+  const [refreshKey, setRefreshKey] = useState(0)
   const loadSeq = useRef(0)
 
   async function loadDashboard(range: number) {
@@ -63,7 +66,10 @@ export default function AdminPaymentDashboardView() {
           <Button
             type="button"
             variant="secondary"
-            onClick={() => void loadDashboard(days)}
+            onClick={() => {
+              void loadDashboard(days)
+              setRefreshKey((key) => key + 1)
+            }}
             disabled={loading}
             title={t('common.refresh')}
             aria-label={t('common.refresh')}
@@ -96,6 +102,9 @@ export default function AdminPaymentDashboardView() {
           </div>
         </>
       ) : null}
+
+      {/* 订单漏斗自行加载，看板数据加载期间保持挂载，切换天数时形状直接过渡 */}
+      <OrderFunnelPanel days={days} refreshKey={refreshKey} />
     </div>
   )
 }
