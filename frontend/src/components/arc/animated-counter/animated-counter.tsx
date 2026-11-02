@@ -70,7 +70,8 @@ export function AnimatedCounter({ value, label, prefix = "", suffix = "", decima
   const reduceMotion = !!useReducedMotion();
   const [previous, setPrevious] = useState(value);
   const [direction, setDirection] = useState(1);
-  if (value !== previous) { setPrevious(value); setDirection(value > previous ? 1 : -1); }
+  // Object.is so a NaN value (missing data) does not trigger a state update on every render.
+  if (!Object.is(value, previous)) { setPrevious(value); setDirection(value > previous ? 1 : -1); }
   const parts = partsFor(value, decimals, locale);
   const text = `${prefix}${parts.map(part => "text" in part ? part.text : part.digit).join("")}${suffix}`;
   const armed = animateOnView && !inView;
