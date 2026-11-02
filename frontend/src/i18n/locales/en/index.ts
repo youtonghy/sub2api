@@ -11,6 +11,10 @@ import authUi from './authUi'
 import chartsUi from './chartsUi'
 import opsUi from './opsUi'
 import settingsUi from './settingsUi'
+import radarUi from './radarUi'
+import funnelUi from './funnelUi'
+import flowUi from './flowUi'
+import insightsUi from './insightsUi'
 
 export default {
   adminAccessKeys,
@@ -26,4 +30,8 @@ export default {
   ...chartsUi,
   ...opsUi,
   ...settingsUi,
+  ...radarUi,
+  ...funnelUi,
+  ...flowUi,
+  ...insightsUi,
 }
