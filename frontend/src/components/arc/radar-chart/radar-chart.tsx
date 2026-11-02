@@ -23,6 +23,25 @@ export interface RadarSeries {
   values: Record<string, number | undefined>;
 }
 
+/** Screen-reader and announced strings, for translation. */
+export interface RadarChartLabels {
+  /** aria-roledescription of the chart stage. */
+  roleDescription: string;
+  /** Accessible name of the chart stage, with the keyboard hint. */
+  keyboardHint: (label: string) => string;
+  /** Accessible name of the legend group. */
+  profiles: (label: string) => string;
+  /** Header of the measure column in the screen-reader table. */
+  measure: string;
+}
+
+const DEFAULT_LABELS: RadarChartLabels = {
+  roleDescription: "radar chart",
+  keyboardHint: label => `${label}. Use arrow keys to move between measures.`,
+  profiles: label => `${label} profiles`,
+  measure: "Measure",
+};
+
 /** Use a radar chart to compare the shape of two or three profiles across the same five to eight measures. */
 export interface RadarChartProps {
   axes: RadarAxis[];
@@ -39,13 +58,18 @@ export interface RadarChartProps {
   rings?: number;
   /** Largest diameter of the web in pixels. It shrinks to fit narrow containers. */
   size?: number;
-  formatValue?: (value: number, axis: RadarAxis) => string;
+  /** Formats a reading. The series is passed for readings of one profile (tooltip, table, announcements), not for gaps. */
+  formatValue?: (value: number, axis: RadarAxis, series?: RadarSeries) => string;
+  /** Show the gap to the leading profile in the tooltip. Turn off when values are scores whose difference means nothing in the formatted unit. */
+  showGap?: boolean;
   /** Controlled axis in focus. */
   activeAxis?: string | null;
   onActiveAxisChange?: (key: string | null) => void;
   /** Profile names with a line key below the chart. */
   legend?: boolean;
   emptyLabel?: string;
+  /** Translated screen-reader strings; English defaults. */
+  labels?: Partial<RadarChartLabels>;
   ref?: Ref<HTMLElement>;
   className?: string;
 }
@@ -64,7 +88,8 @@ function useReducedMotionSafe() {
   return !!useReducedMotion() && hydrated;
 }
 
-export function RadarChart({ axes, series, label, max = 100, rings = 4, size = 320, formatValue, activeAxis, onActiveAxisChange, legend = true, emptyLabel = "No data", ref, className }: RadarChartProps) {
+export function RadarChart({ axes, series, label, max = 100, rings = 4, size = 320, formatValue, activeAxis, onActiveAxisChange, legend = true, emptyLabel = "No data", showGap = true, labels: labelOverrides, ref, className }: RadarChartProps) {
+  const text = { ...DEFAULT_LABELS, ...labelOverrides };
   const reduced = useReducedMotionSafe();
   const figure = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
@@ -199,18 +224,18 @@ export function RadarChart({ axes, series, label, max = 100, rings = 4, size = 3
     setAxis((moves[event.key] + n) % n);
   };
 
-  const format = (value: number, axis: RadarAxis) => formatValue ? formatValue(value, axis) : grouped.format(value);
+  const format = (value: number, axis: RadarAxis, item?: RadarSeries) => formatValue ? formatValue(value, axis, item) : grouped.format(value);
   const axis = current !== null ? axes[current] : null;
   const tipAxis = axis ?? (held !== null ? axes[held] ?? null : null);
   const readings = tipAxis ? shown.map((item, slot) => ({ item, slot, value: item.values[tipAxis.key] ?? 0 })).sort((a, b) => b.value - a.value) : [];
   const lead = readings[0]?.value ?? 0;
-  const announce = axis ? `${axis.label}. ${readings.map(entry => `${entry.item.label} ${format(entry.value, axis)}`).join(", ")}` : "";
-  const summary = empty ? `${label}. ${emptyLabel}.` : `${label}. ${shown.map(item => `${item.label}: ${axes.map(entry => `${entry.label} ${format(item.values[entry.key] ?? 0, entry)}`).join(", ")}`).join(". ")}.`;
+  const announce = axis ? `${axis.label}. ${readings.map(entry => `${entry.item.label} ${format(entry.value, axis, entry.item)}`).join(", ")}` : "";
+  const summary = empty ? `${label}. ${emptyLabel}.` : `${label}. ${shown.map(item => `${item.label}: ${axes.map(entry => `${entry.label} ${format(item.values[entry.key] ?? 0, entry, item)}`).join(", ")}`).join(". ")}.`;
   const offset = width ? (width - box) / 2 : 0;
 
   return <figure ref={figure} className={[styles.figure, className].filter(Boolean).join(" ")} aria-label={label}>
     <div ref={stage} className={styles.stage} style={{ height: width ? box : undefined }} data-active={current !== null || undefined} data-focus={focusSlot !== null || undefined}
-      role="group" tabIndex={empty ? -1 : 0} aria-roledescription="radar chart" aria-label={`${label}. Use arrow keys to move between measures.`}
+      role="group" tabIndex={empty ? -1 : 0} aria-roledescription={text.roleDescription} aria-label={text.keyboardHint(label)}
       onPointerMove={onPointerMove} onPointerDown={onPointerDown} onPointerUp={event => { if (event.pointerType !== "mouse") setAxis(null); }} onPointerCancel={() => setAxis(null)} onPointerLeave={event => { if (event.pointerType === "mouse") setAxis(null); }}
       onKeyDown={onKeyDown} onBlur={() => setAxis(null)} onFocus={event => { if (event.currentTarget.matches(":focus-visible") && !empty && current === null) setAxis(0); }}>
       {width > 0 && <>
@@ -234,13 +259,13 @@ export function RadarChart({ axes, series, label, max = 100, rings = 4, size = 3
         {readings.map(entry => <p key={entry.item.key} className={styles.tipRow} data-slot={entry.slot}>
           <span className={styles.tipKey} />
           <span className={styles.tipName}>{entry.item.label}</span>
-          <span className={styles.tipValue}>{tipAxis ? format(entry.value, tipAxis) : ""}</span>
-          <span className={styles.tipGap}>{tipAxis && entry.value < lead ? `−${format(lead - entry.value, tipAxis)}` : ""}</span>
+          <span className={styles.tipValue}>{tipAxis ? format(entry.value, tipAxis, entry.item) : ""}</span>
+          <span className={styles.tipGap}>{showGap && tipAxis && entry.value < lead ? `−${format(lead - entry.value, tipAxis)}` : ""}</span>
         </p>)}
       </motion.div>
       {empty && <p className={styles.message}>{emptyLabel}</p>}
     </div>
-    {legend && !empty && <div className={styles.legend} role="group" aria-label={`${label} profiles`} onPointerLeave={() => setFocusSlot(null)}>
+    {legend && !empty && <div className={styles.legend} role="group" aria-label={text.profiles(label)} onPointerLeave={() => setFocusSlot(null)}>
       {shown.map((item, slot) => <motion.button key={slot} type="button" layout={!reduced} transition={motionTokens.spring.morph} className={styles.key} data-slot={slot} data-dim={(focusSlot !== null && focusSlot !== slot) || undefined}
         aria-pressed={focusSlot === slot} onClick={() => setFocusSlot(focusSlot === slot ? null : slot)}
         onPointerEnter={event => { if (event.pointerType === "mouse") setFocusSlot(slot); }}>
@@ -253,8 +278,8 @@ export function RadarChart({ axes, series, label, max = 100, rings = 4, size = 3
     <p className={styles.srOnly}>{summary}</p>
     {!empty && <div className={styles.srOnly}><table>
       <caption>{label}</caption>
-      <thead><tr><th scope="col">Measure</th>{shown.map(item => <th key={item.key} scope="col">{item.label}</th>)}</tr></thead>
-      <tbody>{axes.map(entry => <tr key={entry.key}><th scope="row">{entry.label}</th>{shown.map(item => <td key={item.key}>{format(item.values[entry.key] ?? 0, entry)}</td>)}</tr>)}</tbody>
+      <thead><tr><th scope="col">{text.measure}</th>{shown.map(item => <th key={item.key} scope="col">{item.label}</th>)}</tr></thead>
+      <tbody>{axes.map(entry => <tr key={entry.key}><th scope="row">{entry.label}</th>{shown.map(item => <td key={item.key}>{format(item.values[entry.key] ?? 0, entry, item)}</td>)}</tr>)}</tbody>
     </table></div>}
   </figure>;
 }

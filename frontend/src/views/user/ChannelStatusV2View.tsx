@@ -31,6 +31,7 @@ import {
   MetricCell,
   MonitorRankBadge,
   MonitorHorizonChart,
+  MonitorRadarComparison,
   MonitorTrendChart,
   RelayPulseMatrix,
   formatLatencyKpiSecondary,
@@ -648,6 +649,11 @@ export default function ChannelStatusV2View() {
           </div>
         ) : null}
       </div>
+
+      {/* 渠道对比雷达图：复用矩阵行，与趋势视图无关始终显示 */}
+      {(matrix || loading) && (
+        <MonitorRadarComparison rows={matrixRows} showThroughput={showThroughput} loading={loading && !matrix} />
+      )}
 
       <section className={styles.panel}>
         <div className={styles.tabsHeader}>

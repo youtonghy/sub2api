@@ -12,6 +12,7 @@ export {
 } from './MonitorTrendChart'
 export { default as MonitorHorizonChart, type MonitorHorizonChartProps } from './MonitorHorizonChart'
 export { default as RelayPulseMatrix, type RelayPulseMatrixProps } from './RelayPulseMatrix'
+export { default as MonitorRadarComparison, type MonitorRadarComparisonProps } from './MonitorRadarComparison'
 export {
   defaultMonitorThresholds,
   healthAttr,
