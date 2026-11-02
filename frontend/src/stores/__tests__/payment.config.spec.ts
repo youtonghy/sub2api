@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
 import { usePaymentStore } from '../payment'
+import { liveStore, resetStore } from './storeHarness'
 import type { PaymentConfig } from '@/types/payment'
 
 const getConfig = vi.hoisted(() => vi.fn())
@@ -15,7 +15,7 @@ function deferred() {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia())
+  resetStore(usePaymentStore)
   getConfig.mockReset()
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
@@ -25,7 +25,7 @@ describe('payment configuration requests', () => {
   it('waits for the same response for concurrent initial callers', async () => {
     const pending = deferred()
     getConfig.mockReturnValue(pending.promise)
-    const store = usePaymentStore()
+    const store = liveStore(usePaymentStore)
     const first = store.fetchConfig()
     let finished = false
     const second = store.fetchConfig().then(value => { finished = true; return value })
@@ -41,7 +41,7 @@ describe('payment configuration requests', () => {
 
   it('shares a forced refresh instead of returning stale cached configuration', async () => {
     getConfig.mockResolvedValueOnce({ data: config })
-    const store = usePaymentStore()
+    const store = liveStore(usePaymentStore)
     await store.fetchConfig()
     const pending = deferred()
     getConfig.mockReturnValueOnce(pending.promise)
@@ -56,7 +56,7 @@ describe('payment configuration requests', () => {
   it('releases the shared request after failure so a later call can retry', async () => {
     const pending = deferred()
     getConfig.mockReturnValueOnce(pending.promise)
-    const store = usePaymentStore()
+    const store = liveStore(usePaymentStore)
     const first = store.fetchConfig()
     const second = store.fetchConfig()
     pending.reject(new Error('offline'))
@@ -70,7 +70,7 @@ describe('payment configuration requests', () => {
 
   it('returns cached configuration without another request', async () => {
     getConfig.mockResolvedValue({ data: config })
-    const store = usePaymentStore()
+    const store = liveStore(usePaymentStore)
     await store.fetchConfig()
     expect(await store.fetchConfig()).toEqual(config)
     expect(getConfig).toHaveBeenCalledTimes(1)

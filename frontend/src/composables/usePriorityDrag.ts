@@ -1,15 +1,19 @@
-import { ref } from 'vue'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 /**
- * 账号表格行内拖动排序。
+ * 账号表格行内拖动排序，对应 Vue 版 composables/usePriorityDrag.ts。
  *
- * 只有按住拖拽把手（`.account-priority-drag-handle`）才会进入拖动，按住行其它
- * 地方仍然是表格原有的滑动多选（useSwipeSelect）——两者互不抢占。
+ * 只有按住拖拽把手才会进入拖动，按住行其它地方仍然是表格原有的滑动多选
+ * （useSwipeSelect）——两者互不抢占。
  *
  * 拖动期间：
  *  - 被拖动的行跟随指针浮起（视觉反馈）
  *  - 目标插入位置显示一条指示线
  *  - 松手后按"新前后邻居"的优先级算出新值（见 utils/accountPriorityOrder）
+ *
+ * 与 Vue 版的差异：逻辑放在与框架无关的 createPriorityDrag 中（可直接单测），
+ * Vue 版的 activeId.value / isDragging.value 变为 getActiveId() / isDragging()；
+ * Hook 版额外返回渲染期快照 activeId，供把手高亮使用。
  */
 
 export interface PriorityDragRow {
@@ -38,10 +42,10 @@ export interface UsePriorityDragOptions<T extends PriorityDragRow> {
 
 const DRAG_THRESHOLD = 4
 
-export function usePriorityDrag<T extends PriorityDragRow>(options: UsePriorityDragOptions<T>) {
-  const activeId = ref<number | null>(null)
-  const dropIndex = ref(-1)
-  const isDragging = ref(false)
+export function createPriorityDrag<T extends PriorityDragRow>(options: UsePriorityDragOptions<T>) {
+  let activeId: number | null = null
+  let dropIndex = -1
+  let dragActive = false
 
   let startY = 0
   let startX = 0
@@ -50,6 +54,25 @@ export function usePriorityDrag<T extends PriorityDragRow>(options: UsePriorityD
   let ghostEl: HTMLElement | null = null
   let indicatorEl: HTMLElement | null = null
   let armed = false
+  const listeners = new Set<() => void>()
+
+  const notify = () => listeners.forEach((listener) => listener())
+
+  const setActiveId = (next: number | null) => {
+    if (activeId === next) return
+    activeId = next
+    notify()
+  }
+
+  const setDragActive = (next: boolean) => {
+    if (dragActive === next) return
+    dragActive = next
+    notify()
+  }
+
+  const preventSelection = (event: Event) => {
+    if (dragActive || armed) event.preventDefault()
+  }
 
   const cleanup = () => {
     document.removeEventListener('mousemove', onPointerMove)
@@ -58,16 +81,17 @@ export function usePriorityDrag<T extends PriorityDragRow>(options: UsePriorityD
     document.removeEventListener('touchend', onPointerUp)
     document.removeEventListener('touchcancel', onPointerUp)
     document.removeEventListener('keydown', onKeyDown)
+    document.removeEventListener('selectstart', preventSelection)
     ghostEl?.remove()
     ghostEl = null
     indicatorEl?.remove()
     indicatorEl = null
-    activeId.value = null
-    dropIndex.value = -1
-    isDragging.value = false
+    dropIndex = -1
     dragging = null
     rowElements = []
     armed = false
+    setActiveId(null)
+    setDragActive(false)
   }
 
   /** 找到指针当前落在哪两行之间，返回插入位置（0..rows.length）。 */
@@ -86,17 +110,17 @@ export function usePriorityDrag<T extends PriorityDragRow>(options: UsePriorityD
     if (!container) return
     const containerRect = container.getBoundingClientRect()
     const referenceRect =
-      dropIndex.value >= rowElements.length
+      dropIndex >= rowElements.length
         ? rowElements[rowElements.length - 1].getBoundingClientRect()
-        : rowElements[dropIndex.value].getBoundingClientRect()
-    const top = dropIndex.value >= rowElements.length ? referenceRect.bottom : referenceRect.top
+        : rowElements[dropIndex].getBoundingClientRect()
+    const top = dropIndex >= rowElements.length ? referenceRect.bottom : referenceRect.top
     Object.assign(indicatorEl.style, {
       position: 'fixed',
       left: `${containerRect.left}px`,
       width: `${containerRect.width}px`,
       top: `${top - 1}px`,
       height: '2px',
-      background: 'rgb(59 130 246)',
+      background: 'var(--accent)',
       borderRadius: '1px',
       pointerEvents: 'none',
       zIndex: '9998'
@@ -113,8 +137,8 @@ export function usePriorityDrag<T extends PriorityDragRow>(options: UsePriorityD
       height: `${sourceRect.height}px`,
       pointerEvents: 'none',
       opacity: '0.85',
-      background: 'rgba(59, 130, 246, 0.08)',
-      border: '1.5px dashed rgba(59, 130, 246, 0.6)',
+      background: 'var(--accent-subtle)',
+      border: '1.5px dashed var(--accent)',
       borderRadius: '6px',
       zIndex: '9999'
     })
@@ -127,27 +151,28 @@ export function usePriorityDrag<T extends PriorityDragRow>(options: UsePriorityD
 
   const startDrag = () => {
     if (!dragging) return
-    isDragging.value = true
+    setDragActive(true)
     const container = options.getContainer()
     // 收集当前渲染出来的数据行；虚拟滚动下只有可见行在 DOM 里。
     rowElements = container
       ? Array.from(container.querySelectorAll<HTMLElement>('tbody tr[data-row-id]')).filter(
-          element => !element.hasAttribute('aria-hidden')
+          (element) => !element.hasAttribute('aria-hidden')
         )
       : []
-    const source = rowElements.find(element => element.dataset.rowId === String(dragging!.id))
-    if (source) createOverlay(dragging, source.getBoundingClientRect())
-    dropIndex.value = findDropIndex(startY)
+    const current = dragging
+    const source = rowElements.find((element) => element.dataset.rowId === String(current.id))
+    if (source) createOverlay(current, source.getBoundingClientRect())
+    dropIndex = findDropIndex(startY)
     positionIndicator()
   }
 
-  const onPointerMove = (event: MouseEvent | TouchEvent) => {
+  function onPointerMove(event: MouseEvent | TouchEvent) {
     const point = 'touches' in event ? event.touches[0] : event
     if (!point) return
     // 阻止拖动过程中的页面滚动/文字选择
-    if (isDragging.value && event.cancelable) event.preventDefault()
+    if (dragActive && event.cancelable) event.preventDefault()
 
-    if (!isDragging.value) {
+    if (!dragActive) {
       const deltaY = Math.abs(point.clientY - startY)
       const deltaX = Math.abs(point.clientX - startX)
       if (deltaY < DRAG_THRESHOLD && deltaX < DRAG_THRESHOLD) return
@@ -157,22 +182,22 @@ export function usePriorityDrag<T extends PriorityDragRow>(options: UsePriorityD
         return
       }
       startDrag()
-      if (!isDragging.value) return
+      if (!dragActive) return
     }
 
     if (ghostEl) {
       ghostEl.style.transform = `translateY(${point.clientY - startY}px)`
     }
-    dropIndex.value = findDropIndex(point.clientY)
+    dropIndex = findDropIndex(point.clientY)
     positionIndicator()
   }
 
-  const onPointerUp = () => {
-    const wasDragging = isDragging.value
-    const targetIndex = dropIndex.value
+  function onPointerUp() {
+    const wasDragging = dragActive
+    const targetIndex = dropIndex
     const moved = dragging
     const rows = options.getRows()
-    const sourceIndex = moved ? rows.findIndex(row => row.id === moved.id) : -1
+    const sourceIndex = moved ? rows.findIndex((row) => row.id === moved.id) : -1
 
     cleanup()
 
@@ -192,12 +217,8 @@ export function usePriorityDrag<T extends PriorityDragRow>(options: UsePriorityD
     void options.onDrop({ moved, order, previous, next })
   }
 
-  const onKeyDown = (event: KeyboardEvent) => {
+  function onKeyDown(event: KeyboardEvent) {
     if (event.key === 'Escape') cleanup()
-  }
-
-  const preventSelection = (event: Event) => {
-    if (isDragging.value || armed) event.preventDefault()
   }
 
   const start = (event: MouseEvent | TouchEvent, row: T) => {
@@ -206,7 +227,7 @@ export function usePriorityDrag<T extends PriorityDragRow>(options: UsePriorityD
     if (!point) return
     cleanup()
     dragging = row
-    activeId.value = row.id
+    setActiveId(row.id)
     startY = point.clientY
     startX = point.clientX
     armed = true
@@ -221,5 +242,43 @@ export function usePriorityDrag<T extends PriorityDragRow>(options: UsePriorityD
     document.addEventListener('selectstart', preventSelection)
   }
 
-  return { activeId, isDragging, start, cancel: cleanup }
+  const subscribe = (listener: () => void) => {
+    listeners.add(listener)
+    return () => {
+      listeners.delete(listener)
+    }
+  }
+
+  return {
+    getActiveId: () => activeId,
+    isDragging: () => dragActive,
+    subscribe,
+    start,
+    cancel: cleanup
+  }
+}
+
+export type PriorityDragController<T extends PriorityDragRow> = ReturnType<typeof createPriorityDrag<T>>
+
+/** Hook 版：选项每次渲染更新（读最新行），卸载时清理进行中的拖动 */
+export function usePriorityDrag<T extends PriorityDragRow>(options: UsePriorityDragOptions<T>) {
+  const optionsRef = useRef(options)
+  useEffect(() => {
+    optionsRef.current = options
+  })
+
+  // 闭包只在指针事件中读取 optionsRef，不在渲染期间
+  // eslint-disable-next-line react-hooks/refs
+  const [controller] = useState(() =>
+    createPriorityDrag<T>({
+      getRows: () => optionsRef.current.getRows(),
+      getContainer: () => optionsRef.current.getContainer(),
+      onDrop: (result) => optionsRef.current.onDrop(result)
+    })
+  )
+
+  useEffect(() => () => controller.cancel(), [controller])
+
+  const activeId = useSyncExternalStore(controller.subscribe, controller.getActiveId, controller.getActiveId)
+  return { ...controller, activeId }
 }

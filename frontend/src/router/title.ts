@@ -1,7 +1,7 @@
-import { i18n } from '@/i18n'
-import type { RouteLocationNormalizedLoaded } from 'vue-router'
+import { t } from '@/i18n'
 import type { CustomMenuItem } from '@/types'
 import type { SiteBillingMode } from '@/utils/siteBillingMode'
+import type { RouteLike } from './meta'
 
 /**
  * 统一生成页面标题，避免多处写入 document.title 产生覆盖冲突。
@@ -11,7 +11,7 @@ export function resolveDocumentTitle(routeTitle: unknown, siteName?: string, tit
   const normalizedSiteName = typeof siteName === 'string' && siteName.trim() ? siteName.trim() : 'RetooAi'
 
   if (typeof titleKey === 'string' && titleKey.trim()) {
-    const translated = i18n.global.t(titleKey)
+    const translated = t(titleKey)
     if (translated && translated !== titleKey) {
       return `${translated} - ${normalizedSiteName}`
     }
@@ -37,15 +37,15 @@ export interface RouteMetaKeys {
   descriptionKey?: string
 }
 
-/** /purchase 路由名，与 router/index.ts 中的声明保持一致。 */
+/** /purchase 路由名，与 router/routes.ts 中的声明保持一致。 */
 export const PURCHASE_ROUTE_NAME = 'PurchaseSubscription'
 
 /**
  * 解析路由的 i18n 标题/描述 key。绝大多数路由直接取 meta；
- * /purchase 随站点计费模式切换文案，AppHeader 与 document.title 共用这一处判断。
+ * /purchase 随站点计费模式切换文案，页头与 document.title 共用这一处判断。
  */
 export function resolveRouteMetaKeys(
-  route: Pick<RouteLocationNormalizedLoaded, 'name' | 'meta'>,
+  route: Pick<RouteLike, 'name' | 'meta'>,
   options: RouteTitleOptions = {},
 ): RouteMetaKeys {
   if (route.name === PURCHASE_ROUTE_NAME) {
@@ -63,7 +63,7 @@ export function resolveRouteMetaKeys(
 }
 
 export function resolveRouteDocumentTitle(
-  route: Pick<RouteLocationNormalizedLoaded, 'name' | 'params' | 'meta'>,
+  route: RouteLike,
   siteName: string | undefined,
   customMenuItems: CustomMenuItem[] = [],
   options: RouteTitleOptions = {},

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises } from '@vue/test-utils'
+const flushPromises = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 import { bulkUpdate } from '../keys'
 
 const { put } = vi.hoisted(() => ({ put: vi.fn() }))

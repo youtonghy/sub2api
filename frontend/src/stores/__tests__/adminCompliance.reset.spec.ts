@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
 import type { AdminComplianceStatus } from '@/api/admin/compliance'
-import { useAdminComplianceStore } from '../adminCompliance'
+import { useAdminComplianceStore, type AdminComplianceState } from '../adminCompliance'
+import { liveStore, resetStore } from './storeHarness'
 
 const api = vi.hoisted(() => ({ getStatus: vi.fn(), accept: vi.fn() }))
 vi.mock('@/api/admin/compliance', () => ({ default: api }))
-vi.mock('@/i18n', () => ({ getLocale: () => 'en' }))
+vi.mock('@/i18n', () => ({ getLocale: () => 'en', subscribeI18n: () => () => {} }))
 
 function status(required: boolean, version = 'current'): AdminComplianceStatus {
   return {
@@ -22,21 +22,21 @@ function deferred() {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia())
+  resetStore(useAdminComplianceStore)
   vi.resetAllMocks()
 })
 
 describe.each(['fetch', 'accept'] as const)('compliance %s across logout', (action) => {
   const mock = () => action === 'fetch' ? api.getStatus : api.accept
-  const run = (store: ReturnType<typeof useAdminComplianceStore>) =>
+  const run = (store: AdminComplianceState) =>
     action === 'fetch' ? store.fetchStatus() : store.accept('test')
-  const busy = (store: ReturnType<typeof useAdminComplianceStore>) =>
+  const busy = (store: AdminComplianceState) =>
     action === 'fetch' ? store.loading : store.submitting
 
   it('does not repopulate cleared state when an old request succeeds', async () => {
     const pending = deferred()
     mock().mockReturnValueOnce(pending.promise)
-    const store = useAdminComplianceStore()
+    const store = liveStore(useAdminComplianceStore)
     const request = run(store)
     store.reset()
     const response = status(true, 'old')
@@ -52,7 +52,7 @@ describe.each(['fetch', 'accept'] as const)('compliance %s across logout', (acti
     const old = deferred()
     const current = deferred()
     mock().mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise)
-    const store = useAdminComplianceStore()
+    const store = liveStore(useAdminComplianceStore)
     const first = run(store).catch(error => error)
     store.reset()
     const second = run(store)
@@ -72,7 +72,7 @@ describe.each(['fetch', 'accept'] as const)('compliance %s across logout', (acti
 it('still updates compliance status during a normal fetch and acceptance', async () => {
   api.getStatus.mockResolvedValue(status(true))
   api.accept.mockResolvedValue(status(false))
-  const store = useAdminComplianceStore()
+  const store = liveStore(useAdminComplianceStore)
   await store.fetchStatus()
   expect(store.initialized).toBe(true)
   expect(store.shouldShow).toBe(true)

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
-import { flushPromises } from '@vue/test-utils'
 import { useAnnouncementStore } from '../announcements'
+import { flushPromises, liveStore, resetStore } from './storeHarness'
 import type { UserAnnouncement } from '@/types'
 
 const markRead = vi.hoisted(() => vi.fn())
@@ -12,8 +11,14 @@ const announcement = (id: number): UserAnnouncement => ({
   created_at: '2026-09-15T00:00:00Z', updated_at: '2026-09-15T00:00:00Z'
 })
 
+// Replaces assigning store.announcements; unreadCount is derived state kept in sync by the store
+const setAnnouncements = (announcements: UserAnnouncement[]) =>
+  useAnnouncementStore.setState({ announcements, unreadCount: announcements.filter((a) => !a.read_at).length })
+
 beforeEach(() => {
-  setActivePinia(createPinia())
+  // Throttle timestamp, popup queue and shown-popup set live outside the state object
+  useAnnouncementStore.getState().reset()
+  resetStore(useAnnouncementStore)
   vi.resetAllMocks()
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
@@ -21,8 +26,8 @@ afterEach(() => { vi.restoreAllMocks() })
 
 describe('mark all announcements read', () => {
   it('keeps successful results and retries only failed announcements', async () => {
-    const store = useAnnouncementStore()
-    store.announcements = [announcement(1), announcement(2)]
+    const store = liveStore(useAnnouncementStore)
+    setAnnouncements([announcement(1), announcement(2)])
     const error = new Error('offline')
     markRead.mockImplementation((id: number) => id === 1 ? Promise.resolve() : Promise.reject(error))
     await expect(store.markAllAsRead()).rejects.toBe(error)
@@ -36,8 +41,8 @@ describe('mark all announcements read', () => {
   })
 
   it('keeps loading until all submitted requests finish, even after a rejection', async () => {
-    const store = useAnnouncementStore()
-    store.announcements = [announcement(1), announcement(2)]
+    const store = liveStore(useAnnouncementStore)
+    setAnnouncements([announcement(1), announcement(2)])
     let finish!: () => void
     const error = new Error('offline')
     markRead.mockImplementation((id: number) => id === 1
@@ -52,12 +57,12 @@ describe('mark all announcements read', () => {
   })
 
   it('does not mark a newly arrived announcement that was not submitted', async () => {
-    const store = useAnnouncementStore()
-    store.announcements = [announcement(1)]
+    const store = liveStore(useAnnouncementStore)
+    setAnnouncements([announcement(1)])
     let finish!: () => void
     markRead.mockImplementation(() => new Promise<void>(resolve => { finish = resolve }))
     const result = store.markAllAsRead()
-    store.announcements.push(announcement(2))
+    setAnnouncements([...store.announcements, announcement(2)])
     finish()
     await result
     expect(markRead.mock.calls).toEqual([[1]])

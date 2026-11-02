@@ -6,6 +6,11 @@ import channelMonitorV2 from './channelMonitorV2'
 import batchImage from './batchImage'
 import admin from './admin'
 import misc from './misc'
+import shell from './shell'
+import authUi from './authUi'
+import chartsUi from './chartsUi'
+import opsUi from './opsUi'
+import settingsUi from './settingsUi'
 
 export default {
   adminAccessKeys,
@@ -16,4 +21,9 @@ export default {
   ...batchImage,
   admin,
   ...misc,
+  ...shell,
+  ...authUi,
+  ...chartsUi,
+  ...opsUi,
+  ...settingsUi,
 }

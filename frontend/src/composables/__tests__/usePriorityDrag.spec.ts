@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { usePriorityDrag } from '../usePriorityDrag'
+import { act, renderHook } from '@testing-library/react'
+
+import { createPriorityDrag, usePriorityDrag } from '../usePriorityDrag'
 
 type Row = { id: number; priority: number }
 
@@ -12,6 +14,7 @@ const rows: Row[] = [
 /** 构造假的表格容器：三行，每行 100px 高，从 y=0 开始。 */
 const buildContainer = () => {
   const container = document.createElement('div')
+  const table = document.createElement('table')
   const tbody = document.createElement('tbody')
   rows.forEach((row, index) => {
     const tr = document.createElement('tr')
@@ -21,7 +24,8 @@ const buildContainer = () => {
       ({ top: index * 100, bottom: index * 100 + 100, height: 100, left: 0, width: 600 }) as DOMRect
     tbody.appendChild(tr)
   })
-  container.appendChild(tbody)
+  table.appendChild(tbody)
+  container.appendChild(table)
   container.getBoundingClientRect = () => ({ top: 0, bottom: 300, height: 300, left: 0, width: 600 }) as DOMRect
   document.body.appendChild(container)
   return container
@@ -30,6 +34,7 @@ const buildContainer = () => {
 const mouseMove = (clientY: number) =>
   document.dispatchEvent(new MouseEvent('mousemove', { clientY, clientX: 10, bubbles: true }))
 const mouseUp = () => document.dispatchEvent(new MouseEvent('mouseup', { clientY: 0, clientX: 10, bubbles: true }))
+const mouseDown = (clientY: number) => new MouseEvent('mousedown', { clientY, clientX: 10, button: 0 })
 
 describe('usePriorityDrag', () => {
   let container: HTMLDivElement
@@ -41,30 +46,28 @@ describe('usePriorityDrag', () => {
     onDrop = vi.fn()
   })
 
-  const setup = () => {
-    const drag = usePriorityDrag<Row>({
+  const setup = () =>
+    createPriorityDrag<Row>({
       getRows: () => rows,
       getContainer: () => container,
       onDrop
     })
-    return drag
-  }
 
   it('ignores movement below the drag threshold', () => {
     const drag = setup()
-    drag.start(new MouseEvent('mousedown', { clientY: 10, clientX: 10, button: 0 }) as unknown as MouseEvent, rows[0])
+    drag.start(mouseDown(10), rows[0])
     mouseMove(12)
     mouseUp()
-    expect(drag.isDragging.value).toBe(false)
+    expect(drag.isDragging()).toBe(false)
     expect(onDrop).not.toHaveBeenCalled()
   })
 
   it('reports the new neighbours when a row is dragged down past the next row', () => {
     const drag = setup()
-    drag.start(new MouseEvent('mousedown', { clientY: 10, clientX: 10, button: 0 }) as unknown as MouseEvent, rows[0])
+    drag.start(mouseDown(10), rows[0])
     // 拖到第二行下半部分 → 插到第 2 行之后
     mouseMove(180)
-    expect(drag.isDragging.value).toBe(true)
+    expect(drag.isDragging()).toBe(true)
     mouseUp()
 
     expect(onDrop).toHaveBeenCalledTimes(1)
@@ -77,7 +80,7 @@ describe('usePriorityDrag', () => {
 
   it('reports a null previous when dragged to the very top', () => {
     const drag = setup()
-    drag.start(new MouseEvent('mousedown', { clientY: 210, clientX: 10, button: 0 }) as unknown as MouseEvent, rows[2])
+    drag.start(mouseDown(210), rows[2])
     mouseMove(5)
     mouseUp()
 
@@ -90,7 +93,7 @@ describe('usePriorityDrag', () => {
 
   it('reports a null next when dragged to the very bottom', () => {
     const drag = setup()
-    drag.start(new MouseEvent('mousedown', { clientY: 10, clientX: 10, button: 0 }) as unknown as MouseEvent, rows[0])
+    drag.start(mouseDown(10), rows[0])
     mouseMove(295)
     mouseUp()
 
@@ -102,7 +105,7 @@ describe('usePriorityDrag', () => {
 
   it('does not call onDrop when the row lands back where it started', () => {
     const drag = setup()
-    drag.start(new MouseEvent('mousedown', { clientY: 10, clientX: 10, button: 0 }) as unknown as MouseEvent, rows[1])
+    drag.start(mouseDown(10), rows[1])
     mouseMove(110)
     mouseUp()
     expect(onDrop).not.toHaveBeenCalled()
@@ -110,21 +113,41 @@ describe('usePriorityDrag', () => {
 
   it('bails out when the gesture is mostly horizontal', () => {
     const drag = setup()
-    drag.start(new MouseEvent('mousedown', { clientY: 10, clientX: 10, button: 0 }) as unknown as MouseEvent, rows[0])
+    drag.start(mouseDown(10), rows[0])
     mouseMove(10)
     document.dispatchEvent(new MouseEvent('mousemove', { clientY: 12, clientX: 80, bubbles: true }))
     mouseUp()
-    expect(drag.isDragging.value).toBe(false)
+    expect(drag.isDragging()).toBe(false)
     expect(onDrop).not.toHaveBeenCalled()
   })
 
   it('cleans up its overlays after a drop', () => {
     const drag = setup()
-    drag.start(new MouseEvent('mousedown', { clientY: 10, clientX: 10, button: 0 }) as unknown as MouseEvent, rows[0])
+    drag.start(mouseDown(10), rows[0])
     mouseMove(180)
     expect(document.body.querySelector('[data-priority-drag-row]')).not.toBeNull()
     mouseUp()
     expect(document.body.querySelector('[data-priority-drag-row]')).toBeNull()
-    expect(drag.activeId.value).toBeNull()
+    expect(drag.getActiveId()).toBeNull()
+  })
+
+  it('exposes the active row to React and uses the latest options on drop', () => {
+    const latestDrop = vi.fn()
+    const { result, rerender } = renderHook(({ handler }) => usePriorityDrag<Row>({
+      getRows: () => rows,
+      getContainer: () => container,
+      onDrop: handler
+    }), { initialProps: { handler: onDrop } })
+
+    rerender({ handler: latestDrop })
+    act(() => result.current.start(mouseDown(10), rows[0]))
+    expect(result.current.activeId).toBe(1)
+    act(() => {
+      mouseMove(180)
+      mouseUp()
+    })
+    expect(result.current.activeId).toBeNull()
+    expect(onDrop).not.toHaveBeenCalled()
+    expect(latestDrop).toHaveBeenCalledTimes(1)
   })
 })

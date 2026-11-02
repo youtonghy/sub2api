@@ -1,8 +1,8 @@
-import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
+import { t } from '@/i18n'
+import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage, extractI18nErrorMessage } from '@/utils/apiError'
+import { createObservableState, useObservableInstance } from './useObservableState'
 
 export interface OpenAITokenInfo {
   access_token?: string
@@ -27,37 +27,37 @@ export interface OpenAITokenInfo {
 
 export type OpenAIOAuthPlatform = 'openai'
 
-export function useOpenAIOAuth() {
-  const appStore = useAppStore()
-  const { t } = useI18n()
-  const endpointPrefix = '/admin/openai'
+interface OpenAIOAuthState {
+  authUrl: string
+  sessionId: string
+  oauthState: string
+  loading: boolean
+  error: string
+}
 
-  // State
-  const authUrl = ref('')
-  const sessionId = ref('')
-  const oauthState = ref('')
-  const loading = ref(false)
-  const error = ref('')
+const initialState = (): OpenAIOAuthState => ({
+  authUrl: '',
+  sessionId: '',
+  oauthState: '',
+  loading: false,
+  error: ''
+})
+
+/** OpenAI OAuth 流程（对应 Vue 版 useOpenAIOAuth）；状态字段为只读 getter，总是返回最新值 */
+export function createOpenAIOAuth() {
+  const endpointPrefix = '/admin/openai'
+  const observable = createObservableState<OpenAIOAuthState>(initialState())
+  const s = () => observable.get()
+  const set = observable.set
 
   // Reset state
   const resetState = () => {
-    authUrl.value = ''
-    sessionId.value = ''
-    oauthState.value = ''
-    loading.value = false
-    error.value = ''
+    set(initialState())
   }
 
   // Generate auth URL for OpenAI OAuth
-  const generateAuthUrl = async (
-    proxyId?: number | null,
-    redirectUri?: string
-  ): Promise<boolean> => {
-    loading.value = true
-    authUrl.value = ''
-    sessionId.value = ''
-    oauthState.value = ''
-    error.value = ''
+  const generateAuthUrl = async (proxyId?: number | null, redirectUri?: string): Promise<boolean> => {
+    set({ loading: true, authUrl: '', sessionId: '', oauthState: '', error: '' })
 
     try {
       const payload: Record<string, unknown> = {}
@@ -68,25 +68,22 @@ export function useOpenAIOAuth() {
         payload.redirect_uri = redirectUri
       }
 
-      const response = await adminAPI.accounts.generateAuthUrl(
-        `${endpointPrefix}/generate-auth-url`,
-        payload
-      )
-      authUrl.value = response.auth_url
-      sessionId.value = response.session_id
+      const response = await adminAPI.accounts.generateAuthUrl(`${endpointPrefix}/generate-auth-url`, payload)
+      let oauthState = ''
       try {
         const parsed = new URL(response.auth_url)
-        oauthState.value = parsed.searchParams.get('state') || ''
+        oauthState = parsed.searchParams.get('state') || ''
       } catch {
-        oauthState.value = ''
+        oauthState = ''
       }
+      set({ authUrl: response.auth_url, sessionId: response.session_id, oauthState })
       return true
     } catch (err: any) {
-      error.value = extractApiErrorMessage(err, t('admin.accounts.oauth.openai.failedToGenerateUrl'))
-      appStore.showError(error.value)
+      set({ error: extractApiErrorMessage(err, t('admin.accounts.oauth.openai.failedToGenerateUrl')) })
+      useAppStore.getState().showError(s().error)
       return false
     } finally {
-      loading.value = false
+      set({ loading: false })
     }
   }
 
@@ -98,12 +95,11 @@ export function useOpenAIOAuth() {
     proxyId?: number | null
   ): Promise<OpenAITokenInfo | null> => {
     if (!code.trim() || !currentSessionId || !state.trim()) {
-      error.value = 'Missing auth code, session ID, or state'
+      set({ error: 'Missing auth code, session ID, or state' })
       return null
     }
 
-    loading.value = true
-    error.value = ''
+    set({ loading: true, error: '' })
 
     try {
       const payload: { session_id: string; code: string; state: string; proxy_id?: number } = {
@@ -118,16 +114,18 @@ export function useOpenAIOAuth() {
       const tokenInfo = await adminAPI.accounts.exchangeCode(`${endpointPrefix}/exchange-code`, payload)
       return tokenInfo as OpenAITokenInfo
     } catch (err: any) {
-      error.value = extractI18nErrorMessage(
-        err,
-        t,
-        'admin.accounts.oauth.openai.errors',
-        t('admin.accounts.oauth.openai.failedToExchangeCode')
-      )
-      appStore.showError(error.value)
+      set({
+        error: extractI18nErrorMessage(
+          err,
+          t,
+          'admin.accounts.oauth.openai.errors',
+          t('admin.accounts.oauth.openai.failedToExchangeCode')
+        )
+      })
+      useAppStore.getState().showError(s().error)
       return null
     } finally {
-      loading.value = false
+      set({ loading: false })
     }
   }
 
@@ -139,12 +137,11 @@ export function useOpenAIOAuth() {
     clientId?: string
   ): Promise<OpenAITokenInfo | null> => {
     if (!refreshToken.trim()) {
-      error.value = 'Missing refresh token'
+      set({ error: 'Missing refresh token' })
       return null
     }
 
-    loading.value = true
-    error.value = ''
+    set({ loading: true, error: '' })
 
     try {
       // Use dedicated refresh-token endpoint
@@ -156,16 +153,18 @@ export function useOpenAIOAuth() {
       )
       return tokenInfo as OpenAITokenInfo
     } catch (err: any) {
-      error.value = extractI18nErrorMessage(
-        err,
-        t,
-        'admin.accounts.oauth.openai.errors',
-        t('admin.accounts.oauth.openai.failedToValidateRT')
-      )
-      appStore.showError(error.value)
+      set({
+        error: extractI18nErrorMessage(
+          err,
+          t,
+          'admin.accounts.oauth.openai.errors',
+          t('admin.accounts.oauth.openai.failedToValidateRT')
+        )
+      })
+      useAppStore.getState().showError(s().error)
       return null
     } finally {
-      loading.value = false
+      set({ loading: false })
     }
   }
 
@@ -224,12 +223,23 @@ export function useOpenAIOAuth() {
   }
 
   return {
+    observable,
     // State
-    authUrl,
-    sessionId,
-    oauthState,
-    loading,
-    error,
+    get authUrl() {
+      return s().authUrl
+    },
+    get sessionId() {
+      return s().sessionId
+    },
+    get oauthState() {
+      return s().oauthState
+    },
+    get loading() {
+      return s().loading
+    },
+    get error() {
+      return s().error
+    },
     // Methods
     resetState,
     generateAuthUrl,
@@ -238,4 +248,10 @@ export function useOpenAIOAuth() {
     buildCredentials,
     buildExtraInfo
   }
+}
+
+export type OpenAIOAuth = ReturnType<typeof createOpenAIOAuth>
+
+export function useOpenAIOAuth(): OpenAIOAuth {
+  return useObservableInstance(createOpenAIOAuth)
 }

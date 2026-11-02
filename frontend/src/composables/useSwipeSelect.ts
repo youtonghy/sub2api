@@ -1,5 +1,5 @@
-import { ref, onMounted, onUnmounted, type Ref } from 'vue'
-import type { Virtualizer } from '@tanstack/vue-virtual'
+import { useEffect, useRef, useState, type RefObject } from 'react'
+import type { Virtualizer } from '@tanstack/react-virtual'
 
 /**
  * WeChat-style swipe/drag to select rows in a DataTable,
@@ -12,15 +12,18 @@ import type { Virtualizer } from '@tanstack/vue-virtual'
  *  - 5px drag threshold to avoid accidental selection on click
  *
  * Usage:
- *   const containerRef = ref<HTMLElement | null>(null)
+ *   const containerRef = useRef<HTMLDivElement>(null)
+ *   const selection = useTableSelection({ rows, getId: (row) => row.id })
  *   useSwipeSelect(containerRef, {
- *     isSelected: (id) => selIds.value.includes(id),
- *     select: (id) => { if (!selIds.value.includes(id)) selIds.value.push(id) },
- *     deselect: (id) => { selIds.value = selIds.value.filter(x => x !== id) },
+ *     isSelected: selection.isSelected,
+ *     select: selection.select,
+ *     deselect: selection.deselect,
+ *     batchUpdate: selection.batchUpdate,
  *   })
  *
- * Wrap <DataTable> with <div ref="containerRef">...</div>
+ * Wrap <DataTable> with <div ref={containerRef}>...</div>
  * DataTable rows must have data-row-id attribute.
+ * The adapter and virtualContext may change between renders; the latest ones are used.
  */
 export interface SwipeSelectAdapter {
   isSelected: (id: number) => boolean
@@ -73,12 +76,32 @@ export function findRowIndexByDomPosition(scrollEl: Element, clientY: number): n
   return (clientY - rHi.bottom < rLo.top - clientY) ? idxOf(domRows[hi]) : idxOf(domRows[lo])
 }
 
-export function useSwipeSelect(
-  containerRef: Ref<HTMLElement | null>,
-  adapter: SwipeSelectAdapter,
-  virtualContext?: SwipeSelectVirtualContext
+/**
+ * Framework-free controller behind useSwipeSelect. Adapter and virtual context are read lazily,
+ * so the hook can always hand in the latest callbacks without re-binding listeners.
+ */
+function createSwipeSelectController(
+  getContainer: () => HTMLElement | null,
+  getAdapter: () => SwipeSelectAdapter,
+  getVirtualContext: () => SwipeSelectVirtualContext | undefined,
+  onDraggingChange: (dragging: boolean) => void
 ) {
-  const isDragging = ref(false)
+  const isDragging = {
+    current: false,
+    get value() {
+      return this.current
+    },
+    set value(next: boolean) {
+      if (this.current === next) return
+      this.current = next
+      onDraggingChange(next)
+    }
+  }
+  const containerRef = {
+    get value() {
+      return getContainer()
+    }
+  }
 
   let dragMode: 'select' | 'deselect' = 'select'
   let startRowIndex = -1
@@ -98,7 +121,7 @@ export function useSwipeSelect(
   function getActivationRoot(): HTMLElement | null {
     const container = containerRef.value
     if (!container) return null
-    return container.closest('.table-page-layout') as HTMLElement | null || container
+    return container.closest('[data-table-page-layout]') as HTMLElement | null || container
   }
 
   function getDataRows(): HTMLElement[] {
@@ -144,7 +167,7 @@ export function useSwipeSelect(
 
   /** Virtual mode: find row index from Y coordinate using virtualizer data */
   function findRowIndexAtYVirtual(clientY: number): number {
-    const virt = virtualContext!.getVirtualizer()
+    const virt = getVirtualContext()!.getVirtualizer()
     if (!virt) return -1
     const scrollEl = virt.scrollElement
     if (!scrollEl) return -1
@@ -168,7 +191,7 @@ export function useSwipeSelect(
     }
 
     // Outside visible range: estimate
-    const totalCount = virtualContext!.getSortedData().length
+    const totalCount = getVirtualContext()!.getSortedData().length
     if (totalCount === 0) return -1
     const est = virt.options.estimateSize(0)
     const guess = Math.floor(contentY / est)
@@ -182,11 +205,11 @@ export function useSwipeSelect(
   function createMarquee() {
     removeMarquee() // defensive: remove any stale marquee
     marqueeEl = document.createElement('div')
-    const isDark = document.documentElement.classList.contains('dark')
+    // 颜色取自主题 token，亮/暗主题自动适配
     Object.assign(marqueeEl.style, {
       position: 'fixed',
-      background: isDark ? 'rgba(96, 165, 250, 0.15)' : 'rgba(59, 130, 246, 0.12)',
-      border: isDark ? '1.5px solid rgba(96, 165, 250, 0.5)' : '1.5px solid rgba(59, 130, 246, 0.4)',
+      background: 'color-mix(in oklab, var(--accent) 12%, transparent)',
+      border: '1.5px solid color-mix(in oklab, var(--accent) 45%, transparent)',
       borderRadius: '4px',
       pointerEvents: 'none',
       zIndex: '9999',
@@ -220,8 +243,9 @@ export function useSwipeSelect(
     const lo = Math.min(rangeMin, prevMin)
     const hi = Math.max(rangeMax, prevMax)
 
-    if (adapter.batchUpdate) {
-      adapter.batchUpdate((draft) => {
+    const batchUpdate = getAdapter().batchUpdate
+    if (batchUpdate) {
+      batchUpdate((draft) => {
         for (let i = lo; i <= hi && i < cachedRows.length; i++) {
           const id = getRowId(cachedRows[i])
           if (id === null) continue
@@ -237,12 +261,12 @@ export function useSwipeSelect(
         const id = getRowId(cachedRows[i])
         if (id === null) continue
         if (i >= rangeMin && i <= rangeMax) {
-          if (dragMode === 'select') adapter.select(id)
-          else adapter.deselect(id)
+          if (dragMode === 'select') getAdapter().select(id)
+          else getAdapter().deselect(id)
         } else {
           const wasSelected = initialSelectedSnapshot.get(id) ?? false
-          if (wasSelected) adapter.select(id)
-          else adapter.deselect(id)
+          if (wasSelected) getAdapter().select(id)
+          else getAdapter().deselect(id)
         }
       }
     }
@@ -258,12 +282,13 @@ export function useSwipeSelect(
     const prevMax = lastEndIndex >= 0 ? Math.max(startRowIndex, lastEndIndex) : rangeMax
     const lo = Math.min(rangeMin, prevMin)
     const hi = Math.max(rangeMax, prevMax)
-    const data = virtualContext!.getSortedData()
+    const data = getVirtualContext()!.getSortedData()
 
-    if (adapter.batchUpdate) {
-      adapter.batchUpdate((draft) => {
+    const batchUpdate = getAdapter().batchUpdate
+    if (batchUpdate) {
+      batchUpdate((draft) => {
         for (let i = lo; i <= hi && i < data.length; i++) {
-          const id = virtualContext!.getRowId(data[i], i)
+          const id = getVirtualContext()!.getRowId(data[i], i)
           const shouldBeSelected = (i >= rangeMin && i <= rangeMax)
             ? (dragMode === 'select')
             : (initialSelectedSnapshot.get(id) ?? false)
@@ -273,14 +298,14 @@ export function useSwipeSelect(
       })
     } else {
       for (let i = lo; i <= hi && i < data.length; i++) {
-        const id = virtualContext!.getRowId(data[i], i)
+        const id = getVirtualContext()!.getRowId(data[i], i)
         if (i >= rangeMin && i <= rangeMax) {
-          if (dragMode === 'select') adapter.select(id)
-          else adapter.deselect(id)
+          if (dragMode === 'select') getAdapter().select(id)
+          else getAdapter().deselect(id)
         } else {
           const wasSelected = initialSelectedSnapshot.get(id) ?? false
-          if (wasSelected) adapter.select(id)
-          else adapter.deselect(id)
+          if (wasSelected) getAdapter().select(id)
+          else getAdapter().deselect(id)
         }
       }
     }
@@ -366,9 +391,9 @@ export function useSwipeSelect(
     if (shouldPreferNativeTextSelection(target)) return
     if (shouldPreferNativeSelectionOutsideRows(target)) return
 
-    if (virtualContext) {
+    if (getVirtualContext()) {
       // Virtual mode: check data availability instead of DOM rows
-      const data = virtualContext.getSortedData()
+      const data = getVirtualContext()!.getSortedData()
       if (data.length === 0) return
     } else {
       cachedRows = getDataRows()
@@ -391,7 +416,7 @@ export function useSwipeSelect(
     document.removeEventListener('mousemove', onThresholdMove)
     document.removeEventListener('mouseup', onThresholdUp)
 
-    if (virtualContext) {
+    if (getVirtualContext()) {
       beginDragVirtual(pendingStartY)
     } else {
       beginDrag(pendingStartY)
@@ -400,8 +425,8 @@ export function useSwipeSelect(
     // Process the move that crossed the threshold
     lastMouseY = e.clientY
     updateMarquee(e.clientY)
-    const findIdx = virtualContext ? findRowIndexAtYVirtual : findRowIndexAtY
-    const apply = virtualContext ? applyRangeVirtual : applyRange
+    const findIdx = getVirtualContext() ? findRowIndexAtYVirtual : findRowIndexAtY
+    const apply = getVirtualContext() ? applyRangeVirtual : applyRange
     const rowIdx = findIdx(e.clientY)
     if (rowIdx >= 0) apply(rowIdx)
     autoScroll(e)
@@ -425,12 +450,12 @@ export function useSwipeSelect(
   function beginDrag(clientY: number) {
     startRowIndex = findRowIndexAtY(clientY)
     const startRowId = startRowIndex >= 0 ? getRowId(cachedRows[startRowIndex]) : null
-    dragMode = (startRowId !== null && adapter.isSelected(startRowId)) ? 'deselect' : 'select'
+    dragMode = (startRowId !== null && getAdapter().isSelected(startRowId)) ? 'deselect' : 'select'
 
     initialSelectedSnapshot = new Map()
     for (const row of cachedRows) {
       const id = getRowId(row)
-      if (id !== null) initialSelectedSnapshot.set(id, adapter.isSelected(id))
+      if (id !== null) initialSelectedSnapshot.set(id, getAdapter().isSelected(id))
     }
 
     isDragging.value = true
@@ -453,17 +478,17 @@ export function useSwipeSelect(
   /** Virtual mode: begin drag using data array */
   function beginDragVirtual(clientY: number) {
     startRowIndex = findRowIndexAtYVirtual(clientY)
-    const data = virtualContext!.getSortedData()
+    const data = getVirtualContext()!.getSortedData()
     const startRowId = startRowIndex >= 0 && startRowIndex < data.length
-      ? virtualContext!.getRowId(data[startRowIndex], startRowIndex)
+      ? getVirtualContext()!.getRowId(data[startRowIndex], startRowIndex)
       : null
-    dragMode = (startRowId !== null && adapter.isSelected(startRowId)) ? 'deselect' : 'select'
+    dragMode = (startRowId !== null && getAdapter().isSelected(startRowId)) ? 'deselect' : 'select'
 
     // Build full snapshot from all data rows
     initialSelectedSnapshot = new Map()
     for (let i = 0; i < data.length; i++) {
-      const id = virtualContext!.getRowId(data[i], i)
-      initialSelectedSnapshot.set(id, adapter.isSelected(id))
+      const id = getVirtualContext()!.getRowId(data[i], i)
+      initialSelectedSnapshot.set(id, getAdapter().isSelected(id))
     }
 
     isDragging.value = true
@@ -472,7 +497,7 @@ export function useSwipeSelect(
     lastEndIndex = -1
 
     // In virtual mode, scroll parent is the virtualizer's scroll element
-    const virt = virtualContext!.getVirtualizer()
+    const virt = getVirtualContext()!.getVirtualizer()
     cachedScrollParent = virt?.scrollElement ?? (containerRef.value ? getScrollParent(containerRef.value) : null)
 
     createMarquee()
@@ -486,8 +511,8 @@ export function useSwipeSelect(
   function onMouseMove(e: MouseEvent) {
     if (!isDragging.value) return
     lastMouseY = e.clientY
-    const findIdx = virtualContext ? findRowIndexAtYVirtual : findRowIndexAtY
-    const apply = virtualContext ? applyRangeVirtual : applyRange
+    const findIdx = getVirtualContext() ? findRowIndexAtYVirtual : findRowIndexAtY
+    const apply = getVirtualContext() ? applyRangeVirtual : applyRange
     cancelAnimationFrame(moveRAF)
     moveRAF = requestAnimationFrame(() => {
       updateMarquee(lastMouseY)
@@ -499,8 +524,8 @@ export function useSwipeSelect(
 
   function onWheel() {
     if (!isDragging.value) return
-    const findIdx = virtualContext ? findRowIndexAtYVirtual : findRowIndexAtY
-    const apply = virtualContext ? applyRangeVirtual : applyRange
+    const findIdx = getVirtualContext() ? findRowIndexAtYVirtual : findRowIndexAtY
+    const apply = getVirtualContext() ? applyRangeVirtual : applyRange
     // After wheel scroll, rows shift in viewport — re-check selection
     requestAnimationFrame(() => {
       if (!isDragging.value) return // guard: drag may have ended before this frame
@@ -557,8 +582,8 @@ export function useSwipeSelect(
     }
 
     if (dy !== 0) {
-      const findIdx = virtualContext ? findRowIndexAtYVirtual : findRowIndexAtY
-      const apply = virtualContext ? applyRangeVirtual : applyRange
+      const findIdx = getVirtualContext() ? findRowIndexAtYVirtual : findRowIndexAtY
+      const apply = getVirtualContext() ? applyRangeVirtual : applyRange
       const step = () => {
         const prevScrollTop = scrollEl.scrollTop
         scrollEl.scrollTop += dy
@@ -578,12 +603,12 @@ export function useSwipeSelect(
   }
 
   // --- Lifecycle ---
-  onMounted(() => {
+  function mount() {
     document.addEventListener('mousedown', onMouseDown)
     window.addEventListener('blur', onWindowBlur)
-  })
+  }
 
-  onUnmounted(() => {
+  function unmount() {
     document.removeEventListener('mousedown', onMouseDown)
     window.removeEventListener('blur', onWindowBlur)
     // Clean up any in-progress drag state
@@ -591,7 +616,35 @@ export function useSwipeSelect(
     document.removeEventListener('mouseup', onThresholdUp)
     document.removeEventListener('selectstart', onSelectStart)
     cleanupDrag()
+  }
+
+  return { mount, unmount }
+}
+
+export function useSwipeSelect(
+  containerRef: RefObject<HTMLElement | null>,
+  adapter: SwipeSelectAdapter,
+  virtualContext?: SwipeSelectVirtualContext
+) {
+  const [isDragging, setIsDragging] = useState(false)
+  const adapterRef = useRef(adapter)
+  const virtualRef = useRef(virtualContext)
+
+  useEffect(() => {
+    adapterRef.current = adapter
+    virtualRef.current = virtualContext
   })
+
+  useEffect(() => {
+    const controller = createSwipeSelectController(
+      () => containerRef.current,
+      () => adapterRef.current,
+      () => virtualRef.current,
+      setIsDragging
+    )
+    controller.mount()
+    return () => controller.unmount()
+  }, [containerRef])
 
   return { isDragging }
 }

@@ -1,50 +1,44 @@
-import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { t } from '@/i18n'
 import { useAppStore } from '@/stores/app'
+import { createObservableState, useObservableInstance } from './useObservableState'
 import { adminAPI } from '@/api/admin'
 import type { AntigravityTokenInfo } from '@/api/admin/antigravity'
 
-export function useAntigravityOAuth() {
-  const appStore = useAppStore()
-  const { t } = useI18n()
+interface FlowState {
+  authUrl: string
+  sessionId: string
+  state: string
+  loading: boolean
+  error: string
+}
 
-  const authUrl = ref('')
-  const sessionId = ref('')
-  const state = ref('')
-  const loading = ref(false)
-  const error = ref('')
+const initialState = (): FlowState => ({ authUrl: '', sessionId: '', state: '', loading: false, error: '' })
+
+export function createAntigravityOAuth() {
+  const observable = createObservableState<FlowState>(initialState())
+  const s = () => observable.get()
+  const set = observable.set
 
   const resetState = () => {
-    authUrl.value = ''
-    sessionId.value = ''
-    state.value = ''
-    loading.value = false
-    error.value = ''
+    set(initialState())
   }
 
   const generateAuthUrl = async (proxyId: number | null | undefined): Promise<boolean> => {
-    loading.value = true
-    authUrl.value = ''
-    sessionId.value = ''
-    state.value = ''
-    error.value = ''
+    set({ loading: true, authUrl: '', sessionId: '', state: '', error: '' })
 
     try {
       const payload: Record<string, unknown> = {}
       if (proxyId) payload.proxy_id = proxyId
 
       const response = await adminAPI.antigravity.generateAuthUrl(payload as any)
-      authUrl.value = response.auth_url
-      sessionId.value = response.session_id
-      state.value = response.state
+      set({ authUrl: response.auth_url, sessionId: response.session_id, state: response.state })
       return true
     } catch (err: any) {
-      error.value =
-        err.response?.data?.detail || t('admin.accounts.oauth.antigravity.failedToGenerateUrl')
-      appStore.showError(error.value)
+      set({ error: err.response?.data?.detail || t('admin.accounts.oauth.antigravity.failedToGenerateUrl') })
+      useAppStore.getState().showError(s().error)
       return false
     } finally {
-      loading.value = false
+      set({ loading: false })
     }
   }
 
@@ -56,12 +50,11 @@ export function useAntigravityOAuth() {
   }): Promise<AntigravityTokenInfo | null> => {
     const code = params.code?.trim()
     if (!code || !params.sessionId || !params.state) {
-      error.value = t('admin.accounts.oauth.antigravity.missingExchangeParams')
+      set({ error: t('admin.accounts.oauth.antigravity.missingExchangeParams') })
       return null
     }
 
-    loading.value = true
-    error.value = ''
+    set({ loading: true, error: '' })
 
     try {
       const payload: Record<string, unknown> = {
@@ -74,12 +67,11 @@ export function useAntigravityOAuth() {
       const tokenInfo = await adminAPI.antigravity.exchangeCode(payload as any)
       return tokenInfo as AntigravityTokenInfo
     } catch (err: any) {
-      error.value =
-        err.response?.data?.detail || t('admin.accounts.oauth.antigravity.failedToExchangeCode')
-      appStore.showError(error.value)
+      set({ error: err.response?.data?.detail || t('admin.accounts.oauth.antigravity.failedToExchangeCode') })
+      useAppStore.getState().showError(s().error)
       return null
     } finally {
-      loading.value = false
+      set({ loading: false })
     }
   }
 
@@ -88,12 +80,11 @@ export function useAntigravityOAuth() {
     proxyId?: number | null
   ): Promise<AntigravityTokenInfo | null> => {
     if (!refreshToken.trim()) {
-      error.value = t('admin.accounts.oauth.antigravity.pleaseEnterRefreshToken')
+      set({ error: t('admin.accounts.oauth.antigravity.pleaseEnterRefreshToken') })
       return null
     }
 
-    loading.value = true
-    error.value = ''
+    set({ loading: true, error: '' })
 
     try {
       const tokenInfo = await adminAPI.antigravity.refreshAntigravityToken(
@@ -102,13 +93,12 @@ export function useAntigravityOAuth() {
       )
       return tokenInfo as AntigravityTokenInfo
     } catch (err: any) {
-      error.value =
-        err.response?.data?.detail || t('admin.accounts.oauth.antigravity.failedToValidateRT')
+      set({ error: err.response?.data?.detail || t('admin.accounts.oauth.antigravity.failedToValidateRT') })
       // Don't show global error toast for batch validation to avoid spamming
       // appStore.showError(error.value)
       return null
     } finally {
-      loading.value = false
+      set({ loading: false })
     }
   }
 
@@ -138,15 +128,32 @@ export function useAntigravityOAuth() {
   }
 
   return {
-    authUrl,
-    sessionId,
-    state,
-    loading,
-    error,
+    observable,
+    get authUrl() {
+      return s().authUrl
+    },
+    get sessionId() {
+      return s().sessionId
+    },
+    get state() {
+      return s().state
+    },
+    get loading() {
+      return s().loading
+    },
+    get error() {
+      return s().error
+    },
     resetState,
     generateAuthUrl,
     exchangeAuthCode,
     validateRefreshToken,
     buildCredentials
   }
+}
+
+export type AntigravityOAuth = ReturnType<typeof createAntigravityOAuth>
+
+export function useAntigravityOAuth(): AntigravityOAuth {
+  return useObservableInstance(createAntigravityOAuth)
 }

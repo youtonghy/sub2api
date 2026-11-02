@@ -1,11 +1,21 @@
-import { computed, ref } from 'vue'
+import { create } from 'zustand'
+
 import { keysAPI } from '@/api/keys'
 import { useAuthStore } from '@/stores/auth'
 import type { ApiKey } from '@/types'
 
-const loaded = ref(false)
-const loading = ref(false)
-const hasAllowedBatchImageKey = ref(false)
+interface BatchImageAccessState {
+  loaded: boolean
+  loading: boolean
+  hasAllowedBatchImageKey: boolean
+}
+
+const useBatchImageAccessStore = create<BatchImageAccessState>()(() => ({
+  loaded: false,
+  loading: false,
+  hasAllowedBatchImageKey: false,
+}))
+
 let pendingLoad: Promise<boolean> | null = null
 const pageSize = 100
 
@@ -18,22 +28,22 @@ function keyAllowsBatchImage(key: ApiKey): boolean {
 }
 
 async function loadBatchImageAccess(force = false): Promise<boolean> {
-  const authStore = useAuthStore()
-  if (!authStore.isAuthenticated) {
-    loaded.value = true
-    hasAllowedBatchImageKey.value = false
+  const set = useBatchImageAccessStore.setState
+  const state = useBatchImageAccessStore.getState()
+  if (!useAuthStore.getState().isAuthenticated) {
+    set({ loaded: true, hasAllowedBatchImageKey: false })
     return false
   }
 
-  if (loaded.value && !force) {
-    return hasAllowedBatchImageKey.value
+  if (state.loaded && !force) {
+    return state.hasAllowedBatchImageKey
   }
 
   if (pendingLoad && !force) {
     return pendingLoad
   }
 
-  loading.value = true
+  set({ loading: true })
   pendingLoad = (async () => {
     let page = 1
     while (true) {
@@ -44,14 +54,12 @@ async function loadBatchImageAccess(force = false): Promise<boolean> {
       })
 
       if ((response.items || []).some(keyAllowsBatchImage)) {
-        hasAllowedBatchImageKey.value = true
-        loaded.value = true
+        set({ hasAllowedBatchImageKey: true, loaded: true })
         return true
       }
 
       if (page >= response.pages || (response.items || []).length === 0) {
-        hasAllowedBatchImageKey.value = false
-        loaded.value = true
+        set({ hasAllowedBatchImageKey: false, loaded: true })
         return false
       }
 
@@ -59,25 +67,27 @@ async function loadBatchImageAccess(force = false): Promise<boolean> {
     }
   })()
     .catch(() => {
-      hasAllowedBatchImageKey.value = false
-      loaded.value = false
+      set({ hasAllowedBatchImageKey: false, loaded: false })
       return false
     })
     .finally(() => {
-      loading.value = false
+      set({ loading: false })
       pendingLoad = null
     })
 
   return pendingLoad
 }
 
+/** 与 Vue 版同名同形：是否存在允许批量生图的有效密钥 */
 export function useBatchImageAccess() {
-  const canUseBatchImage = computed(() => hasAllowedBatchImageKey.value)
+  const canUseBatchImage = useBatchImageAccessStore((state) => state.hasAllowedBatchImageKey)
+  const batchImageAccessLoaded = useBatchImageAccessStore((state) => state.loaded)
+  const batchImageAccessLoading = useBatchImageAccessStore((state) => state.loading)
 
   return {
     canUseBatchImage,
-    batchImageAccessLoaded: computed(() => loaded.value),
-    batchImageAccessLoading: computed(() => loading.value),
+    batchImageAccessLoaded,
+    batchImageAccessLoading,
     refreshBatchImageAccess: loadBatchImageAccess,
   }
 }

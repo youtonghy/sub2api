@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/stores/app', () => ({
-  useAppStore: () => ({
-    showError: vi.fn()
-  })
+  useAppStore: {
+    getState: () => ({
+      showError: vi.fn()
+    })
+  }
 }))
 
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({
-    t: (key: string) => key
-  })
+vi.mock('@/i18n', () => ({
+  t: (key: string) => key
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -22,11 +22,11 @@ vi.mock('@/api/admin', () => ({
   }
 }))
 
-import { useAntigravityOAuth } from '@/composables/useAntigravityOAuth'
+import { createAntigravityOAuth } from '@/composables/useAntigravityOAuth'
 
 describe('useAntigravityOAuth.buildCredentials', () => {
   it('falls back to the submitted refresh token when the response omits it', () => {
-    const oauth = useAntigravityOAuth()
+    const oauth = createAntigravityOAuth()
 
     const credentials = oauth.buildCredentials(
       {
@@ -40,7 +40,7 @@ describe('useAntigravityOAuth.buildCredentials', () => {
   })
 
   it('prefers a new refresh token returned by the response', () => {
-    const oauth = useAntigravityOAuth()
+    const oauth = createAntigravityOAuth()
 
     const credentials = oauth.buildCredentials(
       {
@@ -58,13 +58,13 @@ describe('useAntigravityOAuth.buildCredentials', () => {
 // This builder is shared by OAuth creation, refresh-token import and reauthorization.
 describe('Antigravity subscription metadata', () => {
   it.each(['pro', 'ultra', 'free'])('preserves the upstream %s plan when saving credentials', (plan) => {
-    const oauth = useAntigravityOAuth()
+    const oauth = createAntigravityOAuth()
     const credentials = oauth.buildCredentials({ plan_type: plan })
     expect(credentials.plan_type).toBe(plan)
   })
 
   it('does not invent a plan when subscription discovery is unavailable', () => {
-    const credentials = useAntigravityOAuth().buildCredentials({})
+    const credentials = createAntigravityOAuth().buildCredentials({})
     expect(credentials).not.toHaveProperty('plan_type')
   })
 })

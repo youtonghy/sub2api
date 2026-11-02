@@ -1,22 +1,22 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/stores/app', () => ({
-  useAppStore: () => ({
-    showError: vi.fn()
-  })
+  useAppStore: {
+    getState: () => ({
+      showError: vi.fn()
+    })
+  }
 }))
 
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({
-    t: (key: string) => {
-      const messages: Record<string, string> = {
-        'admin.accounts.oauth.openai.failedToExchangeCode': 'OpenAI 授权码兑换失败',
-        'admin.accounts.oauth.openai.errors.OPENAI_OAUTH_PROXY_REQUIRED':
-          '未设置代理，当前服务器无法直连 OpenAI，导致 OpenAI OAuth 请求失败。请先选择可访问 OpenAI 的代理后重试；如果授权码已失效，请重新生成授权链接。'
-      }
-      return messages[key] ?? key
+vi.mock('@/i18n', () => ({
+  t: (key: string) => {
+    const messages: Record<string, string> = {
+      'admin.accounts.oauth.openai.failedToExchangeCode': 'OpenAI 授权码兑换失败',
+      'admin.accounts.oauth.openai.errors.OPENAI_OAUTH_PROXY_REQUIRED':
+        '未设置代理，当前服务器无法直连 OpenAI，导致 OpenAI OAuth 请求失败。请先选择可访问 OpenAI 的代理后重试；如果授权码已失效，请重新生成授权链接。'
     }
-  })
+    return messages[key] ?? key
+  }
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -29,12 +29,12 @@ vi.mock('@/api/admin', () => ({
   }
 }))
 
-import { useOpenAIOAuth } from '@/composables/useOpenAIOAuth'
+import { createOpenAIOAuth } from '@/composables/useOpenAIOAuth'
 import { adminAPI } from '@/api/admin'
 
 describe('useOpenAIOAuth.buildCredentials', () => {
   it('should keep client_id when token response contains it', () => {
-    const oauth = useOpenAIOAuth()
+    const oauth = createOpenAIOAuth()
     const creds = oauth.buildCredentials({
       access_token: 'at',
       refresh_token: 'rt',
@@ -48,7 +48,7 @@ describe('useOpenAIOAuth.buildCredentials', () => {
   })
 
   it('should keep legacy behavior when client_id is missing', () => {
-    const oauth = useOpenAIOAuth()
+    const oauth = createOpenAIOAuth()
     const creds = oauth.buildCredentials({
       access_token: 'at',
       refresh_token: 'rt',
@@ -61,7 +61,7 @@ describe('useOpenAIOAuth.buildCredentials', () => {
   })
 
   it('should keep ChatGPT subscription expiration from token response', () => {
-    const oauth = useOpenAIOAuth()
+    const oauth = createOpenAIOAuth()
     const creds = oauth.buildCredentials({
       access_token: 'at',
       refresh_token: 'rt',
@@ -82,12 +82,12 @@ describe('useOpenAIOAuth.exchangeAuthCode', () => {
       reason: 'OPENAI_OAUTH_PROXY_REQUIRED',
       message: 'OpenAI OAuth token exchange failed: no proxy is configured.'
     })
-    const oauth = useOpenAIOAuth()
+    const oauth = createOpenAIOAuth()
 
     const tokenInfo = await oauth.exchangeAuthCode('code', 'session-id', 'state')
 
     expect(tokenInfo).toBeNull()
-    expect(oauth.error.value).toBe(
+    expect(oauth.error).toBe(
       '未设置代理，当前服务器无法直连 OpenAI，导致 OpenAI OAuth 请求失败。请先选择可访问 OpenAI 的代理后重试；如果授权码已失效，请重新生成授权链接。'
     )
   })

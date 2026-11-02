@@ -1,6 +1,6 @@
-import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { t } from '@/i18n'
 import { useAppStore } from '@/stores/app'
+import { createObservableState, useObservableInstance } from './useObservableState'
 import { adminAPI } from '@/api/admin'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import type { GeminiOAuthCapabilities } from '@/api/admin/gemini'
@@ -18,22 +18,23 @@ export interface GeminiTokenInfo {
   [key: string]: unknown
 }
 
-export function useGeminiOAuth() {
-  const appStore = useAppStore()
-  const { t } = useI18n()
+interface FlowState {
+  authUrl: string
+  sessionId: string
+  state: string
+  loading: boolean
+  error: string
+}
 
-  const authUrl = ref('')
-  const sessionId = ref('')
-  const state = ref('')
-  const loading = ref(false)
-  const error = ref('')
+const initialState = (): FlowState => ({ authUrl: '', sessionId: '', state: '', loading: false, error: '' })
+
+export function createGeminiOAuth() {
+  const observable = createObservableState<FlowState>(initialState())
+  const s = () => observable.get()
+  const set = observable.set
 
   const resetState = () => {
-    authUrl.value = ''
-    sessionId.value = ''
-    state.value = ''
-    loading.value = false
-    error.value = ''
+    set(initialState())
   }
 
   const generateAuthUrl = async (
@@ -42,11 +43,7 @@ export function useGeminiOAuth() {
     oauthType?: string,
     tierId?: string
   ): Promise<boolean> => {
-    loading.value = true
-    authUrl.value = ''
-    sessionId.value = ''
-    state.value = ''
-    error.value = ''
+    set({ loading: true, authUrl: '', sessionId: '', state: '', error: '' })
 
     try {
       const payload: Record<string, unknown> = {}
@@ -58,16 +55,14 @@ export function useGeminiOAuth() {
       if (trimmedTierID) payload.tier_id = trimmedTierID
 
       const response = await adminAPI.gemini.generateAuthUrl(payload as any)
-      authUrl.value = response.auth_url
-      sessionId.value = response.session_id
-      state.value = response.state
+      set({ authUrl: response.auth_url, sessionId: response.session_id, state: response.state })
       return true
     } catch (err: unknown) {
-      error.value = extractApiErrorMessage(err, t('admin.accounts.oauth.gemini.failedToGenerateUrl'))
-      appStore.showError(error.value)
+      set({ error: extractApiErrorMessage(err, t('admin.accounts.oauth.gemini.failedToGenerateUrl')) })
+      useAppStore.getState().showError(s().error)
       return false
     } finally {
-      loading.value = false
+      set({ loading: false })
     }
   }
 
@@ -81,12 +76,11 @@ export function useGeminiOAuth() {
   }): Promise<GeminiTokenInfo | null> => {
     const code = params.code?.trim()
     if (!code || !params.sessionId || !params.state) {
-      error.value = t('admin.accounts.oauth.gemini.missingExchangeParams')
+      set({ error: t('admin.accounts.oauth.gemini.missingExchangeParams') })
       return null
     }
 
-    loading.value = true
-    error.value = ''
+    set({ loading: true, error: '' })
 
     try {
       const payload: Record<string, unknown> = {
@@ -105,14 +99,14 @@ export function useGeminiOAuth() {
       // Check for specific missing project_id error
       const errorMessage = err.message || err.response?.data?.message || ''
       if (errorMessage.includes('missing project_id')) {
-        error.value = t('admin.accounts.oauth.gemini.missingProjectId')
+        set({ error: t('admin.accounts.oauth.gemini.missingProjectId') })
       } else {
-        error.value = errorMessage || t('admin.accounts.oauth.gemini.failedToExchangeCode')
+        set({ error: errorMessage || t('admin.accounts.oauth.gemini.failedToExchangeCode') })
       }
-      appStore.showError(error.value)
+      useAppStore.getState().showError(s().error)
       return null
     } finally {
-      loading.value = false
+      set({ loading: false })
     }
   }
 
@@ -144,18 +138,29 @@ export function useGeminiOAuth() {
   const getCapabilities = async (): Promise<GeminiOAuthCapabilities | null> => {
     try {
       return await adminAPI.gemini.getCapabilities()
-    } catch (err: any) {
+    } catch {
       // Capabilities are optional for older servers; don't block the UI.
       return null
     }
   }
 
   return {
-    authUrl,
-    sessionId,
-    state,
-    loading,
-    error,
+    observable,
+    get authUrl() {
+      return s().authUrl
+    },
+    get sessionId() {
+      return s().sessionId
+    },
+    get state() {
+      return s().state
+    },
+    get loading() {
+      return s().loading
+    },
+    get error() {
+      return s().error
+    },
     resetState,
     generateAuthUrl,
     exchangeAuthCode,
@@ -163,4 +168,10 @@ export function useGeminiOAuth() {
     buildExtraInfo,
     getCapabilities
   }
+}
+
+export type GeminiOAuth = ReturnType<typeof createGeminiOAuth>
+
+export function useGeminiOAuth(): GeminiOAuth {
+  return useObservableInstance(createGeminiOAuth)
 }

@@ -1,8 +1,7 @@
-import { ref } from 'vue'
-import { useAppStore } from '@/stores/app'
-import { i18n } from '@/i18n'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-const { t } = i18n.global
+import { t } from '@/i18n'
+import { useAppStore } from '@/stores/app'
 
 /**
  * 检测是否支持 Clipboard API（需要安全上下文：HTTPS/localhost）
@@ -33,17 +32,19 @@ function fallbackCopy(text: string): boolean {
   }
 }
 
+/** 与 Vue 版 useClipboard 相同：复制成功后 2 秒内 copied 为 true，并用 toast 提示结果 */
 export function useClipboard() {
-  const appStore = useAppStore()
-  const copied = ref(false)
+  const [copied, setCopied] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const copyToClipboard = async (
-    text: string,
-    successMessage?: string
-  ): Promise<boolean> => {
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current)
+  }, [])
+
+  const copyToClipboard = useCallback(async (text: string, successMessage?: string): Promise<boolean> => {
     if (!text) return false
 
-    let success = false
+    let success: boolean
 
     if (isClipboardSupported()) {
       try {
@@ -56,18 +57,20 @@ export function useClipboard() {
       success = fallbackCopy(text)
     }
 
+    const appStore = useAppStore.getState()
     if (success) {
-      copied.value = true
+      setCopied(true)
       appStore.showSuccess(successMessage || t('common.copiedToClipboard'))
-      setTimeout(() => {
-        copied.value = false
+      if (timer.current) clearTimeout(timer.current)
+      timer.current = setTimeout(() => {
+        setCopied(false)
       }, 2000)
     } else {
       appStore.showError(t('common.copyFailed'))
     }
 
     return success
-  }
+  }, [])
 
   return { copied, copyToClipboard }
 }

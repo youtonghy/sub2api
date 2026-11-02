@@ -3,8 +3,7 @@
  * Global state management for user subscriptions with caching and deduplication
  */
 
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { create } from 'zustand'
 import subscriptionsAPI from '@/api/subscriptions'
 import type { UserSubscription } from '@/types'
 
@@ -14,12 +13,24 @@ const CACHE_TTL_MS = 60_000
 // Request generation counter to invalidate stale in-flight responses
 let requestGeneration = 0
 
-export const useSubscriptionStore = defineStore('subscriptions', () => {
+export interface SubscriptionState {
   // State
-  const activeSubscriptions = ref<UserSubscription[]>([])
-  const loading = ref(false)
-  const loaded = ref(false)
-  const lastFetchedAt = ref<number | null>(null)
+  activeSubscriptions: UserSubscription[]
+  loading: boolean
+  hasActiveSubscriptions: boolean
+
+  // Actions
+  fetchActiveSubscriptions: (force?: boolean) => Promise<UserSubscription[]>
+  startPolling: () => void
+  stopPolling: () => void
+  clear: () => void
+  invalidateCache: () => void
+}
+
+export const useSubscriptionStore = create<SubscriptionState>()((set, get) => {
+  // Internal state, not exposed by the Vue store either
+  let loaded = false
+  let lastFetchedAt: number | null = null
 
   // In-flight request deduplication
   let activePromise: Promise<UserSubscription[]> | null = null
@@ -27,8 +38,9 @@ export const useSubscriptionStore = defineStore('subscriptions', () => {
   // Auto-refresh interval
   let pollerInterval: ReturnType<typeof setInterval> | null = null
 
-  // Computed
-  const hasActiveSubscriptions = computed(() => activeSubscriptions.value.length > 0)
+  function setActiveSubscriptions(activeSubscriptions: UserSubscription[]): void {
+    set({ activeSubscriptions, hasActiveSubscriptions: activeSubscriptions.length > 0 })
+  }
 
   /**
    * Fetch active subscriptions with caching and deduplication
@@ -40,11 +52,11 @@ export const useSubscriptionStore = defineStore('subscriptions', () => {
     // Return cached data if valid
     if (
       !force &&
-      loaded.value &&
-      lastFetchedAt.value &&
-      now - lastFetchedAt.value < CACHE_TTL_MS
+      loaded &&
+      lastFetchedAt &&
+      now - lastFetchedAt < CACHE_TTL_MS
     ) {
-      return activeSubscriptions.value
+      return get().activeSubscriptions
     }
 
     // Return in-flight request if exists (deduplication)
@@ -55,14 +67,14 @@ export const useSubscriptionStore = defineStore('subscriptions', () => {
     const currentGeneration = ++requestGeneration
 
     // Start new request
-    loading.value = true
+    set({ loading: true })
     const requestPromise = subscriptionsAPI
       .getActiveSubscriptions()
       .then((data) => {
         if (currentGeneration === requestGeneration) {
-          activeSubscriptions.value = data
-          loaded.value = true
-          lastFetchedAt.value = Date.now()
+          setActiveSubscriptions(data)
+          loaded = true
+          lastFetchedAt = Date.now()
         }
         return data
       })
@@ -72,7 +84,7 @@ export const useSubscriptionStore = defineStore('subscriptions', () => {
       })
       .finally(() => {
         if (activePromise === requestPromise) {
-          loading.value = false
+          set({ loading: false })
           activePromise = null
         }
       })
@@ -83,7 +95,7 @@ export const useSubscriptionStore = defineStore('subscriptions', () => {
   }
 
   /**
-   * Start auto-refresh polling 
+   * Start auto-refresh polling
    */
   function startPolling() {
     if (pollerInterval) return
@@ -111,10 +123,10 @@ export const useSubscriptionStore = defineStore('subscriptions', () => {
   function clear() {
     requestGeneration++
     activePromise = null
-    loading.value = false
-    activeSubscriptions.value = []
-    loaded.value = false
-    lastFetchedAt.value = null
+    set({ loading: false })
+    setActiveSubscriptions([])
+    loaded = false
+    lastFetchedAt = null
     stopPolling()
   }
 
@@ -122,14 +134,14 @@ export const useSubscriptionStore = defineStore('subscriptions', () => {
    * Invalidate cache (force next fetch to reload)
    */
   function invalidateCache() {
-    lastFetchedAt.value = null
+    lastFetchedAt = null
   }
 
   return {
     // State
-    activeSubscriptions,
-    loading,
-    hasActiveSubscriptions,
+    activeSubscriptions: [],
+    loading: false,
+    hasActiveSubscriptions: false,
 
     // Actions
     fetchActiveSubscriptions,

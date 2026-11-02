@@ -1,6 +1,6 @@
-import { ref } from 'vue'
-import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
+import { useAppStore } from '@/stores/app'
+import { createObservableState, useObservableInstance } from './useObservableState'
 
 export type AddMethod = 'oauth' | 'setup-token'
 export type AuthInputMethod =
@@ -32,90 +32,77 @@ export interface TokenInfo {
   [key: string]: unknown
 }
 
-export function useAccountOAuth() {
-  const appStore = useAppStore()
+const initialState = (): OAuthState => ({
+  authUrl: '',
+  authCode: '',
+  sessionId: '',
+  sessionKey: '',
+  loading: false,
+  error: ''
+})
 
-  // State
-  const authUrl = ref('')
-  const authCode = ref('')
-  const sessionId = ref('')
-  const sessionKey = ref('')
-  const loading = ref(false)
-  const error = ref('')
+/**
+ * Anthropic OAuth / Setup Token 流程状态（对应 Vue 版 useAccountOAuth）。
+ * 状态字段为只读 getter，总是返回最新值；用 setAuthCode/setSessionKey 写入输入值。
+ */
+export function createAccountOAuth() {
+  const observable = createObservableState<OAuthState>(initialState())
+  const s = () => observable.get()
+  const set = observable.set
 
   // Reset state
   const resetState = () => {
-    authUrl.value = ''
-    authCode.value = ''
-    sessionId.value = ''
-    sessionKey.value = ''
-    loading.value = false
-    error.value = ''
+    set(initialState())
   }
 
   // Generate auth URL
-  const generateAuthUrl = async (
-    addMethod: AddMethod,
-    proxyId?: number | null
-  ): Promise<boolean> => {
-    loading.value = true
-    authUrl.value = ''
-    sessionId.value = ''
-    error.value = ''
+  const generateAuthUrl = async (addMethod: AddMethod, proxyId?: number | null): Promise<boolean> => {
+    set({ loading: true, authUrl: '', sessionId: '', error: '' })
 
     try {
       const proxyConfig = proxyId ? { proxy_id: proxyId } : {}
       const endpoint =
-        addMethod === 'oauth'
-          ? '/admin/accounts/generate-auth-url'
-          : '/admin/accounts/generate-setup-token-url'
+        addMethod === 'oauth' ? '/admin/accounts/generate-auth-url' : '/admin/accounts/generate-setup-token-url'
 
       const response = await adminAPI.accounts.generateAuthUrl(endpoint, proxyConfig)
-      authUrl.value = response.auth_url
-      sessionId.value = response.session_id
+      set({ authUrl: response.auth_url, sessionId: response.session_id })
       return true
     } catch (err: any) {
-      error.value = err.response?.data?.detail || 'Failed to generate auth URL'
-      appStore.showError(error.value)
+      set({ error: err.response?.data?.detail || 'Failed to generate auth URL' })
+      useAppStore.getState().showError(s().error)
       return false
     } finally {
-      loading.value = false
+      set({ loading: false })
     }
   }
 
   // Exchange auth code for tokens
-  const exchangeAuthCode = async (
-    addMethod: AddMethod,
-    proxyId?: number | null
-  ): Promise<TokenInfo | null> => {
-    if (!authCode.value.trim() || !sessionId.value) {
-      error.value = 'Missing auth code or session ID'
+  const exchangeAuthCode = async (addMethod: AddMethod, proxyId?: number | null): Promise<TokenInfo | null> => {
+    if (!s().authCode.trim() || !s().sessionId) {
+      set({ error: 'Missing auth code or session ID' })
       return null
     }
 
-    loading.value = true
-    error.value = ''
+    set({ loading: true, error: '' })
 
     try {
       const proxyConfig = proxyId ? { proxy_id: proxyId } : {}
       const endpoint =
-        addMethod === 'oauth'
-          ? '/admin/accounts/exchange-code'
-          : '/admin/accounts/exchange-setup-token-code'
+        addMethod === 'oauth' ? '/admin/accounts/exchange-code' : '/admin/accounts/exchange-setup-token-code'
 
       const tokenInfo = await adminAPI.accounts.exchangeCode(endpoint, {
-        session_id: sessionId.value,
-        code: authCode.value.trim(),
+        session_id: s().sessionId,
+        code: s().authCode.trim(),
         ...proxyConfig
       })
 
       return tokenInfo as TokenInfo
     } catch (err: any) {
-      error.value = err.response?.data?.detail || 'Failed to exchange auth code'
-      appStore.showError(error.value)
+      set({ error: err.response?.data?.detail || 'Failed to exchange auth code' })
+      useAppStore.getState().showError(s().error)
       return null
     } finally {
-      loading.value = false
+      set({ loading: false })
     }
   }
 
@@ -126,19 +113,16 @@ export function useAccountOAuth() {
     proxyId?: number | null
   ): Promise<TokenInfo | null> => {
     if (!sessionKeyValue.trim()) {
-      error.value = 'Please enter sessionKey'
+      set({ error: 'Please enter sessionKey' })
       return null
     }
 
-    loading.value = true
-    error.value = ''
+    set({ loading: true, error: '' })
 
     try {
       const proxyConfig = proxyId ? { proxy_id: proxyId } : {}
       const endpoint =
-        addMethod === 'oauth'
-          ? '/admin/accounts/cookie-auth'
-          : '/admin/accounts/setup-token-cookie-auth'
+        addMethod === 'oauth' ? '/admin/accounts/cookie-auth' : '/admin/accounts/setup-token-cookie-auth'
 
       const tokenInfo = await adminAPI.accounts.exchangeCode(endpoint, {
         session_id: '',
@@ -148,10 +132,10 @@ export function useAccountOAuth() {
 
       return tokenInfo as TokenInfo
     } catch (err: any) {
-      error.value = err.response?.data?.detail || 'Cookie authorization failed'
+      set({ error: err.response?.data?.detail || 'Cookie authorization failed' })
       return null
     } finally {
-      loading.value = false
+      set({ loading: false })
     }
   }
 
@@ -179,13 +163,28 @@ export function useAccountOAuth() {
   }
 
   return {
+    observable,
     // State
-    authUrl,
-    authCode,
-    sessionId,
-    sessionKey,
-    loading,
-    error,
+    get authUrl() {
+      return s().authUrl
+    },
+    get authCode() {
+      return s().authCode
+    },
+    get sessionId() {
+      return s().sessionId
+    },
+    get sessionKey() {
+      return s().sessionKey
+    },
+    get loading() {
+      return s().loading
+    },
+    get error() {
+      return s().error
+    },
+    setAuthCode: (value: string) => set({ authCode: value }),
+    setSessionKey: (value: string) => set({ sessionKey: value }),
     // Methods
     resetState,
     generateAuthUrl,
@@ -194,4 +193,10 @@ export function useAccountOAuth() {
     parseSessionKeys,
     buildExtraInfo
   }
+}
+
+export type AccountOAuth = ReturnType<typeof createAccountOAuth>
+
+export function useAccountOAuth(): AccountOAuth {
+  return useObservableInstance(createAccountOAuth)
 }

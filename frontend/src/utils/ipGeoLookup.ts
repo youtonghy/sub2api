@@ -1,5 +1,3 @@
-import { reactive } from 'vue'
-
 export type IpGeoStatus = 'idle' | 'loading' | 'success' | 'error' | 'private'
 
 export interface IpGeoDetail {
@@ -33,7 +31,47 @@ interface StoredEntry {
   fetchedAt: number
 }
 
-const cache = reactive(new Map<string, IpGeoEntry>())
+const listeners = new Set<() => void>()
+let revision = 0
+
+/** 缓存变化时通知订阅者（React 组件配合 useSyncExternalStore 使用）。 */
+export function subscribeIpGeo(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+/** 每次缓存变化都会递增，作为订阅快照。 */
+export function getIpGeoRevision(): number {
+  return revision
+}
+
+class NotifyingMap<K, V> extends Map<K, V> {
+  override set(key: K, value: V): this {
+    super.set(key, value)
+    this.notify()
+    return this
+  }
+
+  override delete(key: K): boolean {
+    const removed = super.delete(key)
+    if (removed) this.notify()
+    return removed
+  }
+
+  override clear(): void {
+    super.clear()
+    this.notify()
+  }
+
+  private notify(): void {
+    revision += 1
+    listeners.forEach((listener) => listener())
+  }
+}
+
+const cache = new NotifyingMap<string, IpGeoEntry>()
 
 function isFreshSuccess(entry: IpGeoEntry | undefined): entry is IpGeoEntry & { status: 'success'; fetchedAt: number } {
   return entry?.status === 'success' && typeof entry.fetchedAt === 'number' && Date.now() - entry.fetchedAt <= CACHE_TTL_MS

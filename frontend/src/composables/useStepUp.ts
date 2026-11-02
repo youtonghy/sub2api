@@ -1,5 +1,5 @@
 /**
- * Step-up (sudo) 2FA composable.
+ * Step-up (sudo) 2FA hook，对应 Vue 版 composables/useStepUp.ts。
  *
  * Wraps a sensitive admin action so that when the backend responds with a
  * STEP_UP_REQUIRED error, the caller can prompt for a TOTP code, obtain a
@@ -10,9 +10,13 @@
  *   async function exportData() {
  *     await stepUp.run(() => adminAPI.accounts.exportData(...))
  *   }
- *   // template: <TotpStepUpDialog :controller="stepUp" />
+ *   // JSX: <TotpStepUpDialog controller={stepUp} />
+ *
+ * 与 Vue 版的差异：状态放在与框架无关的 createStepUpController 中（可在组件外单测），
+ * useStepUp 通过 useSyncExternalStore 订阅；Vue 版的 visible.value / blockedReason.value
+ * 变为 visible / blockedReason 字段（渲染期快照）与 isVisible() / getBlockedReason()（即时值）。
  */
-import { ref } from 'vue'
+import { useState, useSyncExternalStore } from 'react'
 
 /** Error codes the backend uses to signal step-up state. */
 const STEP_UP_REQUIRED = 'STEP_UP_REQUIRED'
@@ -62,36 +66,56 @@ export function stepUpBlockReason(err: unknown): string {
   return markerOf(err)
 }
 
-export type StepUpController = ReturnType<typeof useStepUp>
-
-export function useStepUp() {
-  const visible = ref(false)
-  const blockedReason = ref<string>('')
+/** 与框架无关的 step-up 控制器：保存弹窗可见性并在验证结束时唤醒等待者 */
+export function createStepUpController() {
+  let visible = false
+  let blockedReason = ''
   let resolver: ((ok: boolean) => void) | null = null
   let pendingPrompt: Promise<boolean> | null = null
+  const listeners = new Set<() => void>()
+
+  const notify = () => listeners.forEach((listener) => listener())
+
+  const setVisible = (next: boolean) => {
+    if (visible === next) return
+    visible = next
+    notify()
+  }
+
+  function subscribe(listener: () => void) {
+    listeners.add(listener)
+    return () => {
+      listeners.delete(listener)
+    }
+  }
+
+  const isVisible = () => visible
+  const getBlockedReason = () => blockedReason
 
   /** Open the TOTP dialog and resolve true once a grant is obtained. */
   function prompt(): Promise<boolean> {
     if (pendingPrompt) return pendingPrompt
-    visible.value = true
     pendingPrompt = new Promise<boolean>((resolve) => {
       resolver = resolve
     })
+    setVisible(true)
     return pendingPrompt
   }
 
   function onVerified() {
-    visible.value = false
-    resolver?.(true)
+    const resolve = resolver
     resolver = null
     pendingPrompt = null
+    setVisible(false)
+    resolve?.(true)
   }
 
   function onCancel() {
-    visible.value = false
-    resolver?.(false)
+    const resolve = resolver
     resolver = null
     pendingPrompt = null
+    setVisible(false)
+    resolve?.(false)
   }
 
   /**
@@ -106,7 +130,8 @@ export function useStepUp() {
       return await action()
     } catch (err) {
       if (isStepUpBlocked(err)) {
-        blockedReason.value = markerOf(err)
+        blockedReason = markerOf(err)
+        notify()
         throw err
       }
       if (!isStepUpRequired(err)) {
@@ -121,12 +146,25 @@ export function useStepUp() {
     }
   }
 
-  return {
-    visible,
-    blockedReason,
-    prompt,
-    onVerified,
-    onCancel,
-    run
-  }
+  return { subscribe, isVisible, getBlockedReason, prompt, onVerified, onCancel, run }
+}
+
+export type StepUpControllerCore = ReturnType<typeof createStepUpController>
+
+export type StepUpController = StepUpControllerCore & {
+  /** 渲染期快照：TOTP 弹窗是否可见 */
+  visible: boolean
+  /** 渲染期快照：最近一次被阻断的原因标记 */
+  blockedReason: string
+}
+
+export function useStepUp(): StepUpController {
+  const [controller] = useState(createStepUpController)
+  const visible = useSyncExternalStore(controller.subscribe, controller.isVisible, controller.isVisible)
+  const blockedReason = useSyncExternalStore(
+    controller.subscribe,
+    controller.getBlockedReason,
+    controller.getBlockedReason
+  )
+  return { ...controller, visible, blockedReason }
 }

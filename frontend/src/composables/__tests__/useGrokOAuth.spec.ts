@@ -1,22 +1,22 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/stores/app', () => ({
-  useAppStore: () => ({
-    showError: vi.fn()
-  })
+  useAppStore: {
+    getState: () => ({
+      showError: vi.fn()
+    })
+  }
 }))
 
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({
-    t: (key: string) => {
-      const messages: Record<string, string> = {
-        'admin.accounts.oauth.grok.failedToExchangeCode': 'Grok 授权码兑换失败',
-        'admin.accounts.oauth.grok.errors.GROK_OAUTH_INVALID_STATE':
-          'Grok OAuth state 与当前会话不匹配。请粘贴同一次生成的授权链接返回的回调 URL。'
-      }
-      return messages[key] ?? key
+vi.mock('@/i18n', () => ({
+  t: (key: string) => {
+    const messages: Record<string, string> = {
+      'admin.accounts.oauth.grok.failedToExchangeCode': 'Grok 授权码兑换失败',
+      'admin.accounts.oauth.grok.errors.GROK_OAUTH_INVALID_STATE':
+        'Grok OAuth state 与当前会话不匹配。请粘贴同一次生成的授权链接返回的回调 URL。'
     }
-  })
+    return messages[key] ?? key
+  }
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -29,7 +29,7 @@ vi.mock('@/api/admin', () => ({
   }
 }))
 
-import { useGrokOAuth } from '@/composables/useGrokOAuth'
+import { createGrokOAuth } from '@/composables/useGrokOAuth'
 import { adminAPI } from '@/api/admin'
 
 describe('useGrokOAuth.exchangeAuthCode', () => {
@@ -39,7 +39,7 @@ describe('useGrokOAuth.exchangeAuthCode', () => {
       reason: 'GROK_OAUTH_INVALID_STATE',
       message: 'invalid oauth state'
     })
-    const oauth = useGrokOAuth()
+    const oauth = createGrokOAuth()
 
     const tokenInfo = await oauth.exchangeAuthCode({
       code: 'code',
@@ -48,7 +48,7 @@ describe('useGrokOAuth.exchangeAuthCode', () => {
     })
 
     expect(tokenInfo).toBeNull()
-    expect(oauth.error.value).toBe(
+    expect(oauth.error).toBe(
       'Grok OAuth state 与当前会话不匹配。请粘贴同一次生成的授权链接返回的回调 URL。'
     )
   })
@@ -56,7 +56,7 @@ describe('useGrokOAuth.exchangeAuthCode', () => {
 
 describe('useGrokOAuth.buildCredentials', () => {
   it('builds OAuth credentials without forcing base_url or leaking sso/password', () => {
-    const oauth = useGrokOAuth()
+    const oauth = createGrokOAuth()
 
     const credentials = oauth.buildCredentials({
       access_token: 'access-token',

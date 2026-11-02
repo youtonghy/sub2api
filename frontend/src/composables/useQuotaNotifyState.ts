@@ -1,54 +1,71 @@
-import { reactive, ref } from 'vue'
 import { adminAPI } from '@/api/admin'
 import { QUOTA_THRESHOLD_TYPE_FIXED, type QuotaThresholdType } from '@/constants/account'
+import { createObservableState, useObservableInstance } from './useObservableState'
 
 export const QUOTA_NOTIFY_DIMS = ['daily', 'weekly', 'total'] as const
 export type QuotaNotifyDim = (typeof QUOTA_NOTIFY_DIMS)[number]
 
-interface DimState {
+export interface QuotaNotifyDimState {
   enabled: boolean | null
   threshold: number | null
   thresholdType: QuotaThresholdType | null
 }
 
-export function useQuotaNotifyState() {
-  const globalEnabled = ref(false)
-  const state = reactive<Record<QuotaNotifyDim, DimState>>({
-    daily: { enabled: null, threshold: null, thresholdType: null },
-    weekly: { enabled: null, threshold: null, thresholdType: null },
-    total: { enabled: null, threshold: null, thresholdType: null },
-  })
+interface QuotaNotifySnapshot {
+  globalEnabled: boolean
+  state: Record<QuotaNotifyDim, QuotaNotifyDimState>
+}
+
+const emptyDims = (): Record<QuotaNotifyDim, QuotaNotifyDimState> => ({
+  daily: { enabled: null, threshold: null, thresholdType: null },
+  weekly: { enabled: null, threshold: null, thresholdType: null },
+  total: { enabled: null, threshold: null, thresholdType: null }
+})
+
+/**
+ * 账号配额通知状态（对应 Vue 版 useQuotaNotifyState）。
+ * `state` 为只读快照，用 setDim 修改；writeToExtra 总是读取最新值。
+ */
+export function createQuotaNotifyState() {
+  const observable = createObservableState<QuotaNotifySnapshot>({ globalEnabled: false, state: emptyDims() })
+  const s = () => observable.get()
+
+  function setDim(dim: QuotaNotifyDim, patch: Partial<QuotaNotifyDimState>) {
+    observable.set({ state: { ...s().state, [dim]: { ...s().state[dim], ...patch } } })
+  }
 
   function loadGlobalState() {
     adminAPI.settings
       .getSettings()
       .then((settings) => {
-        globalEnabled.value = settings.account_quota_notify_enabled === true
+        observable.set({ globalEnabled: settings.account_quota_notify_enabled === true })
       })
       .catch(() => {
-        globalEnabled.value = false
+        observable.set({ globalEnabled: false })
       })
   }
 
   function loadFromExtra(extra: Record<string, unknown> | null | undefined) {
+    const next = emptyDims()
     for (const d of QUOTA_NOTIFY_DIMS) {
-      state[d].enabled = (extra?.[`quota_notify_${d}_enabled`] as boolean) ?? null
-      state[d].threshold = (extra?.[`quota_notify_${d}_threshold`] as number) ?? null
-      state[d].thresholdType = (extra?.[`quota_notify_${d}_threshold_type`] as QuotaThresholdType) ?? null
+      next[d].enabled = (extra?.[`quota_notify_${d}_enabled`] as boolean) ?? null
+      next[d].threshold = (extra?.[`quota_notify_${d}_threshold`] as number) ?? null
+      next[d].thresholdType = (extra?.[`quota_notify_${d}_threshold_type`] as QuotaThresholdType) ?? null
     }
+    observable.set({ state: next })
   }
 
   function writeToExtra(extra: Record<string, unknown>, mode: 'create' | 'update') {
     for (const d of QUOTA_NOTIFY_DIMS) {
-      const s = state[d]
-      if (s.enabled) {
+      const dimState = s().state[d]
+      if (dimState.enabled) {
         extra[`quota_notify_${d}_enabled`] = true
-        if (s.threshold != null) {
-          extra[`quota_notify_${d}_threshold`] = s.threshold
+        if (dimState.threshold != null) {
+          extra[`quota_notify_${d}_threshold`] = dimState.threshold
         } else if (mode === 'update') {
           delete extra[`quota_notify_${d}_threshold`]
         }
-        extra[`quota_notify_${d}_threshold_type`] = s.thresholdType || QUOTA_THRESHOLD_TYPE_FIXED
+        extra[`quota_notify_${d}_threshold_type`] = dimState.thresholdType || QUOTA_THRESHOLD_TYPE_FIXED
       } else if (mode === 'update') {
         delete extra[`quota_notify_${d}_enabled`]
         delete extra[`quota_notify_${d}_threshold`]
@@ -58,12 +75,27 @@ export function useQuotaNotifyState() {
   }
 
   function reset() {
-    for (const d of QUOTA_NOTIFY_DIMS) {
-      state[d].enabled = null
-      state[d].threshold = null
-      state[d].thresholdType = null
-    }
+    observable.set({ state: emptyDims() })
   }
 
-  return { globalEnabled, state, loadGlobalState, loadFromExtra, writeToExtra, reset }
+  return {
+    observable,
+    get globalEnabled() {
+      return s().globalEnabled
+    },
+    get state() {
+      return s().state
+    },
+    setDim,
+    loadGlobalState,
+    loadFromExtra,
+    writeToExtra,
+    reset
+  }
+}
+
+export type QuotaNotifyState = ReturnType<typeof createQuotaNotifyState>
+
+export function useQuotaNotifyState(): QuotaNotifyState {
+  return useObservableInstance(createQuotaNotifyState)
 }

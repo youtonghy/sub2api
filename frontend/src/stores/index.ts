@@ -1,5 +1,5 @@
 /**
- * Pinia Stores Export
+ * Zustand Stores Export
  * Central export point for all application stores
  */
 

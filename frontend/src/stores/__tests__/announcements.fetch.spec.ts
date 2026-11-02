@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
 import { useAnnouncementStore } from '../announcements'
+import { liveStore, resetStore } from './storeHarness'
 import type { UserAnnouncement } from '@/types'
 
 const list = vi.hoisted(() => vi.fn())
@@ -19,7 +19,9 @@ function pendingList() {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia())
+  // Throttle timestamp, popup queue and shown-popup set live outside the state object
+  useAnnouncementStore.getState().reset()
+  resetStore(useAnnouncementStore)
   vi.resetAllMocks()
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
@@ -27,7 +29,7 @@ afterEach(() => vi.restoreAllMocks())
 
 describe('announcement fetch ownership', () => {
   it('does not restore announcements or popups after logout resets the store', async () => {
-    const store = useAnnouncementStore()
+    const store = liveStore(useAnnouncementStore)
     const old = pendingList()
     list.mockReturnValueOnce(old.promise)
     const request = store.fetchAnnouncements()
@@ -40,7 +42,7 @@ describe('announcement fetch ownership', () => {
   })
 
   it('keeps the new session loading when an old request finishes', async () => {
-    const store = useAnnouncementStore()
+    const store = liveStore(useAnnouncementStore)
     const old = pendingList()
     const current = pendingList()
     list.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise)
@@ -57,7 +59,7 @@ describe('announcement fetch ownership', () => {
   })
 
   it('keeps the latest forced refresh when responses arrive out of order', async () => {
-    const store = useAnnouncementStore()
+    const store = liveStore(useAnnouncementStore)
     const old = pendingList()
     list.mockReturnValueOnce(old.promise).mockResolvedValueOnce([notice(2)])
     const oldRequest = store.fetchAnnouncements()
@@ -69,7 +71,7 @@ describe('announcement fetch ownership', () => {
   })
 
   it('does not clear the new session throttle when an old request rejects', async () => {
-    const store = useAnnouncementStore()
+    const store = liveStore(useAnnouncementStore)
     const old = pendingList()
     list.mockReturnValueOnce(old.promise).mockResolvedValue([notice(2)])
     const oldRequest = store.fetchAnnouncements()
@@ -83,7 +85,7 @@ describe('announcement fetch ownership', () => {
   })
 
   it('still retries a failed current request', async () => {
-    const store = useAnnouncementStore()
+    const store = liveStore(useAnnouncementStore)
     list.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce([notice(1)])
     await store.fetchAnnouncements()
     await store.fetchAnnouncements()
@@ -92,7 +94,7 @@ describe('announcement fetch ownership', () => {
   })
 
   it('still throttles ordinary concurrent fetches', async () => {
-    const store = useAnnouncementStore()
+    const store = liveStore(useAnnouncementStore)
     const current = pendingList()
     list.mockReturnValueOnce(current.promise)
     const request = store.fetchAnnouncements()

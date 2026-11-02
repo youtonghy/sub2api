@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
 import { useSubscriptionStore } from '@/stores/subscriptions'
+import { liveStore, resetStore } from './storeHarness'
 
 // Mock subscriptions API
 const mockGetActiveSubscriptions = vi.fn()
@@ -46,7 +46,9 @@ const fakeSubscriptions = [
 
 describe('useSubscriptionStore', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
+    // Internal cache, in-flight request and poller live outside the state object
+    useSubscriptionStore.getState().clear()
+    resetStore(useSubscriptionStore)
     vi.useFakeTimers()
     vi.clearAllMocks()
   })
@@ -60,7 +62,7 @@ describe('useSubscriptionStore', () => {
   describe('fetchActiveSubscriptions', () => {
     it('成功获取活跃订阅', async () => {
       mockGetActiveSubscriptions.mockResolvedValue(fakeSubscriptions)
-      const store = useSubscriptionStore()
+      const store = liveStore(useSubscriptionStore)
 
       const result = await store.fetchActiveSubscriptions()
 
@@ -71,7 +73,7 @@ describe('useSubscriptionStore', () => {
 
     it('缓存有效时返回缓存数据', async () => {
       mockGetActiveSubscriptions.mockResolvedValue(fakeSubscriptions)
-      const store = useSubscriptionStore()
+      const store = liveStore(useSubscriptionStore)
 
       // 第一次请求
       await store.fetchActiveSubscriptions()
@@ -85,7 +87,7 @@ describe('useSubscriptionStore', () => {
 
     it('缓存过期后重新请求', async () => {
       mockGetActiveSubscriptions.mockResolvedValue(fakeSubscriptions)
-      const store = useSubscriptionStore()
+      const store = liveStore(useSubscriptionStore)
 
       await store.fetchActiveSubscriptions()
       expect(mockGetActiveSubscriptions).toHaveBeenCalledTimes(1)
@@ -103,7 +105,7 @@ describe('useSubscriptionStore', () => {
 
     it('force=true 强制重新请求', async () => {
       mockGetActiveSubscriptions.mockResolvedValue(fakeSubscriptions)
-      const store = useSubscriptionStore()
+      const store = liveStore(useSubscriptionStore)
 
       await store.fetchActiveSubscriptions()
 
@@ -120,7 +122,7 @@ describe('useSubscriptionStore', () => {
       mockGetActiveSubscriptions.mockImplementation(
         () => new Promise((resolve) => { resolvePromise = resolve })
       )
-      const store = useSubscriptionStore()
+      const store = liveStore(useSubscriptionStore)
 
       // 并发发起两个请求
       const p1 = store.fetchActiveSubscriptions()
@@ -139,7 +141,7 @@ describe('useSubscriptionStore', () => {
 
     it('API 错误时抛出异常', async () => {
       mockGetActiveSubscriptions.mockRejectedValue(new Error('Network error'))
-      const store = useSubscriptionStore()
+      const store = liveStore(useSubscriptionStore)
 
       await expect(store.fetchActiveSubscriptions()).rejects.toThrow('Network error')
     })
@@ -150,7 +152,7 @@ describe('useSubscriptionStore', () => {
   describe('hasActiveSubscriptions', () => {
     it('有订阅时返回 true', async () => {
       mockGetActiveSubscriptions.mockResolvedValue(fakeSubscriptions)
-      const store = useSubscriptionStore()
+      const store = liveStore(useSubscriptionStore)
 
       await store.fetchActiveSubscriptions()
 
@@ -158,13 +160,13 @@ describe('useSubscriptionStore', () => {
     })
 
     it('无订阅时返回 false', () => {
-      const store = useSubscriptionStore()
+      const store = liveStore(useSubscriptionStore)
       expect(store.hasActiveSubscriptions).toBe(false)
     })
 
     it('清除后返回 false', async () => {
       mockGetActiveSubscriptions.mockResolvedValue(fakeSubscriptions)
-      const store = useSubscriptionStore()
+      const store = liveStore(useSubscriptionStore)
 
       await store.fetchActiveSubscriptions()
       expect(store.hasActiveSubscriptions).toBe(true)
@@ -179,7 +181,7 @@ describe('useSubscriptionStore', () => {
   describe('invalidateCache', () => {
     it('失效缓存后下次请求重新获取数据', async () => {
       mockGetActiveSubscriptions.mockResolvedValue(fakeSubscriptions)
-      const store = useSubscriptionStore()
+      const store = liveStore(useSubscriptionStore)
 
       await store.fetchActiveSubscriptions()
       expect(mockGetActiveSubscriptions).toHaveBeenCalledTimes(1)
@@ -196,7 +198,7 @@ describe('useSubscriptionStore', () => {
   describe('clear', () => {
     it('清除所有订阅数据', async () => {
       mockGetActiveSubscriptions.mockResolvedValue(fakeSubscriptions)
-      const store = useSubscriptionStore()
+      const store = liveStore(useSubscriptionStore)
 
       await store.fetchActiveSubscriptions()
       expect(store.activeSubscriptions).toHaveLength(2)
@@ -212,7 +214,7 @@ describe('useSubscriptionStore', () => {
 
   describe('startPolling / stopPolling', () => {
     it('startPolling 不会创建重复 interval', () => {
-      const store = useSubscriptionStore()
+      const store = liveStore(useSubscriptionStore)
       mockGetActiveSubscriptions.mockResolvedValue([])
 
       store.startPolling()
@@ -226,7 +228,7 @@ describe('useSubscriptionStore', () => {
     })
 
     it('stopPolling 停止定期刷新', () => {
-      const store = useSubscriptionStore()
+      const store = liveStore(useSubscriptionStore)
       mockGetActiveSubscriptions.mockResolvedValue([])
 
       store.startPolling()

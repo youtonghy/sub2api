@@ -1,4 +1,3 @@
-import { shallowRef } from 'vue'
 import builtinCatalog from './platformCatalog.builtin.json'
 
 /**
@@ -55,16 +54,35 @@ export interface PlatformCatalog {
 
 export const BUILTIN_PLATFORM_CATALOG: PlatformCatalog = builtinCatalog as PlatformCatalog
 
-const catalogState = shallowRef<PlatformCatalog>(BUILTIN_PLATFORM_CATALOG)
+const catalogState: { value: PlatformCatalog } = { value: BUILTIN_PLATFORM_CATALOG }
+const catalogListeners = new Set<() => void>()
+
+/** 订阅清单变化（platforms.ts 据此重建选项，React 组件可配合 useSyncExternalStore）。 */
+export function subscribePlatformCatalog(listener: () => void): () => void {
+  catalogListeners.add(listener)
+  return () => {
+    catalogListeners.delete(listener)
+  }
+}
+
+/** 当前清单对象，清单替换时引用随之变化，可作为订阅快照。 */
+export function getPlatformCatalog(): PlatformCatalog {
+  return catalogState.value
+}
+
+function replaceCatalog(catalog: PlatformCatalog): void {
+  catalogState.value = catalog
+  catalogListeners.forEach((listener) => listener())
+}
 
 /** 替换当前清单（测试用于模拟新登记的平台）。 */
 export function setPlatformCatalog(catalog: PlatformCatalog): void {
-  catalogState.value = catalog
+  replaceCatalog(catalog)
 }
 
 /** 恢复内置清单（测试用）。 */
 export function resetPlatformCatalog(): void {
-  catalogState.value = BUILTIN_PLATFORM_CATALOG
+  replaceCatalog(BUILTIN_PLATFORM_CATALOG)
 }
 
 /** 全部具体平台，按展示顺序。 */

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
 import { useSubscriptionStore } from '../subscriptions'
+import { liveStore, resetStore } from './storeHarness'
 import type { UserSubscription } from '@/types'
 
 const getActive = vi.hoisted(() => vi.fn())
@@ -14,7 +14,9 @@ function deferred() {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia())
+  // Internal cache, in-flight request and poller live outside the state object
+  useSubscriptionStore.getState().clear()
+  resetStore(useSubscriptionStore)
   getActive.mockReset()
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
@@ -24,7 +26,7 @@ describe('clearing in-flight subscriptions', () => {
   it.each(['resolve', 'reject'] as const)('resets loading immediately and after the old request %s', async (outcome) => {
     const pending = deferred()
     getActive.mockReturnValueOnce(pending.promise)
-    const store = useSubscriptionStore()
+    const store = liveStore(useSubscriptionStore)
     const request = store.fetchActiveSubscriptions().catch(() => [])
     expect(store.loading).toBe(true)
     store.clear()
@@ -40,7 +42,7 @@ describe('clearing in-flight subscriptions', () => {
     const older = deferred()
     const newer = deferred()
     getActive.mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise)
-    const store = useSubscriptionStore()
+    const store = liveStore(useSubscriptionStore)
     const first = store.fetchActiveSubscriptions()
     store.clear()
     const second = store.fetchActiveSubscriptions()

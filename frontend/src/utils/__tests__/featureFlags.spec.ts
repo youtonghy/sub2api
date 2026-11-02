@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import { FeatureFlags, isFeatureFlagEnabled, makeSidebarFlag, resolveFeatureFlag } from '@/utils/featureFlags'
 import type { PublicSettings } from '@/types'
@@ -14,35 +13,34 @@ vi.mock('@/api/auth', () => ({
 
 describe('FeatureFlags.subscription', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
+    useAppStore.setState(useAppStore.getInitialState(), true)
     delete (window as any).__APP_CONFIG__
   })
 
   it('reads subscription_enabled as an opt-out flag: visible before settings load', () => {
     expect(FeatureFlags.subscription.key).toBe('subscription_enabled')
     expect(FeatureFlags.subscription.mode).toBe('opt-out')
-    expect(useAppStore().cachedPublicSettings).toBeNull()
+    expect(useAppStore.getState().cachedPublicSettings).toBeNull()
     expect(isFeatureFlagEnabled(FeatureFlags.subscription)).toBe(true)
   })
 
   it('hides only when the backend explicitly sends false', () => {
-    const store = useAppStore()
     const sidebarFlag = makeSidebarFlag(FeatureFlags.subscription)
 
-    store.cachedPublicSettings = { subscription_enabled: false } as PublicSettings
+    useAppStore.setState({ cachedPublicSettings: { subscription_enabled: false } as PublicSettings })
     expect(sidebarFlag()).toBe(false)
 
-    store.cachedPublicSettings = { subscription_enabled: true } as PublicSettings
+    useAppStore.setState({ cachedPublicSettings: { subscription_enabled: true } as PublicSettings })
     expect(sidebarFlag()).toBe(true)
 
-    store.cachedPublicSettings = {} as PublicSettings
+    useAppStore.setState({ cachedPublicSettings: {} as PublicSettings })
     expect(sidebarFlag()).toBe(true)
   })
 })
 
 describe('resolveFeatureFlag', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
+    useAppStore.setState(useAppStore.getInitialState(), true)
   })
 
   it('reads an explicit boolean from the given settings object', () => {
@@ -59,7 +57,7 @@ describe('resolveFeatureFlag', () => {
   })
 
   it('backs isFeatureFlagEnabled with the same resolution', () => {
-    useAppStore().cachedPublicSettings = { subscription_enabled: false } as PublicSettings
+    useAppStore.setState({ cachedPublicSettings: { subscription_enabled: false } as PublicSettings })
     expect(isFeatureFlagEnabled(FeatureFlags.subscription)).toBe(false)
   })
 })

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
 import { useAppStore } from '@/stores/app'
+import { liveStore, resetStore } from './storeHarness'
 import { getPublicSettings } from '@/api/auth'
 import type { PublicSettings } from '@/types'
 
@@ -77,7 +77,9 @@ vi.mock('@/api/auth', () => ({
 
 describe('useAppStore', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
+    // Toast and loading counters live outside the state object
+    useAppStore.getState().reset()
+    resetStore(useAppStore)
     vi.useFakeTimers()
     localStorage.clear()
     vi.mocked(getPublicSettings).mockReset()
@@ -94,7 +96,7 @@ describe('useAppStore', () => {
 
   describe('Toast 消息管理', () => {
     it('showSuccess 创建 success 类型 toast', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       const id = store.showSuccess('操作成功')
 
       expect(id).toMatch(/^toast-/)
@@ -104,7 +106,7 @@ describe('useAppStore', () => {
     })
 
     it('showError 创建 error 类型 toast', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       store.showError('出错了')
 
       expect(store.toasts).toHaveLength(1)
@@ -113,7 +115,7 @@ describe('useAppStore', () => {
     })
 
     it('showWarning 创建 warning 类型 toast', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       store.showWarning('警告信息')
 
       expect(store.toasts).toHaveLength(1)
@@ -121,7 +123,7 @@ describe('useAppStore', () => {
     })
 
     it('showInfo 创建 info 类型 toast', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       store.showInfo('提示信息')
 
       expect(store.toasts).toHaveLength(1)
@@ -129,7 +131,7 @@ describe('useAppStore', () => {
     })
 
     it('toast 在指定 duration 后自动消失', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       store.showSuccess('临时消息', 3000)
 
       expect(store.toasts).toHaveLength(1)
@@ -140,7 +142,7 @@ describe('useAppStore', () => {
     })
 
     it('hideToast 移除指定 toast', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       const id = store.showSuccess('消息1')
       store.showError('消息2')
 
@@ -153,7 +155,7 @@ describe('useAppStore', () => {
     })
 
     it('clearAllToasts 清除所有 toast', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       store.showSuccess('消息1')
       store.showError('消息2')
       store.showWarning('消息3')
@@ -166,7 +168,7 @@ describe('useAppStore', () => {
     })
 
     it('hasActiveToasts 正确反映 toast 状态', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       expect(store.hasActiveToasts).toBe(false)
 
       store.showSuccess('消息')
@@ -177,7 +179,7 @@ describe('useAppStore', () => {
     })
 
     it('多个 toast 的 ID 唯一', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       const id1 = store.showSuccess('消息1')
       const id2 = store.showSuccess('消息2')
       const id3 = store.showSuccess('消息3')
@@ -191,7 +193,7 @@ describe('useAppStore', () => {
 
   describe('侧边栏管理', () => {
     it('toggleSidebar 切换折叠状态', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       expect(store.sidebarCollapsed).toBe(false)
 
       store.toggleSidebar()
@@ -202,7 +204,7 @@ describe('useAppStore', () => {
     })
 
     it('setSidebarCollapsed 直接设置状态', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
 
       store.setSidebarCollapsed(true)
       expect(store.sidebarCollapsed).toBe(true)
@@ -212,18 +214,18 @@ describe('useAppStore', () => {
     })
 
     it('sidebarScrollTop 默认为 0 且可读写', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       expect(store.sidebarScrollTop).toBe(0)
 
-      store.sidebarScrollTop = 256
+      useAppStore.setState({ sidebarScrollTop: 256 })
       expect(store.sidebarScrollTop).toBe(256)
 
-      store.sidebarScrollTop = 0
+      useAppStore.setState({ sidebarScrollTop: 0 })
       expect(store.sidebarScrollTop).toBe(0)
     })
 
     it('toggleMobileSidebar 切换移动端状态', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       expect(store.mobileOpen).toBe(false)
 
       store.toggleMobileSidebar()
@@ -238,7 +240,7 @@ describe('useAppStore', () => {
 
   describe('Loading 状态管理', () => {
     it('setLoading 管理引用计数', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       expect(store.loading).toBe(false)
 
       store.setLoading(true)
@@ -255,7 +257,7 @@ describe('useAppStore', () => {
     })
 
     it('setLoading(false) 不会使计数为负', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
 
       store.setLoading(false)
       store.setLoading(false)
@@ -269,7 +271,7 @@ describe('useAppStore', () => {
     })
 
     it('withLoading 自动管理 loading 状态', async () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
 
       const result = await store.withLoading(async () => {
         expect(store.loading).toBe(true)
@@ -281,7 +283,7 @@ describe('useAppStore', () => {
     })
 
     it('withLoading 错误时也恢复 loading 状态', async () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
 
       await expect(
         store.withLoading(async () => {
@@ -293,7 +295,7 @@ describe('useAppStore', () => {
     })
 
     it('withLoadingAndError 错误时显示 toast 并返回 null', async () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
 
       const result = await store.withLoadingAndError(async () => {
         throw new Error('网络错误')
@@ -310,7 +312,7 @@ describe('useAppStore', () => {
 
   describe('reset', () => {
     it('重置所有 UI 状态', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
 
       store.setSidebarCollapsed(true)
       store.setLoading(true)
@@ -331,7 +333,7 @@ describe('useAppStore', () => {
       const deferred = createDeferred<PublicSettings>()
       vi.mocked(getPublicSettings).mockReturnValue(deferred.promise)
       const settings = createPublicSettings({ payment_enabled: true })
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
 
       const first = store.fetchPublicSettings()
       const second = store.fetchPublicSettings()
@@ -359,7 +361,7 @@ describe('useAppStore', () => {
     it('force 在无活动请求时绕过缓存，刷新期间的普通调用等待刷新结果', async () => {
       const initial = createPublicSettings({ site_name: 'Initial Site' })
       vi.mocked(getPublicSettings).mockResolvedValueOnce(initial)
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       await store.fetchPublicSettings()
 
       const deferred = createDeferred<PublicSettings>()
@@ -383,7 +385,7 @@ describe('useAppStore', () => {
       const deferred = createDeferred<PublicSettings>()
       vi.mocked(getPublicSettings).mockReturnValue(deferred.promise)
       const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
 
       const first = store.fetchPublicSettings()
       const second = store.fetchPublicSettings()
@@ -407,7 +409,7 @@ describe('useAppStore', () => {
         doc_url: 'https://docs.test.com',
       }
 
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       const result = store.initFromInjectedConfig()
 
       expect(result).toBe(true)
@@ -418,7 +420,7 @@ describe('useAppStore', () => {
     })
 
     it('无注入配置时返回 false', () => {
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       const result = store.initFromInjectedConfig()
 
       expect(result).toBe(false)
@@ -428,7 +430,7 @@ describe('useAppStore', () => {
     it('clearPublicSettingsCache 清除缓存', () => {
       const windowAny = window as any
       windowAny.__APP_CONFIG__ = { site_name: 'Test' }
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       store.initFromInjectedConfig()
 
       expect(store.publicSettingsLoaded).toBe(true)
@@ -469,7 +471,7 @@ describe('useAppStore', () => {
         version: '1.0.0'
       })
 
-      const store = useAppStore()
+      const store = liveStore(useAppStore)
       await store.fetchPublicSettings(true)
 
       expect((window as any).__APP_CONFIG__.table_default_page_size).toBe(1000)

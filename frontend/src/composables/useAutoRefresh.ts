@@ -1,4 +1,4 @@
-import { ref, onBeforeUnmount, type Ref } from 'vue'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export interface UseAutoRefreshOptions {
   storageKey: string
@@ -10,104 +10,137 @@ export interface UseAutoRefreshOptions {
   shouldPause?: () => boolean
 }
 
+interface AutoRefreshState {
+  enabled: boolean
+  intervalSeconds: number
+  countdown: number
+  fetching: boolean
+}
+
+const DEFAULT_INTERVALS = [5, 10, 15, 30] as const
+
+function loadInitialState(options: UseAutoRefreshOptions): AutoRefreshState {
+  const intervals = options.intervals ?? DEFAULT_INTERVALS
+  const state: AutoRefreshState = {
+    enabled: options.defaultEnabled ?? false,
+    intervalSeconds: options.defaultInterval ?? intervals[intervals.length - 1],
+    countdown: 0,
+    fetching: false
+  }
+  try {
+    const saved = localStorage.getItem(options.storageKey)
+    if (!saved) return state
+    const parsed = JSON.parse(saved) as { enabled?: boolean; interval_seconds?: number }
+    state.enabled = parsed.enabled === true
+    const iv = Number(parsed.interval_seconds)
+    if (intervals.includes(iv)) state.intervalSeconds = iv
+  } catch {
+    /* 存储内容损坏时沿用默认值 */
+  }
+  return state
+}
+
+/**
+ * 自动刷新倒计时，对应 Vue 版 useAutoRefresh：状态保存到 localStorage，每秒倒数，归零时调用 onRefresh。
+ * 与 Vue 版相同，读取到已启用的存储状态时不会自动开始计时，需要页面调用 start()。
+ */
 export function useAutoRefresh(options: UseAutoRefreshOptions) {
-  const {
-    storageKey,
-    intervals = [5, 10, 15, 30] as const,
-    defaultInterval,
-    onRefresh,
-    shouldPause,
-  } = options
+  const intervals = options.intervals ?? DEFAULT_INTERVALS
+  const [state, setState] = useState(() => loadInitialState(options))
+  const stateRef = useRef(state)
+  const optionsRef = useRef(options)
+  const timerId = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
 
-  const enabled = ref(options.defaultEnabled ?? false)
-  const intervalSeconds = ref(defaultInterval ?? intervals[intervals.length - 1])
-  const countdown = ref(0)
-  const fetching = ref(false)
+  useEffect(() => {
+    optionsRef.current = options
+  })
 
-  let timerId: number | undefined
+  const update = useCallback((patch: Partial<AutoRefreshState>) => {
+    stateRef.current = { ...stateRef.current, ...patch }
+    setState(stateRef.current)
+  }, [])
 
-  function loadFromStorage() {
+  const saveToStorage = useCallback(() => {
     try {
-      const saved = localStorage.getItem(storageKey)
-      if (!saved) return
-      const parsed = JSON.parse(saved) as { enabled?: boolean; interval_seconds?: number }
-      enabled.value = parsed.enabled === true
-      const iv = Number(parsed.interval_seconds)
-      if (intervals.includes(iv as any)) intervalSeconds.value = iv
-    } catch { /* ignore */ }
-  }
+      localStorage.setItem(
+        optionsRef.current.storageKey,
+        JSON.stringify({ enabled: stateRef.current.enabled, interval_seconds: stateRef.current.intervalSeconds })
+      )
+    } catch {
+      /* 存储不可用（隐私模式等）时只保留内存状态 */
+    }
+  }, [])
 
-  function saveToStorage() {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify({
-        enabled: enabled.value,
-        interval_seconds: intervalSeconds.value,
-      }))
-    } catch { /* ignore */ }
-  }
+  const tick = useCallback(async () => {
+    const current = stateRef.current
+    if (!current.enabled) return
+    if (optionsRef.current.shouldPause?.()) return
+    if (current.fetching) return
 
-  async function tick() {
-    if (!enabled.value) return
-    if (shouldPause?.()) return
-    if (fetching.value) return
-
-    if (countdown.value <= 1) {
-      countdown.value = intervalSeconds.value
-      fetching.value = true
-      try { await onRefresh() } finally { fetching.value = false }
+    if (current.countdown <= 1) {
+      update({ countdown: current.intervalSeconds, fetching: true })
+      try {
+        await optionsRef.current.onRefresh()
+      } finally {
+        update({ fetching: false })
+      }
       return
     }
-    countdown.value -= 1
-  }
+    update({ countdown: current.countdown - 1 })
+  }, [update])
 
-  function start() {
-    if (timerId !== undefined) return
-    timerId = setInterval(tick, 1000) as unknown as number
-  }
+  const start = useCallback(() => {
+    if (timerId.current !== undefined) return
+    timerId.current = setInterval(() => void tick(), 1000)
+  }, [tick])
 
-  function stop() {
-    if (timerId !== undefined) {
-      clearInterval(timerId)
-      timerId = undefined
+  const stop = useCallback(() => {
+    if (timerId.current !== undefined) {
+      clearInterval(timerId.current)
+      timerId.current = undefined
     }
-  }
+  }, [])
 
-  function setEnabled(value: boolean) {
-    enabled.value = value
-    saveToStorage()
-    if (value) {
-      countdown.value = intervalSeconds.value
-      start()
-    } else {
-      stop()
-      countdown.value = 0
-    }
-  }
+  const setEnabled = useCallback(
+    (value: boolean) => {
+      update({ enabled: value })
+      saveToStorage()
+      if (value) {
+        update({ countdown: stateRef.current.intervalSeconds })
+        start()
+      } else {
+        stop()
+        update({ countdown: 0 })
+      }
+    },
+    [update, saveToStorage, start, stop]
+  )
 
-  function setInterval_(seconds: number) {
-    intervalSeconds.value = seconds
-    saveToStorage()
-    if (enabled.value) countdown.value = seconds
-  }
+  const setInterval_ = useCallback(
+    (seconds: number) => {
+      update({ intervalSeconds: seconds })
+      saveToStorage()
+      if (stateRef.current.enabled) update({ countdown: seconds })
+    },
+    [update, saveToStorage]
+  )
 
-  function resetCountdown() {
-    countdown.value = intervalSeconds.value
-  }
+  const resetCountdown = useCallback(() => {
+    update({ countdown: stateRef.current.intervalSeconds })
+  }, [update])
 
-  loadFromStorage()
-
-  onBeforeUnmount(stop)
+  useEffect(() => stop, [stop])
 
   return {
-    enabled: enabled as Ref<boolean>,
-    intervalSeconds: intervalSeconds as Ref<number>,
-    countdown: countdown as Ref<number>,
-    fetching: fetching as Ref<boolean>,
+    enabled: state.enabled,
+    intervalSeconds: state.intervalSeconds,
+    countdown: state.countdown,
+    fetching: state.fetching,
     intervals,
     setEnabled,
     setInterval: setInterval_,
     resetCountdown,
     start,
-    stop,
+    stop
   }
 }

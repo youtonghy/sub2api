@@ -2,11 +2,13 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+// Vue 版还断言 vite.config.ts 中的 vendor-stripe 分包规则；React 版 vite 配置没有 manualChunks
+// （Stripe 只经动态 import 进入独立 chunk），该断言不再适用，只保留加载器契约。
 const frontendRoot = resolve(__dirname, '../../../..')
 const stripeConsumers = [
-  'src/views/user/StripePaymentView.vue',
-  'src/views/user/StripePopupView.vue',
-  'src/components/payment/StripePaymentInline.vue',
+  'src/views/user/StripePaymentView.tsx',
+  'src/views/user/StripePopupView.tsx',
+  'src/components/payment/StripePaymentInline.tsx',
 ]
 
 function readFrontendFile(path: string): string {
@@ -19,15 +21,7 @@ describe('Stripe lazy-loading contract', () => {
 
     expect(source).toContain("await import('@stripe/stripe-js/pure')")
     expect(source).not.toMatch(/await import\(['"]@stripe\/stripe-js['"]\)/)
-  })
-
-  it('keeps Stripe out of the shared vendor chunk', () => {
-    const viteConfig = readFrontendFile('vite.config.ts')
-    const stripeRule = viteConfig.indexOf("id.includes('/@stripe/stripe-js/')")
-    const miscFallback = viteConfig.indexOf("return 'vendor-misc'")
-
-    expect(stripeRule).toBeGreaterThan(-1)
-    expect(viteConfig.slice(stripeRule, miscFallback)).toContain("return 'vendor-stripe'")
-    expect(stripeRule).toBeLessThan(miscFallback)
+    // 只允许类型导入（编译后擦除），不能静态导入运行时代码
+    expect(source).not.toMatch(/^import (?!type )[^\n]*from ['"]@stripe\/stripe-js(\/pure)?['"]/m)
   })
 })

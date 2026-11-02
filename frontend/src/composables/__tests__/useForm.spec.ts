@@ -1,7 +1,8 @@
+import { act, renderHook } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
-import { useForm } from '@/composables/useForm'
+import { useForm, type UseFormOptions } from '@/composables/useForm'
 import { useAppStore } from '@/stores/app'
+import { resetStore } from '@/stores/__tests__/storeHarness'
 
 // Mock API 依赖（app store 内部引用了这些）
 vi.mock('@/api/admin/system', () => ({
@@ -11,12 +12,11 @@ vi.mock('@/api/auth', () => ({
   getPublicSettings: vi.fn(),
 }))
 
-describe('useForm', () => {
-  let appStore: ReturnType<typeof useAppStore>
+const setup = <T>(options: UseFormOptions<T>) => renderHook(() => useForm(options))
 
+describe('useForm', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
-    appStore = useAppStore()
+    resetStore(useAppStore)
     vi.clearAllMocks()
   })
 
@@ -26,48 +26,41 @@ describe('useForm', () => {
       () => new Promise<void>((resolve) => { resolveSubmit = resolve })
     )
 
-    const { loading, submit } = useForm({
-      form: { name: 'test' },
-      submitFn,
+    const { result } = setup({ form: { name: 'test' }, submitFn })
+
+    expect(result.current.loading).toBe(false)
+
+    let submitPromise!: Promise<void>
+    act(() => { submitPromise = result.current.submit() })
+    // 提交中
+    expect(result.current.loading).toBe(true)
+
+    await act(async () => {
+      resolveSubmit!()
+      await submitPromise
     })
 
-    expect(loading.value).toBe(false)
-
-    const submitPromise = submit()
-    // 提交中
-    expect(loading.value).toBe(true)
-
-    resolveSubmit!()
-    await submitPromise
-
-    expect(loading.value).toBe(false)
+    expect(result.current.loading).toBe(false)
   })
 
   it('submit 成功时显示成功消息', async () => {
     const submitFn = vi.fn().mockResolvedValue(undefined)
-    const showSuccessSpy = vi.spyOn(appStore, 'showSuccess')
+    const showSuccessSpy = vi.spyOn(useAppStore.getState(), 'showSuccess')
 
-    const { submit } = useForm({
-      form: { name: 'test' },
-      submitFn,
-      successMsg: '保存成功',
-    })
+    const { result } = setup({ form: { name: 'test' }, submitFn, successMsg: '保存成功' })
 
-    await submit()
+    await act(() => result.current.submit())
 
     expect(showSuccessSpy).toHaveBeenCalledWith('保存成功')
   })
 
   it('submit 成功但无 successMsg 时不调用 showSuccess', async () => {
     const submitFn = vi.fn().mockResolvedValue(undefined)
-    const showSuccessSpy = vi.spyOn(appStore, 'showSuccess')
+    const showSuccessSpy = vi.spyOn(useAppStore.getState(), 'showSuccess')
 
-    const { submit } = useForm({
-      form: { name: 'test' },
-      submitFn,
-    })
+    const { result } = setup({ form: { name: 'test' }, submitFn })
 
-    await submit()
+    await act(() => result.current.submit())
 
     expect(showSuccessSpy).not.toHaveBeenCalled()
   })
@@ -77,30 +70,23 @@ describe('useForm', () => {
       response: { data: { message: '服务器错误' } },
     })
     const submitFn = vi.fn().mockRejectedValue(error)
-    const showErrorSpy = vi.spyOn(appStore, 'showError')
+    const showErrorSpy = vi.spyOn(useAppStore.getState(), 'showError')
 
-    const { submit, loading } = useForm({
-      form: { name: 'test' },
-      submitFn,
-    })
+    const { result } = setup({ form: { name: 'test' }, submitFn })
 
-    await expect(submit()).rejects.toThrow('提交失败')
+    await act(() => expect(result.current.submit()).rejects.toThrow('提交失败'))
 
     expect(showErrorSpy).toHaveBeenCalled()
-    expect(loading.value).toBe(false)
+    expect(result.current.loading).toBe(false)
   })
 
   it('submit 失败时使用自定义 errorMsg', async () => {
     const submitFn = vi.fn().mockRejectedValue(new Error('network'))
-    const showErrorSpy = vi.spyOn(appStore, 'showError')
+    const showErrorSpy = vi.spyOn(useAppStore.getState(), 'showError')
 
-    const { submit } = useForm({
-      form: { name: 'test' },
-      submitFn,
-      errorMsg: '自定义错误提示',
-    })
+    const { result } = setup({ form: { name: 'test' }, submitFn, errorMsg: '自定义错误提示' })
 
-    await expect(submit()).rejects.toThrow()
+    await act(() => expect(result.current.submit()).rejects.toThrow())
 
     expect(showErrorSpy).toHaveBeenCalledWith('自定义错误提示')
   })
@@ -111,32 +97,31 @@ describe('useForm', () => {
       () => new Promise<void>((resolve) => { resolveSubmit = resolve })
     )
 
-    const { submit } = useForm({
-      form: { name: 'test' },
-      submitFn,
-    })
+    const { result } = setup({ form: { name: 'test' }, submitFn })
 
-    // 第一次提交
-    const p1 = submit()
-    // 第二次提交（应被忽略，因为 loading=true）
-    submit()
+    let p1!: Promise<void>
+    act(() => {
+      // 第一次提交
+      p1 = result.current.submit()
+      // 第二次提交（应被忽略，因为 loading=true）
+      void result.current.submit()
+    })
 
     expect(submitFn).toHaveBeenCalledTimes(1)
 
-    resolveSubmit!()
-    await p1
+    await act(async () => {
+      resolveSubmit!()
+      await p1
+    })
   })
 
   it('传递 form 数据到 submitFn', async () => {
     const formData = { name: 'test', email: 'test@example.com' }
     const submitFn = vi.fn().mockResolvedValue(undefined)
 
-    const { submit } = useForm({
-      form: formData,
-      submitFn,
-    })
+    const { result } = setup({ form: formData, submitFn })
 
-    await submit()
+    await act(() => result.current.submit())
 
     expect(submitFn).toHaveBeenCalledWith(formData)
   })

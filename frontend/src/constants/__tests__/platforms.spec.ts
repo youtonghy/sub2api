@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { computed } from 'vue'
 import { CONCRETE_PLATFORM_OPTIONS, GROUP_PLATFORM_OPTIONS } from '@/constants/platforms'
 import {
   BUILTIN_PLATFORM_CATALOG,
@@ -72,12 +71,12 @@ describe('platform catalog with a newly registered platform', () => {
   })
 
   it('adds newly registered platforms to options, labels and quota lists reactively', () => {
-    const optionValues = computed(() => CONCRETE_PLATFORM_OPTIONS.map((option) => option.value))
-    expect(optionValues.value).not.toContain('acme_router')
+    const optionValues = () => CONCRETE_PLATFORM_OPTIONS.map((option) => option.value)
+    expect(optionValues()).not.toContain('acme_router')
 
     setPlatformCatalog(withNewProvider)
 
-    expect(optionValues.value).toEqual([...concretePlatforms, 'acme_router'])
+    expect(optionValues()).toEqual([...concretePlatforms, 'acme_router'])
     expect(GROUP_PLATFORM_OPTIONS.map((option) => option.value)).toEqual([
       ...concretePlatforms,
       'acme_router',

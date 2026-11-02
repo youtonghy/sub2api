@@ -1,33 +1,28 @@
+import { act, renderHook } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
+
+import { useAppStore } from '@/stores/app'
 
 // Mock i18n
 vi.mock('@/i18n', () => ({
-  i18n: {
-    global: {
-      t: (key: string) => key,
-    },
-  },
+  t: (key: string) => key,
 }))
 
-// Mock app store
+// Mock app store actions
 const mockShowSuccess = vi.fn()
 const mockShowError = vi.fn()
 
-vi.mock('@/stores/app', () => ({
-  useAppStore: () => ({
-    showSuccess: mockShowSuccess,
-    showError: mockShowError,
-  }),
-}))
-
 import { useClipboard } from '@/composables/useClipboard'
+
+function setup() {
+  return renderHook(() => useClipboard())
+}
 
 describe('useClipboard', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
     vi.useFakeTimers()
     vi.clearAllMocks()
+    useAppStore.setState({ showSuccess: mockShowSuccess, showError: mockShowError })
 
     // 默认模拟安全上下文 + Clipboard API
     Object.defineProperty(window, 'isSecureContext', { value: true, writable: true })
@@ -49,49 +44,51 @@ describe('useClipboard', () => {
   })
 
   it('复制成功后 copied 变为 true', async () => {
-    const { copied, copyToClipboard } = useClipboard()
+    const hook = setup()
 
-    expect(copied.value).toBe(false)
+    expect(hook.result.current.copied).toBe(false)
 
-    await copyToClipboard('hello')
+    await act(() => hook.result.current.copyToClipboard('hello'))
 
-    expect(copied.value).toBe(true)
+    expect(hook.result.current.copied).toBe(true)
   })
 
   it('copied 在 2 秒后自动恢复为 false', async () => {
-    const { copied, copyToClipboard } = useClipboard()
+    const hook = setup()
 
-    await copyToClipboard('hello')
-    expect(copied.value).toBe(true)
+    await act(() => hook.result.current.copyToClipboard('hello'))
+    expect(hook.result.current.copied).toBe(true)
 
-    vi.advanceTimersByTime(2000)
+    act(() => {
+      vi.advanceTimersByTime(2000)
+    })
 
-    expect(copied.value).toBe(false)
+    expect(hook.result.current.copied).toBe(false)
   })
 
   it('复制成功时调用 showSuccess', async () => {
-    const { copyToClipboard } = useClipboard()
+    const hook = setup()
 
-    await copyToClipboard('hello', '已复制')
+    await act(() => hook.result.current.copyToClipboard('hello', '已复制'))
 
     expect(mockShowSuccess).toHaveBeenCalledWith('已复制')
   })
 
   it('无自定义消息时使用 i18n 默认消息', async () => {
-    const { copyToClipboard } = useClipboard()
+    const hook = setup()
 
-    await copyToClipboard('hello')
+    await act(() => hook.result.current.copyToClipboard('hello'))
 
     expect(mockShowSuccess).toHaveBeenCalledWith('common.copiedToClipboard')
   })
 
   it('空文本返回 false 且不复制', async () => {
-    const { copyToClipboard, copied } = useClipboard()
+    const hook = setup()
 
-    const result = await copyToClipboard('')
+    const result = await act(() => hook.result.current.copyToClipboard(''))
 
     expect(result).toBe(false)
-    expect(copied.value).toBe(false)
+    expect(hook.result.current.copied).toBe(false)
     expect(navigator.clipboard.writeText).not.toHaveBeenCalled()
   })
 
@@ -103,11 +100,11 @@ describe('useClipboard', () => {
     const documentAny = document as any
     documentAny.execCommand = vi.fn().mockReturnValue(true)
 
-    const { copyToClipboard, copied } = useClipboard()
-    const result = await copyToClipboard('fallback text')
+    const hook = setup()
+    const result = await act(() => hook.result.current.copyToClipboard('fallback text'))
 
     expect(result).toBe(true)
-    expect(copied.value).toBe(true)
+    expect(hook.result.current.copied).toBe(true)
     expect(document.execCommand).toHaveBeenCalledWith('copy')
   })
 
@@ -117,11 +114,11 @@ describe('useClipboard', () => {
     const documentAny = document as any
     documentAny.execCommand = vi.fn().mockReturnValue(true)
 
-    const { copyToClipboard, copied } = useClipboard()
-    const result = await copyToClipboard('insecure context text')
+    const hook = setup()
+    const result = await act(() => hook.result.current.copyToClipboard('insecure context text'))
 
     expect(result).toBe(true)
-    expect(copied.value).toBe(true)
+    expect(hook.result.current.copied).toBe(true)
     expect(navigator.clipboard.writeText).not.toHaveBeenCalled()
     expect(document.execCommand).toHaveBeenCalledWith('copy')
   })
@@ -133,9 +130,9 @@ describe('useClipboard', () => {
       configurable: true,
       value: vi.fn(() => { throw new DOMException('Copy denied', 'NotAllowedError') })
     })
-    const { copyToClipboard, copied } = useClipboard()
-    await expect(copyToClipboard('text')).resolves.toBe(false)
-    expect(copied.value).toBe(false)
+    const hook = setup()
+    await expect(act(() => hook.result.current.copyToClipboard('text'))).resolves.toBe(false)
+    expect(hook.result.current.copied).toBe(false)
     expect(mockShowError).toHaveBeenCalledWith('common.copyFailed')
     expect(mockShowSuccess).not.toHaveBeenCalled()
     expect(document.querySelector('textarea')).toBeNull()
@@ -148,11 +145,11 @@ describe('useClipboard', () => {
     const documentAny = document as any
     documentAny.execCommand = vi.fn().mockReturnValue(false)
 
-    const { copyToClipboard, copied } = useClipboard()
-    const result = await copyToClipboard('text')
+    const hook = setup()
+    const result = await act(() => hook.result.current.copyToClipboard('text'))
 
     expect(result).toBe(false)
-    expect(copied.value).toBe(false)
+    expect(hook.result.current.copied).toBe(false)
     expect(mockShowError).toHaveBeenCalled()
   })
 })

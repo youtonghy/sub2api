@@ -20,7 +20,7 @@ function collectStaticSourceKeys(source: string): string[] {
   const keys = new Set<string>()
 
   // Covers useI18n().t(), the global $t(), and direct i18n.t() calls in both
-  // TypeScript and Vue script/template source. Dynamic suffixes are checked by
+  // TypeScript and TSX source. Dynamic suffixes are checked by
   // the runtime type of the value and cannot be proven from source text alone.
   const translationCalls = /(?:\bi18n\.t|\$t|\bt)\s*\(\s*(['"])([^'"\r\n]+)\1/g
   for (const match of source.matchAll(translationCalls)) {
@@ -45,14 +45,14 @@ function collectStaticSourceKeys(source: string): string[] {
 }
 
 function sourceKeys(): string[] {
-  const sourceFiles = import.meta.glob('../../**/*.{ts,vue}', {
+  const sourceFiles = import.meta.glob('../../**/*.{ts,tsx}', {
     query: '?raw',
     import: 'default',
     eager: true
   }) as Record<string, string>
 
   return Object.entries(sourceFiles)
-    .filter(([path]) => !path.includes('/__tests__/') && !/\.(spec|test)\.ts$/.test(path))
+    .filter(([path]) => !path.includes('/__tests__/') && !/\.(spec|test)\.tsx?$/.test(path))
     .flatMap(([, source]) => collectStaticSourceKeys(source))
 }
 

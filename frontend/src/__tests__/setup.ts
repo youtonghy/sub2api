@@ -2,7 +2,7 @@
  * Vitest 测试环境设置
  * 提供全局 mock 和测试工具
  */
-import { config } from '@vue/test-utils'
+import '@testing-library/jest-dom/vitest'
 import { vi } from 'vitest'
 
 function createMemoryStorage(): Storage {
@@ -88,11 +88,6 @@ class MockResizeObserver {
 }
 
 globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
-
-// Vue Test Utils 全局配置
-config.global.stubs = {
-  // 可以在这里添加全局 stub
-}
 
 // 设置全局测试超时
 vi.setConfig({ testTimeout: 10000 })

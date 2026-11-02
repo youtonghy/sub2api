@@ -1,7 +1,11 @@
+import { renderHook } from '@testing-library/react'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { useKeyedDebouncedSearch } from '@/composables/useKeyedDebouncedSearch'
+import { useKeyedDebouncedSearch, type UseKeyedDebouncedSearchOptions } from '@/composables/useKeyedDebouncedSearch'
 
 const flushPromises = () => Promise.resolve()
+
+const setup = (options: UseKeyedDebouncedSearchOptions<string[]>) =>
+  renderHook(() => useKeyedDebouncedSearch<string[]>(options))
 
 describe('useKeyedDebouncedSearch', () => {
   beforeEach(() => {
@@ -16,11 +20,8 @@ describe('useKeyedDebouncedSearch', () => {
     const search = vi.fn().mockResolvedValue([])
     const onSuccess = vi.fn()
 
-    const searcher = useKeyedDebouncedSearch<string[]>({
-      delay: 100,
-      search,
-      onSuccess
-    })
+    const { result } = setup({ delay: 100, search, onSuccess })
+    const searcher = result.current
 
     searcher.trigger('a', 'foo')
     searcher.trigger('b', 'bar')
@@ -53,11 +54,8 @@ describe('useKeyedDebouncedSearch', () => {
     )
     const onSuccess = vi.fn()
 
-    const searcher = useKeyedDebouncedSearch<string[]>({
-      delay: 50,
-      search,
-      onSuccess
-    })
+    const { result } = setup({ delay: 50, search, onSuccess })
+    const searcher = result.current
 
     searcher.trigger('rule-1', 'first')
     vi.advanceTimersByTime(50)
@@ -83,11 +81,8 @@ describe('useKeyedDebouncedSearch', () => {
     const search = vi.fn().mockResolvedValue([])
     const onSuccess = vi.fn()
 
-    const searcher = useKeyedDebouncedSearch<string[]>({
-      delay: 100,
-      search,
-      onSuccess
-    })
+    const { result } = setup({ delay: 100, search, onSuccess })
+    const searcher = result.current
 
     searcher.trigger('a', 'foo')
     searcher.clearKey('a')
@@ -96,5 +91,18 @@ describe('useKeyedDebouncedSearch', () => {
 
     expect(search).not.toHaveBeenCalled()
     expect(onSuccess).not.toHaveBeenCalled()
+  })
+
+  it('卸载时取消全部未执行任务', () => {
+    const search = vi.fn().mockResolvedValue([])
+    const onSuccess = vi.fn()
+
+    const { result, unmount } = setup({ delay: 100, search, onSuccess })
+    result.current.trigger('a', 'foo')
+    unmount()
+
+    vi.advanceTimersByTime(100)
+
+    expect(search).not.toHaveBeenCalled()
   })
 })
