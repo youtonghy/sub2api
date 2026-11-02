@@ -16,6 +16,7 @@ See https://uiarc.dev/license.
   frontend/src/layouts/AuthLayout.module.css         (frame styles derived from the Arc Pro login-split block)
   frontend/src/components/arc/blocks/horizon-chart/  (Arc Pro horizon-chart block, with translatable labels)
   frontend/src/components/arc/blocks/kpi-drilldown/  (Arc Pro kpi-drilldown block, with translatable labels, locale, columns and range sums)
+  frontend/src/components/arc/blocks/uptime-status/  (adapted from the Arc Pro uptime-status block: data-driven strips, idle slots, translatable labels; latency chart and incidents removed)
   frontend/src/components/arc/funnel-chart/          (Arc Pro funnel-chart, with translatable labels and locale)
   frontend/src/components/arc/race-bar-chart/        (Arc Pro race-bar-chart, with translatable labels and locale)
   frontend/src/components/arc/radar-chart/           (Arc Pro radar-chart, with translatable labels and per-series value formatting)

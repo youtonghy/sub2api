@@ -42,7 +42,7 @@ export const accountBarrelModule = (overrides: Record<string, (props: any) => Re
   BulkEditAccountModal: capturing('BulkEditAccountModal', overrides.BulkEditAccountModal),
   SyncFromCrsModal: capturing('SyncFromCrsModal'),
   TempUnschedStatusModal: capturing('TempUnschedStatusModal'),
-  AccountFailureHeatmap: capturing('AccountFailureHeatmap')
+  AccountUptimeStatus: capturing('AccountUptimeStatus')
 })
 
 export const platformTypeBadgeModule = () => ({

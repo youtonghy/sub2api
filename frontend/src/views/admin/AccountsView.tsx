@@ -44,7 +44,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/arc/popove
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 import { Switch } from '@/components/arc/switch/switch'
 import {
-  AccountFailureHeatmap,
+  AccountUptimeStatus,
   BulkEditAccountModal,
   CreateAccountModal,
   EditAccountModal,
@@ -2987,7 +2987,7 @@ export default function AccountsView() {
             className={styles.dataTable}
           />
         ) : accountView === 'failures' ? (
-          <AccountFailureHeatmap
+          <AccountUptimeStatus
             accounts={accounts as Account[]}
             byAccount={hourlyFailureData.by_account}
             date={hourlyFailureData.date}
