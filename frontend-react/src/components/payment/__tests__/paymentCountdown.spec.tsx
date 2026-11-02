@@ -9,8 +9,9 @@ import PaymentQRCodeView from '@/views/user/PaymentQRCodeView'
 vi.mock('@/i18n/useI18n', () => ({
   useI18n: () => ({ t: (key: string) => key, te: () => true, locale: 'en' }),
 }))
+const pollOrderStatus = vi.hoisted(() => vi.fn())
 vi.mock('@/stores/payment', () => ({
-  usePaymentStore: { getState: () => ({ pollOrderStatus: vi.fn().mockResolvedValue(null) }) },
+  usePaymentStore: { getState: () => ({ pollOrderStatus }) },
 }))
 vi.mock('@/stores/app', () => ({ useAppStore: { getState: () => ({ showError: vi.fn() }) } }))
 vi.mock('@/api/payment', () => ({ paymentAPI: {} }))
@@ -25,6 +26,7 @@ vi.mock('@/components/common/BaseDialog', () => ({
 }))
 
 beforeEach(() => {
+  pollOrderStatus.mockReset().mockResolvedValue(null)
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-09-30T12:00:00Z'))
 })
@@ -59,6 +61,11 @@ describe.each(['dialog', 'panel', 'page'] as const)('payment countdown: %s', (ki
     vi.setSystemTime(Date.now() + 121_000)
     await advance(1000)
     expect(container.textContent).toContain('payment.qr.expired')
+    // 过期那一刻可能还挂着渲染/按钮动画调度的一次性定时器，数量随渲染时机波动；
+    // 推进 30 秒让它们全部执行，剩下的只可能是没清掉的倒计时或轮询 interval
+    const pollsAtExpiry = pollOrderStatus.mock.calls.length
+    await advance(30_000)
+    expect(pollOrderStatus).toHaveBeenCalledTimes(pollsAtExpiry)
     expect(vi.getTimerCount()).toBe(0)
   })
 
