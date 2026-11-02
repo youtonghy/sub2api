@@ -56,9 +56,55 @@ export interface RaceBarChartProps {
   loop?: boolean;
   /** Item id whose name and value are emphasized, such as your own product. */
   highlight?: string;
+  /** Text shown or announced by the chart, for translation. */
+  labels?: Partial<RaceBarChartLabels>;
+  /** Locale for the default compact numbers and the percentages, such as "zh-CN". Fixed to en-US by default. */
+  locale?: string;
   ref?: Ref<HTMLElement>;
   className?: string;
 }
+
+export interface RaceBarChartLabels {
+  /** The running total beside the period, such as "Total 1.2M". */
+  total: (value: string) => string;
+  roleDescription: string;
+  /** Accessible name of the plot with its keyboard help. */
+  plot: (label: string, period: string) => string;
+  empty: string;
+  /** Tooltip line, such as "Rank 2 of 8, 18% of total". */
+  rank: (rank: number, count: number, share: string) => string;
+  /** Tooltip line comparing with the previous period, such as "+12% vs March 2026". */
+  versus: (change: string, period: string) => string;
+  groups: string;
+  play: string;
+  pause: string;
+  replay: string;
+  /** Accessible name of the timeline slider. */
+  timeline: (label: string) => string;
+  /** Announced while a bar is read. */
+  reading: (item: string, rank: number, value: string) => string;
+  /** Announced after a period change. */
+  leads: (period: string, item: string, value: string) => string;
+  /** First column of the data table for assistive technology. */
+  itemHeader: string;
+}
+
+const DEFAULT_LABELS: RaceBarChartLabels = {
+  total: value => `Total ${value}`,
+  roleDescription: "bar chart race",
+  plot: (label, period) => `${label}, ${period}. Space plays or pauses, left and right arrows change the period, up and down arrows read the bars.`,
+  empty: "No data yet",
+  rank: (rank, count, share) => `Rank ${rank} of ${count}, ${share} of total`,
+  versus: (change, period) => `${change} vs ${period}`,
+  groups: "Groups",
+  play: "Play",
+  pause: "Pause",
+  replay: "Replay from the start",
+  timeline: label => `${label}, period`,
+  reading: (item, rank, value) => `${item}, rank ${rank}, ${value}`,
+  leads: (period, item, value) => `${period}. ${item} leads with ${value}.`,
+  itemHeader: "Item",
+};
 
 const { spring, ease, blur, duration } = motionTokens;
 const physical = ({ visualDuration, bounce }: { visualDuration: number; bounce: number }) => { const root = (2 * Math.PI) / (visualDuration * 1.2); return { k: root * root, c: 2 * (1 - bounce) * root }; };
@@ -70,8 +116,10 @@ const follow = { stiffness: glide.k, damping: glide.c, restDelta: .01 };
 /** Groups take the four series hues in order; a fifth group and beyond stay neutral rather than reuse a hue. */
 const hueOf = (index: number) => index < 0 ? "var(--series-1)" : index < 4 ? `var(--series-${index + 1})` : "color-mix(in oklab, var(--foreground) 45%, var(--surface))";
 const ROW = 36, BAR = 24, AXIS = 26, GAP = 12, VALUE_ROOM = 64, TIP = 12;
-const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
-const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 1, signDisplay: "exceptZero" });
+const numberFormats = (locale: string) => ({
+  compact: new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }),
+  percent: new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 1, signDisplay: "exceptZero" }),
+});
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 function niceStep(span: number, count = 4) {
   const raw = span / count || 1, power = Math.pow(10, Math.floor(Math.log10(raw))), unit = raw / power;
@@ -93,8 +141,12 @@ function useReducedMotionSafe() {
 
 type Bar = { y: number; vy: number; o: number; rank: number; value: number };
 
-export function RaceBarChart({ items, groups, frames, label, formatValue = value => compact.format(value), formatTick = value => compact.format(value), bars = 8, frame, defaultFrame = 0, onFrameChange, playing, defaultPlaying = false, onPlayingChange, autoPlay = true, frameDuration = 1400, loop = false, highlight, ref, className }: RaceBarChartProps) {
+export function RaceBarChart({ items, groups, frames, label, formatValue: formatValueProp, formatTick: formatTickProp, bars = 8, frame, defaultFrame = 0, onFrameChange, playing, defaultPlaying = false, onPlayingChange, autoPlay = true, frameDuration = 1400, loop = false, highlight, labels: labelsProp, locale = "en-US", ref, className }: RaceBarChartProps) {
   const reduced = useReducedMotionSafe();
+  const copy = { ...DEFAULT_LABELS, ...labelsProp };
+  const { compact, percent } = useMemo(() => numberFormats(locale), [locale]);
+  const formatValue = formatValueProp ?? ((value: number) => compact.format(value));
+  const formatTick = formatTickProp ?? ((value: number) => compact.format(value));
   const figure = useRef<HTMLElement>(null);
   const plot = useRef<HTMLDivElement>(null);
   const grid = useRef<HTMLDivElement>(null);
@@ -129,8 +181,8 @@ export function RaceBarChart({ items, groups, frames, label, formatValue = value
 
   const setPlay = (next: boolean) => { if (playing === undefined) setOwnPlaying(next); onPlayingChange?.(next); };
   const running = isPlaying && inView;
-  const live = useRef({ matrix, items, shown, isPlaying: running, reduced, frameDuration, loop, width, labelWidth, formatValue, formatTick, active, count, setPlay, onFrameChange });
-  useLayoutEffect(() => { live.current = { matrix, items, shown, isPlaying: running, reduced, frameDuration, loop, width, labelWidth, formatValue, formatTick, active, count, setPlay, onFrameChange }; });
+  const live = useRef({ matrix, items, shown, isPlaying: running, reduced, frameDuration, loop, width, labelWidth, formatValue, formatTick, active, count, setPlay, onFrameChange, totalLabel: copy.total });
+  useLayoutEffect(() => { live.current = { matrix, items, shown, isPlaying: running, reduced, frameDuration, loop, width, labelWidth, formatValue, formatTick, active, count, setPlay, onFrameChange, totalLabel: copy.total }; });
 
   const wake = useRef<() => void>(() => {});
   useEffect(() => {
@@ -186,7 +238,7 @@ export function RaceBarChart({ items, groups, frames, label, formatValue = value
         const text = L.formatValue(values[k]);
         if (valueEl.textContent !== text) valueEl.textContent = text;
       });
-      if (totalRef.current) { const text = `Total ${L.formatValue(total)}`; if (totalRef.current.textContent !== text) totalRef.current.textContent = text; }
+      if (totalRef.current) { const text = L.totalLabel(L.formatValue(total)); if (totalRef.current.textContent !== text) totalRef.current.textContent = text; }
       // Axis ticks glide with the scale; new ones fade in, retired ones fade out.
       const box = grid.current;
       if (box) {
@@ -270,7 +322,7 @@ export function RaceBarChart({ items, groups, frames, label, formatValue = value
     if (speak) {
       const values = matrix[next] ?? [];
       const leader = values.map((_, k) => k).sort((a, b) => values[b] - values[a])[0];
-      setAnnounce(leader === undefined ? frames[next]?.period ?? "" : `${frames[next].period}. ${items[leader].label} leads with ${formatValue(values[leader])}.`);
+      setAnnounce(leader === undefined ? frames[next]?.period ?? "" : copy.leads(frames[next].period, items[leader].label, formatValue(values[leader])));
     }
   };
   const toggle = () => {
@@ -361,7 +413,7 @@ export function RaceBarChart({ items, groups, frames, label, formatValue = value
       <span ref={totalRef} className={styles.total} />
     </div>
     <div ref={plot} className={styles.plot} style={{ height: AXIS + shown * ROW + 4 }} data-active={active !== null && activeIndex >= 0 ? true : undefined} role="group" tabIndex={empty ? -1 : 0}
-      aria-roledescription="bar chart race" aria-label={`${label}, ${period}. Space plays or pauses, left and right arrows change the period, up and down arrows read the bars.`}
+      aria-roledescription={copy.roleDescription} aria-label={copy.plot(label, period)}
       onKeyDown={onPlotKey} onPointerMove={onPlotMove} onPointerDown={onPlotTap} onPointerLeave={event => { if (event.pointerType === "mouse") setActive(null); }} onBlur={() => setActive(null)}>
       <div ref={grid} className={styles.grid} aria-hidden="true" style={{ height: AXIS + shown * ROW }} />
       <div className={styles.baseline} style={{ left: inside ? 0 : labelWidth + GAP, height: shown * ROW, top: AXIS }} aria-hidden="true" />
@@ -373,21 +425,21 @@ export function RaceBarChart({ items, groups, frames, label, formatValue = value
           <span className={styles.rowValue} />
         </div>)}
       </div>
-      {empty && <p className={styles.message}>No data yet</p>}
+      {empty && <p className={styles.message}>{copy.empty}</p>}
       <motion.div ref={tip} className={styles.tooltip} style={{ x: reduced ? tipX : tipSpringX, y: reduced ? tipY : tipSpringY }} aria-hidden="true">
         {reading && <>
           <p className={styles.tipTitle}>{reading.item.label}</p>
           <p className={styles.tipValue}>{formatValue(reading.value)}</p>
-          <p className={styles.tipNote}>Rank {reading.rank} of {items.length}, {percent.format(reading.share).replace("+", "")} of total</p>
-          {reading.change !== null && <p className={styles.tipNote}>{percent.format(reading.change)} vs {frames[index - 1]?.period}</p>}
+          <p className={styles.tipNote}>{copy.rank(reading.rank, items.length, percent.format(reading.share).replace("+", ""))}</p>
+          {reading.change !== null && <p className={styles.tipNote}>{copy.versus(percent.format(reading.change), frames[index - 1]?.period ?? "")}</p>}
         </>}
       </motion.div>
     </div>
-    {groups && groups.length > 1 && <ul className={styles.legend} aria-label="Groups">
+    {groups && groups.length > 1 && <ul className={styles.legend} aria-label={copy.groups}>
       {groups.map((group, index) => <li key={group.id} className={styles.legendItem} style={{ "--bar": hueOf(index) } as CSSProperties}><span className={styles.swatch} aria-hidden="true" />{group.label}</li>)}
     </ul>}
     <div className={styles.controls}>
-      <button type="button" className={styles.play} onClick={toggle} disabled={count < 2} aria-label={isPlaying ? "Pause" : atEnd ? "Replay from the start" : "Play"}>
+      <button type="button" className={styles.play} onClick={toggle} disabled={count < 2} aria-label={isPlaying ? copy.pause : atEnd ? copy.replay : copy.play}>
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.span key={isPlaying ? "pause" : atEnd ? "replay" : "play"} className={styles.playIcon} initial={{ opacity: 0, scale: reduced ? 1 : .6, filter: reduced ? "none" : `blur(${blur.subtle}px)` }} animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }} exit={{ opacity: 0, scale: reduced ? 1 : .6 }} transition={spring.snappy}>
             {isPlaying ? <Pause size={16} strokeWidth={1.75} fill="currentColor" /> : atEnd ? <RotateCcw size={16} strokeWidth={1.75} /> : <Play size={16} strokeWidth={1.75} fill="currentColor" />}
@@ -395,7 +447,7 @@ export function RaceBarChart({ items, groups, frames, label, formatValue = value
         </AnimatePresence>
       </button>
       <div className={styles.timeline}>
-        <div className={styles.track} role="slider" tabIndex={empty ? -1 : 0} aria-label={`${label}, period`} aria-valuemin={0} aria-valuemax={last} aria-valuenow={index} aria-valuetext={period}
+        <div className={styles.track} role="slider" tabIndex={empty ? -1 : 0} aria-label={copy.timeline(label)} aria-valuemin={0} aria-valuemax={last} aria-valuenow={index} aria-valuetext={period}
           onPointerDown={onScrubDown} onPointerMove={onScrubMove} onPointerUp={onScrubUp} onPointerCancel={onScrubUp} onKeyDown={onScrubKey}>
           <span className={styles.rail} aria-hidden="true"><span ref={fill} className={styles.fill} /></span>
           {frames.map((entry, k) => k > 0 && k < last && <span key={entry.period} className={styles.stop} style={{ left: `${last ? (k / last) * 100 : 0}%` }} data-past={k <= index || undefined} aria-hidden="true" />)}
@@ -404,10 +456,10 @@ export function RaceBarChart({ items, groups, frames, label, formatValue = value
         <div className={styles.ends} aria-hidden="true"><span>{frames[0]?.period}</span><span>{frames[last]?.period}</span></div>
       </div>
     </div>
-    <p className={styles.srOnly} aria-live="polite" aria-atomic="true">{reading && active !== null ? `${reading.item.label}, rank ${reading.rank}, ${formatValue(reading.value)}` : announce}</p>
+    <p className={styles.srOnly} aria-live="polite" aria-atomic="true">{reading && active !== null ? copy.reading(reading.item.label, reading.rank, formatValue(reading.value)) : announce}</p>
     {!empty && <div className={styles.srOnly}><table>
       <caption>{label}</caption>
-      <thead><tr><th scope="col">Item</th>{frames.map(entry => <th key={entry.period} scope="col">{entry.period}</th>)}</tr></thead>
+      <thead><tr><th scope="col">{copy.itemHeader}</th>{frames.map(entry => <th key={entry.period} scope="col">{entry.period}</th>)}</tr></thead>
       <tbody>{items.map((item, k) => <tr key={item.id}><th scope="row">{item.label}</th>{matrix.map((values, f) => <td key={f}>{formatValue(values[k])}</td>)}</tr>)}</tbody>
     </table></div>}
   </figure>;

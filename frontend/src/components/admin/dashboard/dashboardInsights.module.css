@@ -1,0 +1,40 @@
+/* 仪表盘 KPI 下钻与排行赛跑：加载 / 失败状态的外框与 KPI 块宽度 */
+
+/* 与 kpi-drilldown 自身外框一致，加载与失败时占位不跳动 */
+.frame {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.frameTitle {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.kpiSkeleton {
+  min-height: 420px;
+}
+
+/* kpi-drilldown 默认最宽 1000px 居中；仪表盘里与其他面板同宽。重复类名用于压过组件自身的 .root */
+.drilldown.drilldown {
+  width: 100%;
+}
+
+.race {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.raceDescription {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+}

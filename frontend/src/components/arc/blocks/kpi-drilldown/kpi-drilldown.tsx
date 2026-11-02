@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from "motion/react";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, GitCompareArrows, X } from "lucide-react";
 import { AnimatedCounter } from "../../animated-counter/animated-counter";
@@ -28,14 +28,77 @@ export interface KpiDrilldownProps {
   /** Called when a metric opens or closes. */
   onSelectedChange?: (id: string | null) => void;
   title?: string;
+  /** Text shown or announced by the block, for translation. */
+  labels?: Partial<KpiDrilldownLabels>;
+  /** Locale for numbers and dates, such as "zh-CN". Fixed to en-US by default so server and client agree. */
+  locale?: string;
+  /** Cards per row on wide screens. Narrow containers still fall back to two and then one. */
+  columns?: number;
   className?: string;
 }
+
+export interface KpiDrilldownLabels {
+  compare: string;
+  dateRange: string;
+  /** A range option, such as "30 days". */
+  range: (days: number) => string;
+  breakdown: string;
+  breakDownBy: string;
+  /** Column heading when the dimension has no label. */
+  segment: string;
+  share: string;
+  /** Share column heading for rate metrics. */
+  shareRate: string;
+  value: string;
+  change: string;
+  /** Names the breakdown table, such as "Revenue by plan". */
+  byDimension: (metric: string, dimension: string) => string;
+  backToOverview: string;
+  /** Read after a change, such as "versus the previous 30 days". */
+  versusPrevious: (days: number) => string;
+  /** Printed beside the detail value, such as "vs €171.4k the 30 days before". */
+  versusBefore: (value: string, days: number) => string;
+  lastDays: (days: number) => string;
+  previousDays: (days: number) => string;
+  chartSummary: (metric: string, days: number, from: string, to: string) => string;
+  /** Tooltip line for the comparison series. */
+  periodEarlier: (value: string) => string;
+  /** Accessible name of a card. */
+  openCard: (metric: string, value: string, change: string, days: number) => string;
+  /** Change column for a segment that was empty in the comparison period. */
+  newSegment: string;
+  /** Unit of a rate change, with its leading space. */
+  points: string;
+}
+
+const DEFAULT_LABELS: KpiDrilldownLabels = {
+  compare: "Compare",
+  dateRange: "Date range",
+  range: days => `${days} days`,
+  breakdown: "Breakdown",
+  breakDownBy: "Break down by",
+  segment: "Segment",
+  share: "Share",
+  shareRate: "Accounts",
+  value: "Value",
+  change: "Change",
+  byDimension: (metric, dimension) => `${metric} by ${dimension.toLowerCase()}`,
+  backToOverview: "Back to overview",
+  versusPrevious: days => `versus the previous ${days} days`,
+  versusBefore: (value, days) => `vs ${value} the ${days} days before`,
+  lastDays: days => `Last ${days} days`,
+  previousDays: days => `Previous ${days} days`,
+  chartSummary: (metric, days, from, to) => `${metric} over the last ${days} days, from ${from} to ${to}.`,
+  periodEarlier: value => `${value} a period earlier`,
+  openCard: (metric, value, change, days) => `${metric}, ${value}, ${change} versus the previous ${days} days. Open details`,
+  newSegment: "New",
+  points: "\u00a0pts",
+};
 
 type Rect = { x: number; y: number; width: number; height: number };
 type Option = { value: string; label: string };
 
-const ranges: Option[] = [{ value: "7", label: "7 days" }, { value: "30", label: "30 days" }, { value: "90", label: "90 days" }];
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const RANGE_DAYS = ["7", "30", "90"] as const;
 /** One critically damped spring for everything that travels: the panel, the container height, the tab indicator, and the chart. */
 const glide = motionTokens.spring.smooth;
 const expand = { type: "spring", visualDuration: .5, bounce: 0 } as const;
@@ -53,24 +116,29 @@ function resample(values: number[], count: number) {
     return values[low] + (values[high] - values[low]) * (t - low);
   });
 }
-function format(value: number, spec: KpiFormat) {
+function format(value: number, spec: KpiFormat, locale = "en-US") {
   const decimals = spec.decimals ?? 0;
   const scaled = value / (spec.divisor ?? 1);
-  return `${spec.prefix ?? ""}${scaled.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}${spec.suffix ?? ""}`;
+  return `${spec.prefix ?? ""}${scaled.toLocaleString(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}${spec.suffix ?? ""}`;
 }
-function change(kpi: Kpi, now: number, before: number) {
-  const raw = kpi.kind === "rate" ? now - before : (now - before) / before * 100;
+/** The headline value of a range: its last day, or the sum of its days for metrics that add up. */
+function headline(kpi: Kpi, values: number[]) {
+  return kpi.aggregate === "sum" ? values.reduce((sum, value) => sum + value, 0) : values[values.length - 1];
+}
+function change(kpi: Kpi, now: number, before: number, points = DEFAULT_LABELS.points) {
+  // A total that starts from zero has no meaningful percent change, so it reads as flat instead of Infinity.
+  const raw = kpi.kind === "rate" ? now - before : before ? (now - before) / before * 100 : 0;
   const flat = Math.abs(raw) < .05;
   const good = kpi.lowerIsBetter ? raw < 0 : raw > 0;
   const sign = flat ? "" : raw > 0 ? "+" : "−";
   const amount = Number(Math.abs(flat ? 0 : raw).toFixed(1));
-  const unit = kpi.kind === "rate" ? "\u00a0pts" : "%";
+  const unit = kpi.kind === "rate" ? points : "%";
   return { raw, good, flat, sign, amount, unit, text: `${sign}${amount.toFixed(1)}${unit}` };
 }
-function dayLabel(end: string, back: number) {
+function dayLabel(end: string, back: number, locale = "en-US") {
   const date = new Date(`${end}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() - back);
-  return `${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}`;
+  return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: "UTC" }).format(date);
 }
 function relativeRect(node: Element, frame: Element): Rect {
   const a = node.getBoundingClientRect(), b = frame.getBoundingClientRect();
@@ -138,18 +206,18 @@ function Tabs({ options, value, onChange, label, reduce }: { options: Option[]; 
   </div>;
 }
 
-function Counter({ kpi, value }: { kpi: Kpi; value: number }) {
+function Counter({ kpi, value, locale }: { kpi: Kpi; value: number; locale?: string }) {
   const { prefix = "", suffix = "", divisor = 1, decimals = 0 } = kpi.format;
-  return <AnimatedCounter value={Number((value / divisor).toFixed(decimals))} prefix={prefix} suffix={suffix} decimals={decimals} />;
+  return <AnimatedCounter value={Number((value / divisor).toFixed(decimals))} prefix={prefix} suffix={suffix} decimals={decimals} locale={locale} />;
 }
 
 /** The change rolls digit by digit; the arrow crossfades in a fixed box. */
-function Delta({ delta, label, reduce }: { delta: ReturnType<typeof change>; label?: string; reduce: boolean }) {
+function Delta({ delta, label, reduce, locale }: { delta: ReturnType<typeof change>; label?: string; reduce: boolean; locale?: string }) {
   const Icon = delta.flat ? ArrowRight : delta.raw > 0 ? ArrowUpRight : ArrowDownRight;
   const icon = delta.flat ? "flat" : delta.raw > 0 ? "up" : "down";
   return <span className={styles.delta} data-good={delta.good && !delta.flat ? "" : undefined} data-flat={delta.flat ? "" : undefined}>
     <Swap id={icon} reduce={reduce} className={styles.deltaIcon}><Icon size={13} aria-hidden="true" /></Swap>
-    <AnimatedCounter value={delta.amount} decimals={1} prefix={delta.sign} suffix={delta.unit} />
+    <AnimatedCounter value={delta.amount} decimals={1} prefix={delta.sign} suffix={delta.unit} locale={locale} />
     {label && <span className={styles.srOnly}> {label}</span>}
   </span>;
 }
@@ -182,7 +250,7 @@ function blend(from: Frame, to: Frame, t: number): Frame {
 
 const HEIGHT = 220, TOP = 10, BOTTOM = 24, RIGHT = 56, PLOT = HEIGHT - TOP - BOTTOM;
 
-function DetailChart({ kpi, current, previous, compare, days, end, reduce }: { kpi: Kpi; current: number[]; previous: number[]; compare: boolean; days: number; end: string; reduce: boolean }) {
+function DetailChart({ kpi, current, previous, compare, days, end, reduce, labels, locale }: { kpi: Kpi; current: number[]; previous: number[]; compare: boolean; days: number; end: string; reduce: boolean; labels: KpiDrilldownLabels; locale?: string }) {
   const wrap = useRef<HTMLDivElement>(null);
   const clip = useId();
   const width = useWidth(wrap);
@@ -192,20 +260,20 @@ function DetailChart({ kpi, current, previous, compare, days, end, reduce }: { k
 
   // Every drawn value comes from one progress value, so the line, area, comparison, and axis labels always agree mid-flight.
   const progress = useMotionValue(1);
-  const morph = useRef({ from: target, to: target, inner: 0, format: kpi.format });
+  const morph = useRef({ from: target, to: target, inner: 0, format: kpi.format, locale });
   const line = useMotionValue(""), area = useMotionValue(""), before = useMotionValue("");
   const tickHigh = useMotionValue(""), tickMid = useMotionValue(""), tickLow = useMotionValue("");
   const paint = useCallback(() => {
-    const { from, to, inner: w, format: spec } = morph.current;
+    const { from, to, inner: w, format: spec, locale: numbers } = morph.current;
     const f = blend(from, to, progress.get());
     const now = linePath(f.a, w, PLOT, f.min, f.max, TOP);
     line.set(now);
     area.set(`${now}L${w},${TOP + PLOT}L0,${TOP + PLOT}Z`);
     before.set(linePath(f.b, w, PLOT, f.min, f.max, TOP));
-    tickHigh.set(format(f.max - f.pad, spec)); tickMid.set(format((f.max + f.min) / 2, spec)); tickLow.set(format(f.min + f.pad, spec));
+    tickHigh.set(format(f.max - f.pad, spec, numbers)); tickMid.set(format((f.max + f.min) / 2, spec, numbers)); tickLow.set(format(f.min + f.pad, spec, numbers));
   }, [area, before, line, progress, tickHigh, tickLow, tickMid]);
 
-  useLayoutEffect(() => { morph.current.inner = inner; morph.current.format = kpi.format; paint(); }, [inner, kpi.format, paint]);
+  useLayoutEffect(() => { morph.current.inner = inner; morph.current.format = kpi.format; morph.current.locale = locale; paint(); }, [inner, kpi.format, locale, paint]);
   useEffect(() => progress.on("change", paint), [paint, progress]);
   useLayoutEffect(() => {
     const state = morph.current;
@@ -236,7 +304,7 @@ function DetailChart({ kpi, current, previous, compare, days, end, reduce }: { k
     setHover(value => Math.max(0, Math.min(CHART - 1, Math.round((value ?? CHART - 1) + step * stride))));
   }
   const hx = hover === null ? 0 : (hover / (CHART - 1)) * inner;
-  const summary = `${kpi.label} over the last ${days} days, from ${format(current[0], kpi.format)} to ${format(current[current.length - 1], kpi.format)}.`;
+  const summary = labels.chartSummary(kpi.label, days, format(current[0], kpi.format, locale), format(current[current.length - 1], kpi.format, locale));
   const dates = [0, Math.floor((days - 1) / 2), days - 1];
   return <div ref={wrap} className={styles.chart} role="img" aria-label={summary} tabIndex={0} onPointerMove={pick} onPointerDown={pick} onPointerLeave={() => setHover(null)} onKeyDown={onKey} onBlur={() => setHover(null)}>
     {width > 0 && <svg width={width} height={HEIGHT} aria-hidden="true">
@@ -250,7 +318,7 @@ function DetailChart({ kpi, current, previous, compare, days, end, reduce }: { k
         <motion.path d={before} className={styles.chartBefore} initial={false} animate={{ opacity: compare ? 1 : 0 }} transition={reduce ? still : { duration: motionTokens.duration.standard, ease: [...motionTokens.ease.standard] }} />
         <motion.path d={line} className={styles.chartLine} />
       </g>
-      {dates.map((day, i) => <DateLabel key={i} text={dayLabel(end, days - 1 - day)} x={(day / Math.max(1, days - 1)) * inner} anchor={i === 0 ? "start" : i === 2 ? "end" : "middle"} reduce={reduce} />)}
+      {dates.map((day, i) => <DateLabel key={i} text={dayLabel(end, days - 1 - day, locale)} x={(day / Math.max(1, days - 1)) * inner} anchor={i === 0 ? "start" : i === 2 ? "end" : "middle"} reduce={reduce} />)}
       {hover !== null && <g className={styles.cursor}>
         <line x1={hx} x2={hx} y1={TOP} y2={TOP + PLOT} />
         {compare && <circle cx={hx} cy={y(target.b[hover])} r={3} className={styles.cursorBefore} />}
@@ -258,9 +326,9 @@ function DetailChart({ kpi, current, previous, compare, days, end, reduce }: { k
       </g>}
     </svg>}
     <AnimatePresence>{hover !== null && index !== null && <motion.div className={styles.tip} style={{ left: Math.max(70, Math.min(inner - 70, hx)) }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduce ? 0 : motionTokens.duration.instant }}>
-      <span>{dayLabel(end, days - 1 - index)}</span>
-      <strong>{format(current[index], kpi.format)}</strong>
-      {compare && <small>{format(previous[index], kpi.format)} a period earlier</small>}
+      <span>{dayLabel(end, days - 1 - index, locale)}</span>
+      <strong>{format(current[index], kpi.format, locale)}</strong>
+      {compare && <small>{labels.periodEarlier(format(previous[index], kpi.format, locale))}</small>}
     </motion.div>}</AnimatePresence>
   </div>;
 }
@@ -272,36 +340,38 @@ function DateLabel({ text, x, anchor, reduce }: { text: string; x: number; ancho
 }
 
 /** Rows keep their place when the dimension changes: names crossfade, bars and numbers travel to their new values. */
-function Breakdown({ kpi, value, dimension, dimensions, onDimension, reduce }: { kpi: Kpi; value: number; dimension: string; dimensions: Option[]; onDimension: (value: string) => void; reduce: boolean }) {
+function Breakdown({ kpi, value, dimension, dimensions, onDimension, reduce, labels, locale }: { kpi: Kpi; value: number; dimension: string; dimensions: Option[]; onDimension: (value: string) => void; reduce: boolean; labels: KpiDrilldownLabels; locale?: string }) {
   const rows: BreakdownRow[] = kpi.breakdowns[dimension] ?? [];
-  const label = dimensions.find(item => item.value === dimension)?.label ?? "Segment";
-  const unit = kpi.kind === "rate" ? "\u00a0pts" : "%";
+  const label = dimensions.find(item => item.value === dimension)?.label ?? labels.segment;
+  const unit = kpi.kind === "rate" ? labels.points : "%";
   const { prefix = "", suffix = "", divisor = 1, decimals = 0 } = kpi.format;
-  return <section className={styles.breakdown} aria-label={`${kpi.label} by ${label.toLowerCase()}`}>
+  return <section className={styles.breakdown} aria-label={labels.byDimension(kpi.label, label)}>
     <div className={styles.breakdownHead}>
-      <h4>Breakdown</h4>
-      <Tabs options={dimensions} value={dimension} onChange={onDimension} label="Break down by" reduce={reduce} />
+      <h4>{labels.breakdown}</h4>
+      <Tabs options={dimensions} value={dimension} onChange={onDimension} label={labels.breakDownBy} reduce={reduce} />
     </div>
     <table className={styles.table}>
       <thead><tr>
         <th scope="col" className={styles.nameHead}><Swap id={label} reduce={reduce}>{label}</Swap></th>
-        <th scope="col" className={styles.shareHead}>{kpi.kind === "rate" ? "Accounts" : "Share"}</th>
-        <th scope="col" className={`${styles.num} ${styles.valueHead}`}>Value</th>
-        <th scope="col" className={`${styles.num} ${styles.changeHead}`}>Change</th>
+        <th scope="col" className={styles.shareHead}>{kpi.kind === "rate" ? labels.shareRate : labels.share}</th>
+        <th scope="col" className={`${styles.num} ${styles.valueHead}`}>{labels.value}</th>
+        <th scope="col" className={`${styles.num} ${styles.changeHead}`}>{labels.change}</th>
       </tr></thead>
       <tbody>
         {rows.map((row, index) => {
-          const rowValue = kpi.kind === "rate" ? value * (1 + row.delta * 4) : value * row.share;
+          const rowValue = row.value ?? (kpi.kind === "rate" ? value * (1 + row.delta * 4) : value * row.share);
           const rowDelta = Number((row.delta * 100).toFixed(1));
           const good = kpi.lowerIsBetter ? rowDelta < 0 : rowDelta > 0;
           return <tr key={index}>
             <th scope="row"><Swap id={row.name} reduce={reduce}>{row.name}</Swap></th>
             <td className={styles.share}>
               <span className={styles.bar}><motion.span initial={false} animate={{ scaleX: row.share }} transition={reduce ? still : glide} /></span>
-              <span className={styles.percent}><AnimatedCounter value={Math.round(row.share * 100)} suffix="%" /></span>
+              <span className={styles.percent}><AnimatedCounter value={Math.round(row.share * 100)} suffix="%" locale={locale} /></span>
             </td>
-            <td className={styles.num}><AnimatedCounter value={Number((rowValue / divisor).toFixed(decimals))} prefix={prefix} suffix={suffix} decimals={decimals} /></td>
-            <td className={styles.num}><span className={styles.rowDelta} data-good={good ? "" : undefined}><AnimatedCounter value={Math.abs(rowDelta)} decimals={1} prefix={rowDelta >= 0 ? "+" : "−"} suffix={unit} /></span></td>
+            <td className={styles.num}><AnimatedCounter value={Number((rowValue / divisor).toFixed(decimals))} prefix={prefix} suffix={suffix} decimals={decimals} locale={locale} /></td>
+            <td className={styles.num}>{row.isNew
+              ? <span className={styles.rowDelta} data-good={kpi.lowerIsBetter ? undefined : ""}>{labels.newSegment}</span>
+              : <span className={styles.rowDelta} data-good={good ? "" : undefined}><AnimatedCounter value={Math.abs(rowDelta)} decimals={1} prefix={rowDelta >= 0 ? "+" : "−"} suffix={unit} locale={locale} /></span>}</td>
           </tr>;
         })}
       </tbody>
@@ -310,9 +380,9 @@ function Breakdown({ kpi, value, dimension, dimensions, onDimension, reduce }: {
 }
 
 /** The card grows into the detail: position, size, and corners on one spring; label and value keep their exact spot while the rest is revealed around them. */
-function DetailPanel({ kpi, origin, bounds, closing, onClosed, onClose, onMeasure, days, compare, end, dimension, dimensions, onDimension, reduce }: {
+function DetailPanel({ kpi, origin, bounds, closing, onClosed, onClose, onMeasure, days, compare, end, dimension, dimensions, onDimension, reduce, labels, locale }: {
   kpi: Kpi; origin: Rect; bounds: { width: number; height: number }; closing: Rect | null; onClosed: () => void; onClose: () => void; onMeasure: (height: number) => void;
-  days: number; compare: boolean; end: string; dimension: string; dimensions: Option[]; onDimension: (value: string) => void; reduce: boolean;
+  days: number; compare: boolean; end: string; dimension: string; dimensions: Option[]; onDimension: (value: string) => void; reduce: boolean; labels: KpiDrilldownLabels; locale?: string;
 }) {
   const x = useMotionValue(reduce ? INSET : origin.x), y = useMotionValue(reduce ? INSET : origin.y);
   const w = useMotionValue(reduce ? bounds.width : origin.width), h = useMotionValue(reduce ? bounds.height : origin.height);
@@ -322,8 +392,8 @@ function DetailPanel({ kpi, origin, bounds, closing, onClosed, onClose, onMeasur
   const titleId = useId();
   const current = useMemo(() => kpi.series.slice(-days), [days, kpi.series]);
   const previous = useMemo(() => kpi.series.slice(-days * 2, -days), [days, kpi.series]);
-  const value = current[current.length - 1], before = previous[previous.length - 1];
-  const delta = change(kpi, value, before);
+  const value = headline(kpi, current), before = headline(kpi, previous);
+  const delta = change(kpi, value, before, labels.points);
 
   // The content keeps its natural height; the container grows to fit it instead of scrolling inside a fixed box.
   useLayoutEffect(() => {
@@ -362,29 +432,31 @@ function DetailPanel({ kpi, origin, bounds, closing, onClosed, onClose, onMeasur
       <div className={styles.panelHead}>
         <div className={styles.cardTop}>
           <h3 id={titleId} className={styles.label}>{kpi.label}</h3>
-          <button ref={close} type="button" className={styles.close} onClick={onClose} aria-label="Back to overview"><X size={16} aria-hidden="true" /></button>
+          <button ref={close} type="button" className={styles.close} onClick={onClose} aria-label={labels.backToOverview}><X size={16} aria-hidden="true" /></button>
         </div>
         <div className={styles.valueRow}>
-          <span className={styles.value}><Counter kpi={kpi} value={value} /></span>
-          <Delta delta={delta} label={`versus the previous ${days} days`} reduce={reduce} />
-          <motion.span className={styles.versus} style={{ opacity: extra }}><Swap id={`${days}`} reduce={reduce}>vs {format(before, kpi.format)} the {days} days before</Swap></motion.span>
+          <span className={styles.value}><Counter kpi={kpi} value={value} locale={locale} /></span>
+          <Delta delta={delta} label={labels.versusPrevious(days)} reduce={reduce} locale={locale} />
+          <motion.span className={styles.versus} style={{ opacity: extra }}><Swap id={`${days}`} reduce={reduce}>{labels.versusBefore(format(before, kpi.format, locale), days)}</Swap></motion.span>
         </div>
       </div>
       <motion.div className={styles.panelBody} style={{ opacity: extra }}>
         <p className={styles.description}>{kpi.description}</p>
-        <DetailChart kpi={kpi} current={current} previous={previous} compare={compare} days={days} end={end} reduce={reduce} />
+        <DetailChart kpi={kpi} current={current} previous={previous} compare={compare} days={days} end={end} reduce={reduce} labels={labels} locale={locale} />
         <div className={styles.legend} aria-hidden="true">
-          <span className={styles.legendNow}><Swap id={`${days}`} reduce={reduce}>Last {days} days</Swap></span>
-          <motion.span className={styles.legendBefore} initial={false} animate={{ opacity: compare ? 1 : 0 }} transition={reduce ? still : { duration: motionTokens.duration.standard }}><Swap id={`${days}`} reduce={reduce}>Previous {days} days</Swap></motion.span>
+          <span className={styles.legendNow}><Swap id={`${days}`} reduce={reduce}>{labels.lastDays(days)}</Swap></span>
+          <motion.span className={styles.legendBefore} initial={false} animate={{ opacity: compare ? 1 : 0 }} transition={reduce ? still : { duration: motionTokens.duration.standard }}><Swap id={`${days}`} reduce={reduce}>{labels.previousDays(days)}</Swap></motion.span>
         </div>
-        <Breakdown kpi={kpi} value={value} dimension={dimension} dimensions={dimensions} onDimension={onDimension} reduce={reduce} />
+        <Breakdown kpi={kpi} value={value} dimension={dimension} dimensions={dimensions} onDimension={onDimension} reduce={reduce} labels={labels} locale={locale} />
       </motion.div>
     </div>
   </motion.div>;
 }
 
-export function KpiDrilldown({ kpis = sampleKpis, dimensions = breakdownDimensions, end = seriesEnd, defaultRange = "30", selected: selectedProp, onSelectedChange, title = "Overview", className }: KpiDrilldownProps) {
+export function KpiDrilldown({ kpis = sampleKpis, dimensions = breakdownDimensions, end = seriesEnd, defaultRange = "30", selected: selectedProp, onSelectedChange, title = "Overview", labels: labelsProp, locale, columns, className }: KpiDrilldownProps) {
   const reduce = !!useReducedMotion();
+  const labels = { ...DEFAULT_LABELS, ...labelsProp };
+  const ranges: Option[] = RANGE_DAYS.map(value => ({ value, label: labels.range(Number(value)) }));
   const [range, setRange] = useState<KpiRange>(defaultRange);
   const [compare, setCompare] = useState(true);
   const [dimension, setDimension] = useState(dimensions[0]?.value ?? "plan");
@@ -455,32 +527,32 @@ export function KpiDrilldown({ kpis = sampleKpis, dimensions = breakdownDimensio
   const openKpi = kpis.find(item => item.id === open?.id) ?? null;
   const summary = useMemo(() => kpis.map(kpi => {
     const current = kpi.series.slice(-days), previous = kpi.series.slice(-days * 2, -days);
-    const value = current[current.length - 1];
-    return { kpi, current, value, delta: change(kpi, value, previous[previous.length - 1]) };
-  }), [days, kpis]);
+    const value = headline(kpi, current);
+    return { kpi, current, value, delta: change(kpi, value, headline(kpi, previous), labels.points) };
+  }), [days, kpis, labels.points]);
 
   return <div className={`${styles.root} ${className ?? ""}`} onKeyDown={event => { if (event.key === "Escape" && open && !closing) { event.preventDefault(); choose(null); } }}>
     <header className={styles.header}>
       <h2>{title}</h2>
       <div className={styles.controls}>
-        <button type="button" className={styles.compare} aria-pressed={compare} onClick={() => setCompare(value => !value)}><GitCompareArrows size={14} aria-hidden="true" /><span>Compare</span></button>
-        <Tabs options={ranges} value={range} onChange={value => setRange(value as KpiRange)} label="Date range" reduce={reduce} />
+        <button type="button" className={styles.compare} aria-pressed={compare} onClick={() => setCompare(value => !value)}><GitCompareArrows size={14} aria-hidden="true" /><span>{labels.compare}</span></button>
+        <Tabs options={ranges} value={range} onChange={value => setRange(value as KpiRange)} label={labels.dateRange} reduce={reduce} />
       </div>
     </header>
     <div ref={body} className={styles.body}>
-      <ul ref={grid} className={styles.grid} aria-hidden={open ? true : undefined}>
+      <ul ref={grid} className={styles.grid} aria-hidden={open ? true : undefined} style={columns ? { "--kpi-columns": columns } as CSSProperties : undefined}>
         {summary.map(({ kpi, current, value, delta }) => <li key={kpi.id}>
           <button type="button" ref={node => { if (node) cards.current.set(kpi.id, node); else cards.current.delete(kpi.id); }} className={styles.card} data-hidden={open?.id === kpi.id ? "" : undefined}
-            onClick={() => choose(kpi.id)} tabIndex={open ? -1 : undefined} aria-label={`${kpi.label}, ${format(value, kpi.format)}, ${delta.text} versus the previous ${days} days. Open details`}>
+            onClick={() => choose(kpi.id)} tabIndex={open ? -1 : undefined} aria-label={labels.openCard(kpi.label, format(value, kpi.format, locale), delta.text, days)}>
             <span className={styles.cardTop}><span className={styles.label}>{kpi.label}</span></span>
-            <span className={styles.valueRow}><span className={styles.value}><Counter kpi={kpi} value={value} /></span><Delta delta={delta} reduce={reduce} /></span>
+            <span className={styles.valueRow}><span className={styles.value}><Counter kpi={kpi} value={value} locale={locale} /></span><Delta delta={delta} reduce={reduce} locale={locale} /></span>
             <Sparkline values={current} reduce={reduce} />
           </button>
         </li>)}
       </ul>
       <AnimatePresence>{open && !closing && <motion.div key="veil" className={styles.veil} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduce ? motionTokens.duration.instant : motionTokens.duration.standard }} aria-hidden="true" />}</AnimatePresence>
       {open && openKpi && bodyWidth > 0 && <DetailPanel kpi={openKpi} origin={open.origin} bounds={{ width: bodyWidth - INSET * 2, height: contentHeight || openHeight - INSET * 2 }} closing={closing} onClosed={onClosed} onClose={() => choose(null)} onMeasure={onMeasure}
-        days={days} compare={compare} end={end} dimension={dimension} dimensions={dimensions} onDimension={setDimension} reduce={reduce} />}
+        days={days} compare={compare} end={end} dimension={dimension} dimensions={dimensions} onDimension={setDimension} reduce={reduce} labels={labels} locale={locale} />}
     </div>
   </div>;
 }

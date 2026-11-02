@@ -3,6 +3,8 @@ import { ChevronRight, LayoutGrid, RefreshCw, Sparkles, type LucideIcon } from '
 import { Link, useNavigate } from 'react-router'
 
 import { adminAPI } from '@/api/admin'
+import DashboardKpiDrilldown from '@/components/admin/dashboard/DashboardKpiDrilldown'
+import DashboardUserRace from '@/components/admin/dashboard/DashboardUserRace'
 import { Alert } from '@/components/arc/alert/alert'
 import { Button } from '@/components/arc/button/button'
 import { LineChart, type LineChartDatum, type LineChartSeries } from '@/components/arc/line-chart/line-chart'
@@ -111,6 +113,8 @@ export default function DashboardView() {
 
   // Date range
   const [query, setQuery] = useState<DashboardQuery>(createInitialQuery)
+  // 工具栏“刷新”的次数，排行赛跑图据此重新请求
+  const [refreshCount, setRefreshCount] = useState(0)
 
   // Load data
   const loadDashboardSnapshot = async (includeStats: boolean, q: DashboardQuery) => {
@@ -528,12 +532,22 @@ export default function DashboardView() {
         </div>
       </section>
 
+      {/* 用量概览：自带 7/30/90 天区间，不受下方工具栏影响；主数据就绪后懒加载一次 */}
+      <DashboardKpiDrilldown enabled={!loading && stats !== null} />
+
       {/* Charts Section：一行工具栏控制下方所有图表 */}
       <div className={styles.toolbar}>
         <div className={styles.toolbarGroup}>
           <span className={styles.toolbarLabel}>{t('admin.dashboard.timeRange')}</span>
           <DateRangePicker startDate={query.startDate} endDate={query.endDate} onChange={onDateRangeChange} />
-          <Button variant="secondary" onClick={() => void loadDashboardStats()} disabled={chartsLoading}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setRefreshCount((count) => count + 1)
+              void loadDashboardStats()
+            }}
+            disabled={chartsLoading}
+          >
             <RefreshCw size={16} strokeWidth={1.75} aria-hidden="true" />
             {t('common.refresh')}
           </Button>
@@ -600,6 +614,19 @@ export default function DashboardView() {
           formatTick={formatUserTrendValue}
           hiddenSeries={userTrendSeries.hidden}
           onHiddenSeriesChange={userTrendSeries.onHiddenChange}
+        />
+      </section>
+
+      {/* 用户消费排行变化：按工具栏的时间范围与粒度逐期累计实际费用 */}
+      <section className={styles.panel} aria-labelledby="dashboard-user-race">
+        <h2 id="dashboard-user-race" className={chartStyles.title}>
+          {t('insightsUi.race.title')}
+        </h2>
+        <DashboardUserRace
+          startDate={query.startDate}
+          endDate={query.endDate}
+          granularity={query.granularity}
+          reloadKey={refreshCount}
         />
       </section>
     </div>

@@ -1,6 +1,14 @@
 export type KpiFormat = { prefix?: string; suffix?: string; divisor?: number; decimals?: number };
 
-export type BreakdownRow = { name: string; share: number; delta: number };
+export type BreakdownRow = {
+  name: string;
+  share: number;
+  delta: number;
+  /** Measured value of the segment. Without it the row value is derived from the headline value and the share. */
+  value?: number;
+  /** The segment had nothing in the comparison period, so the change prints as a "new" label instead of a percentage. */
+  isNew?: boolean;
+};
 
 export type Kpi = {
   id: string;
@@ -11,6 +19,8 @@ export type Kpi = {
   kind: "total" | "rate";
   /** True when a falling value is good news, like churn. */
   lowerIsBetter?: boolean;
+  /** How a range becomes the headline value: the last day ("last", the default) or the sum of every day in it ("sum"). */
+  aggregate?: "last" | "sum";
   /** One value per day, oldest first. The last 180 days. */
   series: number[];
   breakdowns: Record<string, BreakdownRow[]>;
