@@ -1,0 +1,23 @@
+/* 调用流向面板：标题区复用图表面板样式，这里只补说明文字与错误态布局 */
+
+.heading {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.description {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.placeholder {
+  min-height: 360px;
+}
+
+.error {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+}

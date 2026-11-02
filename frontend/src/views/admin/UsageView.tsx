@@ -11,6 +11,8 @@ import { adminUsageAPI } from '@/api/admin/usage'
 import type { AdminUsageQueryParams, AdminUsageStatsResponse } from '@/api/admin/usage'
 import UsageCleanupDialog from '@/components/admin/usage/UsageCleanupDialog'
 import UsageExportProgress from '@/components/admin/usage/UsageExportProgress'
+import UsageFlowSankey from '@/components/admin/usage/UsageFlowSankey'
+import { createFlowQuery, type FlowQuery } from '@/components/admin/usage/usageFlowData'
 import UsageFilters, { type UsageFiltersHandle, type UsageFiltersValue } from '@/components/admin/usage/UsageFilters'
 import UsageStatsCards from '@/components/admin/usage/UsageStatsCards'
 import UsageTable from '@/components/admin/usage/UsageTable'
@@ -188,6 +190,8 @@ export default function UsageView() {
   const [upstreamModelStats, setUpstreamModelStats] = useState<ModelStat[]>([])
   const [mappingModelStats, setMappingModelStats] = useState<ModelStat[]>([])
   const [groupStats, setGroupStats] = useState<GroupStat[]>([])
+  // 调用流向图的输入：与分组统计同一次请求的筛选快照，内容不变时保持同一对象，避免重复请求
+  const [flowQuery, setFlowQuery] = useState<FlowQuery | null>(null)
   const [chartsLoading, setChartsLoading] = useState(false)
   const [modelStatsLoading, setModelStatsLoading] = useState(false)
   const [granularity, setGranularityState] = useState<Granularity>(initial.granularity)
@@ -475,10 +479,9 @@ export default function UsageView() {
       const current = filtersRef.current
       const requestType = current.request_type
       const legacyStream = requestType ? requestTypeToLegacyStream(requestType) : current.stream
-      const snapshot = await adminAPI.dashboard.getSnapshotV2({
+      const scope = {
         start_date: current.start_date || datesRef.current.start,
         end_date: current.end_date || datesRef.current.end,
-        granularity: granularityRef.current,
         user_id: current.user_id,
         model: current.model,
         api_key_id: current.api_key_id,
@@ -488,7 +491,11 @@ export default function UsageView() {
         stream: legacyStream === null ? undefined : legacyStream,
         native_compaction_v2: current.native_compaction_v2,
         billing_type: current.billing_type,
-        upstream_model_mismatch: current.upstream_model_mismatch,
+        upstream_model_mismatch: current.upstream_model_mismatch
+      }
+      const snapshot = await adminAPI.dashboard.getSnapshotV2({
+        ...scope,
+        granularity: granularityRef.current,
         include_stats: false,
         include_trend: true,
         include_model_stats: false,
@@ -498,6 +505,8 @@ export default function UsageView() {
       if (seq !== chartReqSeq.current) return
       setTrendData(snapshot.trend || [])
       setGroupStats(snapshot.groups || [])
+      const nextFlowQuery = createFlowQuery(scope as FlowQuery['params'], snapshot.groups || [])
+      setFlowQuery((prev) => (prev?.key === nextFlowQuery.key ? prev : nextFlowQuery))
     } catch (error) {
       console.error('Failed to load chart data:', error)
     } finally {
@@ -957,6 +966,7 @@ export default function UsageView() {
               filters={breakdownFilters}
             />
             <TokenUsageTrend trendData={trendData} loading={chartsLoading} />
+            <UsageFlowSankey query={flowQuery} loading={chartsLoading} className={styles.flowPanel} />
           </div>
         </section>
 

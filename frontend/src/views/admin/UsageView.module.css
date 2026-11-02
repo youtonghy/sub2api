@@ -44,6 +44,11 @@
   gap: var(--space-6);
 }
 
+/* 调用流向图横跨整行，三列模型名才放得下 */
+.flowPanel {
+  grid-column: 1 / -1;
+}
+
 /* 明细区：tab 栏 + 筛选 + 内容收进同一个分组区域 */
 .details {
   min-width: 0;

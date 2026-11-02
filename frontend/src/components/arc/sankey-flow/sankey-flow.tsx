@@ -42,9 +42,49 @@ export interface SankeyFlowProps {
   /** Shows the built in particles toggle above the plot. */
   particleToggle?: boolean;
   emptyLabel?: string;
+  /** Locale for the built in number and percent formats. */
+  locale?: string;
+  /** Text shown or announced by the chart, for translation. */
+  labels?: Partial<SankeyFlowLabels>;
   ref?: Ref<HTMLElement>;
   className?: string;
 }
+
+export interface SankeyFlowLabels {
+  /** The particles toggle. */
+  flow: string;
+  /** Column headers of the accessible table. */
+  from: string;
+  to: string;
+  value: string;
+  shareOfSource: string;
+  /** Announced role of the plot. */
+  roleDescription: string;
+  /** Accessible hint on the plot, after the chart name. */
+  keyboardHint: string;
+  /** Tooltip row for a node's outgoing flow, such as "to Pro". */
+  toNode: (label: string) => string;
+  /** Tooltip row for a node's incoming flow, such as "from Trial". */
+  fromNode: (label: string) => string;
+  /** Tooltip title for a ribbon. */
+  linkTitle: (source: string, target: string) => string;
+  /** A share of something, such as "21% of signups". */
+  shareOf: (share: string, of: string) => string;
+}
+
+const DEFAULT_LABELS: SankeyFlowLabels = {
+  flow: "Flow",
+  from: "From",
+  to: "To",
+  value: "Value",
+  shareOfSource: "Share of source",
+  roleDescription: "flow diagram",
+  keyboardHint: "Arrow keys move between stages and nodes, Escape clears.",
+  toNode: label => `to ${label}`,
+  fromNode: label => `from ${label}`,
+  linkTitle: (source, target) => `${source} to ${target}`,
+  shareOf: (share, of) => `${share} of ${of}`,
+};
 
 type Box = { id: string; label: string; column: number; value: number; x0: number; x1: number; y0: number; y1: number };
 type Band = { id: string; source: string; target: string; value: number; sy: number; ty: number; w: number };
@@ -60,8 +100,6 @@ const pour = physical({ visualDuration: .34, bounce: 0 });
 const glide = physical(spring.snappy, .01);
 const follow = { stiffness: glide.stiffness, damping: glide.damping, restDelta: .01 };
 const NODE = 10, PAD = 14, TOP = 4, GAP = 14, SPEED = 46;
-const grouped = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
-const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 0 });
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 const linkId = (link: SankeyLink) => `${link.source}>${link.target}`;
 
@@ -176,7 +214,11 @@ function useReducedMotionSafe() {
   return !!useReducedMotion() && hydrated;
 }
 
-export function SankeyFlow({ nodes, links, label, columns, unit = "", totalLabel = "the total", formatValue = value => grouped.format(value), height = 340, particles, defaultParticles = true, onParticlesChange, particleToggle = true, emptyLabel = "No flows yet", ref, className }: SankeyFlowProps) {
+export function SankeyFlow({ nodes, links, label, columns, unit = "", totalLabel = "the total", formatValue: formatValueProp, height = 340, particles, defaultParticles = true, onParticlesChange, particleToggle = true, emptyLabel = "No flows yet", locale = "en-US", labels: labelsProp, ref, className }: SankeyFlowProps) {
+  const labels = { ...DEFAULT_LABELS, ...labelsProp };
+  const grouped = useMemo(() => new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }), [locale]);
+  const percent = useMemo(() => new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 }), [locale]);
+  const formatValue = formatValueProp ?? ((value: number) => grouped.format(value));
   const reduced = useReducedMotionSafe();
   const figure = useRef<HTMLElement>(null);
   const plot = useRef<HTMLDivElement>(null);
@@ -412,11 +454,11 @@ export function SankeyFlow({ nodes, links, label, columns, unit = "", totalLabel
   if (focusValid && layout) {
     if (focusValid.kind === "node") {
       const box = layout.boxes.get(focusValid.id)!, out = bandsOf(box.id, "source"), into = bandsOf(box.id, "target");
-      const rows = (out.length ? out : into).slice(0, 4).map((band): [string, string] => [`${out.length ? "to" : "from"} ${nameOf(out.length ? band.target : band.source)}`, percent.format(band.value / (box.value || 1))]);
-      tipBody = { title: box.label, value: format(box.value), note: `${percent.format(box.value / (firstTotal || 1))} of ${totalLabel}`, rows };
+      const rows = (out.length ? out : into).slice(0, 4).map((band): [string, string] => [out.length ? labels.toNode(nameOf(band.target)) : labels.fromNode(nameOf(band.source)), percent.format(band.value / (box.value || 1))]);
+      tipBody = { title: box.label, value: format(box.value), note: labels.shareOf(percent.format(box.value / (firstTotal || 1)), totalLabel), rows };
     } else {
       const band = layout.bands.get(focusValid.id)!, source = layout.boxes.get(band.source)!, target = layout.boxes.get(band.target)!;
-      tipBody = { title: `${source.label} to ${target.label}`, value: format(band.value), note: `${percent.format(band.value / (source.value || 1))} of ${source.label}, ${percent.format(band.value / (target.value || 1))} of ${target.label}`, rows: [] };
+      tipBody = { title: labels.linkTitle(source.label, target.label), value: format(band.value), note: `${labels.shareOf(percent.format(band.value / (source.value || 1)), source.label)}, ${labels.shareOf(percent.format(band.value / (target.value || 1)), target.label)}`, rows: [] };
     }
   }
   // The tooltip keeps its last content while it fades out, so it never collapses to an empty box on the way out.
@@ -435,7 +477,7 @@ export function SankeyFlow({ nodes, links, label, columns, unit = "", totalLabel
       })}
     </div>}
     <div className={styles.chart} data-focus={focusValid ? focusValid.kind : undefined} data-glow={focusValid ? slots.get(focusValid.kind === "node" ? focusValid.id : layout?.bands.get(focusValid.id)?.source ?? "") : undefined}>
-      <div ref={plot} className={styles.plot} style={{ height: plotH }} role="group" tabIndex={empty ? -1 : 0} aria-roledescription="flow diagram" aria-label={`${label}. Arrow keys move between stages and nodes, Escape clears.`}
+      <div ref={plot} className={styles.plot} style={{ height: plotH }} role="group" tabIndex={empty ? -1 : 0} aria-roledescription={labels.roleDescription} aria-label={`${label}. ${labels.keyboardHint}`}
         onKeyDown={onKeyDown} onBlur={() => setFocus(null)} onPointerLeave={event => { if (event.pointerType === "mouse") { setFocus(null); setPointer(null); } }}
         onPointerMove={event => { if (event.pointerType === "mouse" && focusValid) setPointer(local(event)); }}
         onFocus={event => { if (event.currentTarget.matches(":focus-visible") && !focusValid && columnsOf[0]?.[0]) setFocus({ kind: "node", id: columnsOf[0][0].id }); }}>
@@ -473,13 +515,13 @@ export function SankeyFlow({ nodes, links, label, columns, unit = "", totalLabel
     {particleToggle && !reduced && <div className={styles.footer}>
       <button type="button" className={styles.flowToggle} aria-pressed={flowing} onClick={() => setFlowing(!flowing)}>
         <span className={styles.flowIcon} aria-hidden="true"><span /><span /><span /></span>
-        Flow
+        {labels.flow}
       </button>
     </div>}
     <p className={styles.srOnly} aria-live="polite" aria-atomic="true">{announce}</p>
     {!empty && layout && <div className={styles.srOnly}><table>
       <caption>{label}</caption>
-      <thead><tr><th scope="col">From</th><th scope="col">To</th><th scope="col">Value</th><th scope="col">Share of source</th></tr></thead>
+      <thead><tr><th scope="col">{labels.from}</th><th scope="col">{labels.to}</th><th scope="col">{labels.value}</th><th scope="col">{labels.shareOfSource}</th></tr></thead>
       <tbody>{[...layout.bands.values()].map(band => <tr key={band.id}><th scope="row">{nameOf(band.source)}</th><td>{nameOf(band.target)}</td><td>{format(band.value)}</td><td>{percent.format(band.value / (layout.boxes.get(band.source)?.value || 1))}</td></tr>)}</tbody>
     </table></div>}
   </figure>;
