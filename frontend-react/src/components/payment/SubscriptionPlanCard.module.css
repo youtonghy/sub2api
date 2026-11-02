@@ -1,0 +1,192 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.accentBar {
+  height: 4px;
+  background: var(--plan-accent, var(--accent));
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.titleBlock {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 标题固定两行高度：长名称换行截断，完整文本在 title 属性里 */
+.title {
+  display: -webkit-box;
+  height: 48px;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.description {
+  display: -webkit-box;
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.priceBlock {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.priceLine {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.currencySymbol,
+.currencyCode {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.price {
+  color: var(--foreground);
+  font-size: var(--text-2xl);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.validityLine {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.platformBadge {
+  flex-shrink: 0;
+}
+
+.validity {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.originalLine {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: 2px;
+}
+
+.originalPrice {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-decoration: line-through;
+}
+
+.quota {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  font-size: var(--text-xs);
+}
+
+.quotaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.quotaRow dt {
+  color: var(--text-muted);
+}
+
+.quotaRow dd {
+  margin: 0;
+  color: var(--foreground);
+  font-weight: 500;
+  text-align: right;
+}
+
+.quotaWide {
+  grid-column: span 2;
+}
+
+.peak {
+  color: var(--warning) !important;
+}
+
+.scopes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feature {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.featureIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--plan-accent, var(--accent));
+}
+
+.spacer {
+  flex: 1;
+}
+
+.action {
+  width: 100%;
+}

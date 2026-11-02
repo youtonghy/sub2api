@@ -62,4 +62,22 @@ describe('UsageStatsCards', () => {
     // Arc 提示层在隐藏时完全不挂载，同样不占布局。
     expect(screen.queryByText('Cache Token Breakdown')).not.toBeInTheDocument()
   })
+
+  it('draws the standard cost with a line-through when strikeStandardCost is set', () => {
+    const { container } = render(<UsageStatsCards stats={stats} showAccountCost={false} strikeStandardCost />)
+
+    const struck = screen.getByTestId('usage-stats-standard-cost')
+    expect(struck.tagName).toBe('S')
+    expect(struck.textContent).toBe('$0.0010')
+    expect(container.textContent).toContain('Standard $0.0010')
+    expect(container.textContent).not.toContain('Cost $0.0010 ·')
+  })
+
+  it('keeps the admin standard cost as plain text by default', () => {
+    const { container } = render(<UsageStatsCards stats={stats} />)
+
+    expect(screen.queryByTestId('usage-stats-standard-cost')).not.toBeInTheDocument()
+    expect(container.querySelector('s')).toBeNull()
+    expect(container.textContent).toContain('Cost $0.0010 · Standard $0.0010')
+  })
 })

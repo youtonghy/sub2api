@@ -1,0 +1,393 @@
+.layout {
+  display: flex;
+  height: calc(100vh - var(--custom-page-offset, 128px));
+  flex-direction: column;
+}
+
+.panel {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.loading {
+  padding: var(--space-6);
+}
+
+.centered {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-10);
+  text-align: center;
+}
+
+.emptyBox {
+  max-width: 28rem;
+}
+
+.emptyIcon {
+  display: flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--space-4);
+  border-radius: 50%;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
+.emptyTitle {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-lg);
+  font-weight: 500;
+}
+
+.emptyText {
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+/* ===== Markdown 模式 ===== */
+.markdownLayout {
+  position: relative;
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+.tocSidebar {
+  display: flex;
+  width: min(240px, 30%);
+  min-width: 160px;
+  max-width: 280px;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.tocSidebar[hidden] {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .tocSidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 20;
+    width: 70%;
+    max-width: 240px;
+    box-shadow: var(--shadow-floating);
+  }
+}
+
+.tocHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-3) var(--space-4);
+}
+
+.tocTitle {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.tocClose {
+  display: inline-flex;
+  border: 0;
+  border-radius: 4px;
+  padding: var(--space-1);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+.tocClose:hover {
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+.tocNav {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2);
+}
+
+.tocItem {
+  display: block;
+  overflow: hidden;
+  border-radius: 4px;
+  padding: 6px var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+.tocItem:hover {
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+.tocItem[data-active] {
+  background: var(--accent-subtle);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.tocItem[data-level='1'] {
+  padding-left: 8px;
+}
+
+.tocItem[data-level='2'] {
+  padding-left: 20px;
+}
+
+.tocItem[data-level='3'] {
+  padding-left: 32px;
+}
+
+.tocItem[data-level='4'] {
+  padding-left: 44px;
+}
+
+.tocToggle {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: 6px var(--space-2);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  box-shadow: var(--shadow-resting);
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.tocToggle:hover {
+  background: var(--surface-muted);
+}
+
+.loadError {
+  color: var(--danger);
+}
+
+.markdownContent {
+  height: 100%;
+  min-width: 0;
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-6);
+  color: inherit;
+  line-height: 1.7;
+}
+
+@media (min-width: 768px) {
+  .markdownContent {
+    padding: var(--space-10);
+  }
+}
+
+.markdownContent :global(h1) {
+  margin: var(--space-8) 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-2);
+  font-size: var(--text-3xl);
+  font-weight: 500;
+}
+
+.markdownContent :global(h2) {
+  margin: var(--space-6) 0 var(--space-3);
+  font-size: var(--text-2xl);
+  font-weight: 500;
+}
+
+.markdownContent :global(h3) {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: var(--text-xl);
+  font-weight: 500;
+}
+
+.markdownContent :global(h4) {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: 500;
+}
+
+.markdownContent :global(p) {
+  margin: 0 0 var(--space-4);
+}
+
+.markdownContent :global(ul),
+.markdownContent :global(ol) {
+  margin: 0 0 var(--space-4);
+  padding-left: var(--space-6);
+}
+
+.markdownContent :global(ul) {
+  list-style: disc;
+}
+
+.markdownContent :global(ol) {
+  list-style: decimal;
+}
+
+.markdownContent :global(li) {
+  margin-bottom: var(--space-1);
+}
+
+.markdownContent :global(a) {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.markdownContent :global(blockquote) {
+  margin: var(--space-4) 0;
+  border-left: 3px solid var(--border);
+  padding-left: var(--space-4);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.markdownContent :global(img) {
+  max-width: 100%;
+  height: auto;
+  margin: var(--space-4) 0;
+  border-radius: var(--radius-control);
+}
+
+.markdownContent :global(table) {
+  width: 100%;
+  margin: var(--space-4) 0;
+  border-collapse: collapse;
+}
+
+.markdownContent :global(th) {
+  border: 1px solid var(--border);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-muted);
+  font-weight: 500;
+  text-align: left;
+}
+
+.markdownContent :global(td) {
+  border: 1px solid var(--border);
+  padding: var(--space-2) var(--space-3);
+}
+
+.markdownContent :global(code) {
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: var(--surface-muted);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--text-sm);
+}
+
+.markdownContent :global(pre) {
+  position: relative;
+  margin: var(--space-4) 0;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: var(--space-4);
+  background: var(--surface-muted);
+}
+
+.markdownContent :global(pre code) {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.markdownContent :global(hr) {
+  margin: var(--space-6) 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+/* 代码块复制按钮由脚本注入（类名 copy-btn），悬停代码块时显示 */
+.markdownContent :global(.copy-btn) {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: var(--space-1) 10px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+.markdownContent :global(.copy-btn:hover) {
+  background: var(--surface-muted);
+}
+
+.markdownContent :global(pre:hover .copy-btn),
+.markdownContent :global(.copy-btn:focus-visible) {
+  opacity: 1;
+}
+
+/* ===== iframe 内嵌模式 ===== */
+.embedShell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--background);
+}
+
+.openFab {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 10;
+  width: max-content;
+  max-width: 100%;
+  text-decoration: none;
+  touch-action: none;
+  user-select: none;
+  box-shadow: var(--shadow-resting);
+}
+
+.embedFrame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  background: transparent;
+}

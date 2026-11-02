@@ -9,10 +9,7 @@ export interface UsageStatsCardsProps {
   stats: (AdminUsageStatsResponse | UsageStatsResponse) | null
   /** 默认 true：显示账号成本 */
   showAccountCost?: boolean
-  /**
-   * 用户端标准价为"划线价"。MetricCard 的 context 只接受纯文本，无法划线；
-   * 保留该属性以兼容 Vue 版调用，标准价照常以文字显示。
-   */
+  /** 用户端标准价显示为划线价（默认 false，管理端不划线） */
   strikeStandardCost?: boolean
 }
 
@@ -37,7 +34,7 @@ function splitDuration(ms: number): { value: number; decimals: number; suffix: s
   return { value: Number((ms / 1000).toFixed(2)), decimals: 2, suffix: 's' }
 }
 
-export default function UsageStatsCards({ stats, showAccountCost = true }: UsageStatsCardsProps) {
+export default function UsageStatsCards({ stats, showAccountCost = true, strikeStandardCost = false }: UsageStatsCardsProps) {
   const { t } = useI18n()
 
   const totalAccountCost = (stats as (AdminUsageStatsResponse & { total_account_cost?: number }) | null)?.total_account_cost ?? null
@@ -54,11 +51,21 @@ export default function UsageStatsCards({ stats, showAccountCost = true }: Usage
     `${cacheLabel()}: ${formatTokens(stats?.total_cache_tokens || 0)}`
   ].join(' / ')
 
-  const standardCost = `${t('usage.standardCost')} $${(stats?.total_cost || 0).toFixed(4)}`
-  const costContext =
-    showAccountCost && totalAccountCost != null
-      ? `${t('usage.accountCost')} $${totalAccountCost.toFixed(4)} · ${standardCost}`
-      : standardCost
+  const standardAmount = `$${(stats?.total_cost || 0).toFixed(4)}`
+  const standardCost = `${t('usage.standardCost')} ${standardAmount}`
+  const accountCostText =
+    showAccountCost && totalAccountCost != null ? `${t('usage.accountCost')} $${totalAccountCost.toFixed(4)} · ` : ''
+  const costContext = `${accountCostText}${standardCost}`
+  // 划线价需要富文本，交给 MetricCard 的 contextNode；纯文本 context 仍保留给读屏与动画回退
+  const costContextNode = strikeStandardCost ? (
+    <>
+      {accountCostText}
+      {t('usage.standardCost')}{' '}
+      <s className={styles.strike} data-testid="usage-stats-standard-cost">
+        {standardAmount}
+      </s>
+    </>
+  ) : undefined
 
   const cacheBreakdown = (
     <span className={styles.breakdown}>
@@ -89,7 +96,14 @@ export default function UsageStatsCards({ stats, showAccountCost = true }: Usage
           />
         </div>
       </Tooltip>
-      <MetricCard label={t('usage.totalCost')} prefix="$" value={actualCost} decimals={4} context={costContext} />
+      <MetricCard
+        label={t('usage.totalCost')}
+        prefix="$"
+        value={actualCost}
+        decimals={4}
+        context={costContext}
+        contextNode={costContextNode}
+      />
       <MetricCard
         label={t('usage.avgDuration')}
         value={duration.value}

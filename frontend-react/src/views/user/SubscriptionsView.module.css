@@ -1,0 +1,214 @@
+/* 用户订阅：每个订阅一个分组区域，宽屏两列 */
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-6);
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.skeleton {
+  min-height: 220px;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.empty {
+  padding: var(--space-8) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.headerMain {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.title {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.rates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.peak {
+  color: var(--warning);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.body {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.expires {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.expiresLabel {
+  color: var(--text-secondary);
+}
+
+.expiresValue {
+  color: var(--foreground);
+  text-align: right;
+}
+
+.expiresValue[data-tone='warning'] {
+  color: var(--warning);
+}
+
+.expiresValue[data-tone='danger'] {
+  color: var(--danger);
+}
+
+.usage {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.usageLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.usageLabel {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.usageValue {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.usageReset {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+/* 用量条：按阈值使用 --success / --warning / --danger */
+.meter {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: color-mix(in oklab, var(--foreground) 10%, transparent);
+}
+
+.meterFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--success);
+  transition: width var(--duration-standard) var(--ease-standard);
+}
+
+.meter[data-tone='warning'] .meterFill {
+  background: var(--warning);
+}
+
+.meter[data-tone='danger'] .meterFill {
+  background: var(--danger);
+}
+
+.meter[data-tone='neutral'] .meterFill {
+  background: var(--text-muted);
+}
+
+.unlimited {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+}
+
+.infinity {
+  color: var(--success);
+  font-size: var(--text-3xl);
+  line-height: 1;
+}
+
+.unlimitedTitle {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.unlimitedDesc {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meterFill {
+    transition: none;
+  }
+}

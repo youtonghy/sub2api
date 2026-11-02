@@ -1,0 +1,211 @@
+/* 邀请返利：KPI、邀请码与链接、额度转入、邀请用户 */
+
+.page {
+  display: grid;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.kpiSkeleton {
+  min-height: 132px;
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+
+.blockSkeleton {
+  min-height: 200px;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.panel {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.panelHeader {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.title {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.shareGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.share {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.shareLabel {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* 手机上值与复制按钮上下堆叠，较宽屏幕并排一行 */
+.copyRow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+}
+
+.value {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-sm);
+  word-break: break-all;
+}
+
+.codeValue {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.copyButton {
+  width: 100%;
+}
+
+.tips {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.transferRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.warning {
+  margin: 0;
+  color: var(--warning);
+  font-size: var(--text-sm);
+}
+
+.empty {
+  margin: 0;
+  padding: var(--space-6);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-control);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+.table th {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--foreground);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table .secondary {
+  color: var(--text-secondary);
+}
+
+.table .rebate {
+  color: var(--success);
+  font-weight: 500;
+}
+
+@media (min-width: 640px) {
+  .copyRow {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .value {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    word-break: normal;
+  }
+
+  .copyButton {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  .transferRow {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+@media (min-width: 768px) {
+  .shareGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

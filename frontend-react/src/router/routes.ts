@@ -1,6 +1,6 @@
 /**
  * 路由表：与 Vue 版 frontend/src/router/index.ts 一一对应（路径、名称、meta 不变）。
- * view 指向已迁移的 React 页面；尚未迁移的页面暂用 pending()，迁移后替换为真实 import。
+ * view 指向对应的 React 页面（懒加载）。
  */
 import type { ComponentType } from 'react'
 import type { RouteLayout, RouteMeta } from './meta'
@@ -14,9 +14,6 @@ export interface AppRouteDef {
   aliases?: string[]
   view: () => Promise<{ default: ComponentType }>
 }
-
-/** 尚未迁移的页面：在对应布局中展示标题与迁移提示，Vue 源文件路径用于跟踪 */
-const pending = (_vueSource: string) => () => import('@/views/PendingMigrationView')
 
 export const redirectRoutes: { path: string; to: string }[] = [
   { path: '/', to: '/home' },
@@ -38,7 +35,7 @@ export const appRoutes: AppRouteDef[] = [
     name: 'Home',
     layout: 'none',
     meta: { requiresAuth: false, title: 'Home' },
-    view: pending('views/HomeView.vue'),
+    view: () => import('@/views/HomeView'),
   },
   {
     path: '/login',
@@ -130,35 +127,35 @@ export const appRoutes: AppRouteDef[] = [
     name: 'KeyUsage',
     layout: 'none',
     meta: { requiresAuth: false, title: 'Key Usage' },
-    view: pending('views/KeyUsageView.vue'),
+    view: () => import('@/views/KeyUsageView'),
   },
   {
     path: '/legal/:documentId',
     name: 'LegalDocument',
     layout: 'none',
     meta: { requiresAuth: false, title: 'Legal Document' },
-    view: pending('views/public/LegalDocumentView.vue'),
+    view: () => import('@/views/public/LegalDocumentView'),
   },
   {
     path: '/model-plaza',
     name: 'ModelPlaza',
     layout: 'none',
     meta: { requiresAuth: false, title: 'Model Plaza', titleKey: 'modelPlaza.title' },
-    view: pending('views/ModelPlazaView.vue'),
+    view: () => import('@/views/ModelPlazaView'),
   },
   {
     path: '/dashboard',
     name: 'Dashboard',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'Dashboard', titleKey: 'dashboard.title', descriptionKey: 'dashboard.welcomeMessage' },
-    view: pending('views/user/DashboardView.vue'),
+    view: () => import('@/views/user/DashboardView'),
   },
   {
     path: '/keys',
     name: 'Keys',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'API Keys', titleKey: 'keys.title', descriptionKey: 'keys.description' },
-    view: pending('views/user/KeysView.vue'),
+    view: () => import('@/views/user/KeysView'),
   },
   {
     path: '/batch-image',
@@ -166,105 +163,105 @@ export const appRoutes: AppRouteDef[] = [
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'Batch Image Guide', titleKey: 'batchImageGuide.title', descriptionKey: 'batchImageGuide.description' },
     aliases: ['/docs/batch-image'],
-    view: pending('views/user/BatchImageGuideView.vue'),
+    view: () => import('@/views/user/BatchImageGuideView'),
   },
   {
     path: '/usage',
     name: 'Usage',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'Usage Records', titleKey: 'usage.title', descriptionKey: 'usage.description' },
-    view: pending('views/user/UsageView.vue'),
+    view: () => import('@/views/user/UsageView'),
   },
   {
     path: '/redeem',
     name: 'Redeem',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'Redeem Code', titleKey: 'redeem.title', descriptionKey: 'redeem.description' },
-    view: pending('views/user/RedeemView.vue'),
+    view: () => import('@/views/user/RedeemView'),
   },
   {
     path: '/affiliate',
     name: 'Affiliate',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'Affiliate', titleKey: 'affiliate.title', descriptionKey: 'affiliate.description' },
-    view: pending('views/user/AffiliateView.vue'),
+    view: () => import('@/views/user/AffiliateView'),
   },
   {
     path: '/available-channels',
     name: 'UserAvailableChannels',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'Available Channels', titleKey: 'availableChannels.title', descriptionKey: 'availableChannels.description' },
-    view: pending('views/user/AvailableChannelsView.vue'),
+    view: () => import('@/views/user/AvailableChannelsView'),
   },
   {
     path: '/profile',
     name: 'Profile',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'Profile', titleKey: 'profile.title', descriptionKey: 'profile.description' },
-    view: pending('views/user/ProfileView.vue'),
+    view: () => import('@/views/user/ProfileView'),
   },
   {
     path: '/subscriptions',
     name: 'Subscriptions',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'My Subscriptions', titleKey: 'userSubscriptions.title', descriptionKey: 'userSubscriptions.description', requiresSubscription: true },
-    view: pending('views/user/SubscriptionsView.vue'),
+    view: () => import('@/views/user/SubscriptionsView'),
   },
   {
     path: '/purchase',
     name: 'PurchaseSubscription',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'Purchase Subscription', titleKey: 'nav.buySubscription', descriptionKey: 'purchase.description', requiresPayment: true },
-    view: pending('views/user/PaymentView.vue'),
+    view: () => import('@/views/user/PaymentView'),
   },
   {
     path: '/orders',
     name: 'OrderList',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'My Orders', titleKey: 'nav.myOrders', requiresPayment: true },
-    view: pending('views/user/UserOrdersView.vue'),
+    view: () => import('@/views/user/UserOrdersView'),
   },
   {
     path: '/payment/qrcode',
     name: 'PaymentQRCode',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'Payment', titleKey: 'payment.qr.scanToPay', requiresPayment: true },
-    view: pending('views/user/PaymentQRCodeView.vue'),
+    view: () => import('@/views/user/PaymentQRCodeView'),
   },
   {
     path: '/payment/result',
     name: 'PaymentResult',
     layout: 'none',
     meta: { requiresAuth: false, requiresAdmin: false, title: 'Payment Result', titleKey: 'payment.result.success', requiresPayment: false },
-    view: pending('views/user/PaymentResultView.vue'),
+    view: () => import('@/views/user/PaymentResultView'),
   },
   {
     path: '/payment/stripe',
     name: 'StripePayment',
     layout: 'none',
     meta: { requiresAuth: false, requiresAdmin: false, title: 'Stripe Payment', titleKey: 'payment.stripePay', requiresPayment: false },
-    view: pending('views/user/StripePaymentView.vue'),
+    view: () => import('@/views/user/StripePaymentView'),
   },
   {
     path: '/payment/airwallex',
     name: 'AirwallexPayment',
     layout: 'app',
     meta: { requiresAuth: false, requiresAdmin: false, title: 'Airwallex Payment', titleKey: 'payment.airwallexPay', requiresPayment: false },
-    view: pending('views/user/AirwallexPaymentView.vue'),
+    view: () => import('@/views/user/AirwallexPaymentView'),
   },
   {
     path: '/payment/stripe-popup',
     name: 'StripePopup',
     layout: 'none',
     meta: { requiresAuth: false, requiresAdmin: false, title: 'Payment', requiresPayment: false },
-    view: pending('views/user/StripePopupView.vue'),
+    view: () => import('@/views/user/StripePopupView'),
   },
   {
     path: '/custom/:id',
     name: 'CustomPage',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'Custom Page', titleKey: 'customPage.title' },
-    view: pending('views/user/CustomPageView.vue'),
+    view: () => import('@/views/user/CustomPageView'),
   },
   {
     path: '/admin/dashboard',
@@ -320,7 +317,7 @@ export const appRoutes: AppRouteDef[] = [
     name: 'ChannelStatus',
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'Channel Status', titleKey: 'nav.channelStatus' },
-    view: pending('views/user/ChannelStatusView.vue'),
+    view: () => import('@/views/user/ChannelStatusView'),
   },
   {
     path: '/admin/subscriptions',

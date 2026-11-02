@@ -1,0 +1,22 @@
+.page {
+  min-height: 100vh;
+  background: var(--background);
+}
+
+.main {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+@media (min-width: 640px) {
+  .main {
+    padding-inline: var(--space-6);
+  }
+}
+
+@media (min-width: 1024px) {
+  .main {
+    padding: var(--space-8);
+  }
+}

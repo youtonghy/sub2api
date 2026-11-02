@@ -2,6 +2,7 @@
  * 应用外壳：基于 Arc Pro sidebar-rail 的侧边栏（可收起为图标栏，窄屏为抽屉）与顶栏。
  * 对应 Vue 版 AppLayout + AppSidebar + AppHeader；作为父路由渲染，导航时不会重新挂载。
  */
+import type { ReactNode } from 'react'
 import { useCallback, useEffect, useRef } from 'react'
 import { BookOpen, Headset, KeyRound, LayoutGrid, RotateCcw, User } from 'lucide-react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router'
@@ -167,7 +168,8 @@ function HeaderActions() {
   )
 }
 
-export default function AppLayout() {
+/** children 用于路由布局为 none 的页面自行套外壳（如模型广场内嵌形态），否则渲染子路由 */
+export default function AppLayout({ children }: { children?: ReactNode } = {}) {
   const { t } = useI18n()
   const navigate = useNavigate()
   const location = useLocation()
@@ -218,7 +220,7 @@ export default function AppLayout() {
         closeNavigation: t('shell.closeNavigation'),
       }}
     >
-      <Outlet />
+      {children ?? <Outlet />}
     </SidebarRail>
   )
 }

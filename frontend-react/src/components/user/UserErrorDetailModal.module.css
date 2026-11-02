@@ -1,0 +1,50 @@
+.body {
+  display: grid;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-6);
+  margin: 0;
+}
+
+.grid dt,
+.label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.grid dd {
+  margin: 2px 0 0;
+  color: var(--foreground);
+  word-break: break-all;
+}
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.message {
+  margin: 0;
+  color: var(--foreground);
+  word-break: break-all;
+}
+
+.pre {
+  max-height: 40vh;
+  margin: 0;
+  overflow: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  word-break: break-all;
+}

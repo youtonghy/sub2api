@@ -30,3 +30,7 @@
 .breakdownValue {
   font-variant-numeric: tabular-nums;
 }
+
+.strike {
+  text-decoration: line-through;
+}

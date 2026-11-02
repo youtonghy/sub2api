@@ -1,0 +1,52 @@
+.screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--space-4);
+  background: var(--background);
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: 28rem;
+}
+
+.status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.bigIcon {
+  width: 72px;
+  height: 72px;
+  margin-bottom: var(--space-2);
+}
+
+.title {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-2xl);
+  font-weight: 500;
+}
+
+.accent {
+  color: var(--accent);
+}
+
+.bonus {
+  color: var(--warning);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}

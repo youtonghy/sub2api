@@ -1,0 +1,215 @@
+/* 兑换码页面：居中单列 */
+
+.page {
+  display: grid;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: 42rem;
+  min-width: 0;
+  margin: 0 auto;
+}
+
+.panel {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.title {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.form {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.submit {
+  width: 100%;
+}
+
+.result {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.result p {
+  margin: 0;
+}
+
+.resultLines {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.strong {
+  font-weight: 500;
+}
+
+.rules {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: 1.25em;
+}
+
+.contact {
+  margin-left: var(--space-2);
+}
+
+.list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.rowIcon {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+
+.rowText {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rowTitle {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.rowMeta {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.rowEnd {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: end;
+  max-width: 50%;
+}
+
+.rowValue {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 记录色调：余额增减、订阅、并发增减 */
+.rowIcon[data-tone='success'],
+.rowValue[data-tone='success'] {
+  color: var(--success);
+}
+
+.rowIcon[data-tone='danger'],
+.rowValue[data-tone='danger'] {
+  color: var(--danger);
+}
+
+.rowIcon[data-tone='warning'],
+.rowValue[data-tone='warning'] {
+  color: var(--warning);
+}
+
+.rowIcon[data-tone='info'],
+.rowValue[data-tone='info'],
+.rowIcon[data-tone='accent'],
+.rowValue[data-tone='accent'] {
+  color: var(--accent);
+}
+
+.code {
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-xs);
+}
+
+.notes {
+  max-width: 200px;
+  overflow: hidden;
+  margin-top: var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyEmpty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) 0;
+  color: var(--text-muted);
+}
+
+.historyEmpty p {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.pageSize {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.select {
+  height: var(--control-height-sm, 32px);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+}
+
+.select:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.pagerButtons {
+  display: inline-flex;
+  gap: var(--space-2);
+}

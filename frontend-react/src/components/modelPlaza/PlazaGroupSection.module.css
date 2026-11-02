@@ -1,0 +1,49 @@
+.section {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--section-accent) 22%, var(--border));
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.header {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-4) var(--space-5);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.description {
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.peakNote,
+.note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 6px 0 0;
+  font-size: var(--text-xs);
+}
+
+.peakNote {
+  color: var(--warning);
+}
+
+.note {
+  color: var(--text-secondary);
+}
+
+.empty {
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}

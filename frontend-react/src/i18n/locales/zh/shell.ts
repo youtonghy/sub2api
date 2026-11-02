@@ -3,8 +3,6 @@
  */
 export default {
   shell: {
-    pendingTitle: '此页面正在重建',
-    pendingDescription: '这个页面的新界面还没有完成，迁移后会显示在这里。',
     expandSidebar: '展开侧边栏',
     collapseSidebar: '收起侧边栏',
     openNavigation: '打开导航',

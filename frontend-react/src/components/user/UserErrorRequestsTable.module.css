@@ -1,0 +1,96 @@
+.root {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow: hidden;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.pagination {
+  flex-shrink: 0;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.secondary {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.strong {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.mono {
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-sm);
+}
+
+.inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.endpoint {
+  max-width: 320px;
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  word-break: break-all;
+}
+
+.fieldLabel {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.fieldValue {
+  margin-left: var(--space-1);
+}
+
+.truncate {
+  display: block;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message {
+  max-width: 280px;
+}
+
+.userAgent {
+  max-width: 320px;
+}
+
+.empty {
+  padding: var(--space-8) var(--space-4);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-align: center;
+}

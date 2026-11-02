@@ -1,0 +1,119 @@
+.root {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.title {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-2xl);
+  font-weight: 500;
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.description {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.description :global(h1),
+.description :global(h2),
+.description :global(h3) {
+  margin: var(--space-3) 0 var(--space-2);
+  color: var(--foreground);
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.description :global(h1:first-child),
+.description :global(h2:first-child),
+.description :global(h3:first-child) {
+  margin-top: 0;
+}
+
+.description :global(p) {
+  margin: 0 0 var(--space-2);
+  color: var(--text-secondary);
+}
+
+.description :global(p:last-child) {
+  margin-bottom: 0;
+}
+
+.description :global(a) {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.description :global(ul),
+.description :global(ol) {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-5);
+}
+
+.description :global(ul) {
+  list-style: disc;
+}
+
+.description :global(ol) {
+  list-style: decimal;
+}
+
+.description :global(li) {
+  margin-bottom: 2px;
+  color: var(--text-secondary);
+}
+
+.description :global(code) {
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: var(--surface-muted);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--text-xs);
+}
+
+.description :global(blockquote) {
+  margin: var(--space-2) 0;
+  border-left: 3px solid var(--border);
+  padding-left: var(--space-3);
+  color: var(--text-secondary);
+}
+
+.hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.loading {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.groups {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.empty {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-12) var(--space-5);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-align: center;
+}

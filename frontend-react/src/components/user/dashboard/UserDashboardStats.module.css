@@ -1,0 +1,195 @@
+/* 用户仪表盘 KPI 两行与按平台拆分区域 */
+
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: stretch;
+  gap: 16px;
+  min-width: 0;
+}
+
+.kpiCell {
+  display: grid;
+  min-width: 0;
+}
+
+.panel {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.panelHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.panelTitle {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.panelMeta {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.platformGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+/* 平台条目：区域内的浅底分块，不再套一层卡片边框 */
+.platform {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+}
+
+.platformOther {
+  border: 1px dashed var(--border);
+  background: transparent;
+}
+
+.platformHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.platformName {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.platformCost {
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.platformStats {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-xs);
+}
+
+.platformStats > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.platformStats dt {
+  color: var(--text-muted);
+}
+
+.platformStats dd {
+  margin: 0;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.quota {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.quotaTitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.quotaRow {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.quotaLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.quotaLabel {
+  color: var(--text-secondary);
+}
+
+.quotaValue {
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.quotaDisabled {
+  color: var(--danger);
+}
+
+.quotaReset {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+/* 用量条：按阈值使用 --success / --warning / --danger */
+.meter {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: color-mix(in oklab, var(--foreground) 10%, transparent);
+}
+
+.meterFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--success);
+  transition: width var(--duration-standard) var(--ease-standard);
+}
+
+.meter[data-tone='warning'] .meterFill {
+  background: var(--warning);
+}
+
+.meter[data-tone='danger'] .meterFill {
+  background: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meterFill {
+    transition: none;
+  }
+}
+
+/* 手机两列时 KPI 数值缩小一档，避免较长数值溢出卡片 */
+@media (max-width: 520px) {
+  .kpiRow {
+    --text-3xl: var(--text-xl);
+  }
+}

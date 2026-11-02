@@ -1,0 +1,27 @@
+.screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--space-8) var(--space-4);
+  background: var(--background);
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: 32rem;
+  margin-inline: auto;
+}
+
+.wechatQr {
+  display: block;
+  width: 224px;
+  height: 224px;
+  border-radius: var(--radius-control);
+}
+
+.center {
+  display: flex;
+  justify-content: center;
+}

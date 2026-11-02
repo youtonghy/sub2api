@@ -1,0 +1,299 @@
+/* 实付分区配色统一从 --plaza-accent（平台主色）派生，新增平台无需扩展样式 */
+.wrapper {
+  --pz-title: color-mix(in srgb, var(--plaza-accent) 72%, var(--foreground));
+  --pz-bg: color-mix(in srgb, var(--plaza-accent) 7%, transparent);
+  --pz-bg-hover: color-mix(in srgb, var(--plaza-accent) 13%, transparent);
+  overflow-x: auto;
+}
+
+:root[data-theme='dark'] .wrapper {
+  --pz-title: color-mix(in srgb, var(--plaza-accent) 70%, var(--foreground));
+  --pz-bg: color-mix(in srgb, var(--plaza-accent) 6%, transparent);
+  --pz-bg-hover: color-mix(in srgb, var(--plaza-accent) 10%, transparent);
+}
+
+.table {
+  width: 100%;
+  min-width: 1000px;
+  table-layout: auto;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+  vertical-align: middle;
+}
+
+.headRow {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.headRow th {
+  font-weight: 500;
+}
+
+.modelHead {
+  border-right: 1px solid var(--border-subtle);
+  padding: 10px var(--space-4) 10px var(--space-5);
+  text-align: left;
+}
+
+.groupHead {
+  padding-top: var(--space-2);
+  text-align: center;
+}
+
+.paidTitle {
+  border-bottom: 1px solid color-mix(in srgb, var(--pz-title) 30%, transparent);
+  padding-bottom: var(--space-2);
+  color: var(--pz-title);
+}
+
+.paidUnit {
+  margin-left: var(--space-1);
+  color: color-mix(in srgb, var(--pz-title) 62%, transparent);
+  font-weight: 400;
+}
+
+.officialTitle {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-2);
+  color: var(--text-muted);
+}
+
+.officialUnit {
+  margin-left: var(--space-1);
+  font-weight: 400;
+}
+
+.rateHead {
+  border-left: 1px solid var(--border-subtle);
+  padding: 10px var(--space-5) 10px var(--space-3);
+  text-align: right;
+}
+
+.subHeadRow {
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: left;
+}
+
+.subHeadRow th {
+  padding: var(--space-2) var(--space-3);
+  font-weight: 500;
+}
+
+.paidBg,
+.paidCell {
+  background-color: var(--pz-bg);
+}
+
+.sectionStart {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.row {
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row:hover {
+  background-color: color-mix(in srgb, var(--surface-muted) 70%, transparent);
+}
+
+.paidCell {
+  padding: 10px var(--space-3);
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.row:hover .paidCell {
+  background-color: var(--pz-bg-hover);
+}
+
+.modelCell {
+  border-right: 1px solid var(--border-subtle);
+  padding: 10px var(--space-4) 10px var(--space-5);
+}
+
+.modelName {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.name {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.periodBadge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  padding: 2px var(--space-1);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.weekdays {
+  margin-right: var(--space-1);
+  font-family: var(--font-body);
+}
+
+.platformBadge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  padding: 2px 6px;
+  background: color-mix(in srgb, var(--badge-accent) 12%, transparent);
+  color: color-mix(in srgb, var(--badge-accent) 70%, var(--foreground));
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.tag {
+  border-radius: 6px;
+  padding: 2px 6px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.reasoningTag {
+  border-radius: 6px;
+  padding: 2px 6px;
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: color-mix(in srgb, var(--warning) 70%, var(--foreground));
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.price {
+  color: var(--foreground);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-weight: 500;
+}
+
+.tierRow {
+  font-size: var(--text-xs);
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.tierLabel {
+  margin-right: var(--space-1);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-weight: 400;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-weight: 400;
+}
+
+.gapLeft {
+  margin-left: var(--space-1);
+}
+
+.cacheText {
+  color: var(--foreground);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-weight: 400;
+}
+
+.cacheStack {
+  display: grid;
+  gap: 2px;
+  color: inherit;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--text-xs);
+}
+
+.paidCell .cacheStack {
+  color: var(--foreground);
+}
+
+.cacheLabel {
+  margin-right: var(--space-1);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-weight: 400;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-radius: 6px;
+  padding: 2px var(--space-2);
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--text-xs);
+}
+
+.chipLabel {
+  color: var(--text-muted);
+  font-family: var(--font-body);
+}
+
+.unitSuffix {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.officialCell {
+  padding: 10px var(--space-3);
+  color: var(--text-secondary);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--text-xs);
+}
+
+.rateCell {
+  border-left: 1px solid var(--border-subtle);
+  padding: 10px var(--space-5) 10px var(--space-3);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--text-xs);
+  text-align: right;
+}
+
+.rate {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.rateAccent {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.struck {
+  margin-right: var(--space-1);
+  color: var(--text-muted);
+  text-decoration: line-through;
+}

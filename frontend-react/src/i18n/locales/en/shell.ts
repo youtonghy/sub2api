@@ -3,8 +3,6 @@
  */
 export default {
   shell: {
-    pendingTitle: 'This page is being rebuilt',
-    pendingDescription: 'The new interface for this page is not ready yet. It will appear here once it is migrated.',
     expandSidebar: 'Expand sidebar',
     collapseSidebar: 'Collapse sidebar',
     openNavigation: 'Open navigation',

@@ -1,0 +1,69 @@
+.qrWrap {
+  display: flex;
+  justify-content: center;
+}
+
+/* 二维码保持白底以便扫码，暗色模式下也不反色 */
+.qrFrame {
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: white;
+}
+
+.qr {
+  display: block;
+  width: 192px;
+  height: 192px;
+}
+
+.secretBlock {
+  text-align: center;
+}
+
+.secretRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.secret {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.codeBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.codeCells {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.codeCell {
+  width: 40px;
+  height: 48px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-lg);
+  font-weight: 500;
+  text-align: center;
+}
+
+.codeCell:focus-visible {
+  border-color: var(--accent);
+}
