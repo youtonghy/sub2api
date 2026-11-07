@@ -195,6 +195,7 @@ export const useAppStore = create<AppState>()((set, get) => {
       service_quota_enabled: false,
       affiliate_enabled: false,
       allow_user_view_error_requests: false,
+      mcp_enabled: false,
     }
   }
 

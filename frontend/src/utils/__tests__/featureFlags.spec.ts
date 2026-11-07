@@ -61,3 +61,19 @@ describe('resolveFeatureFlag', () => {
     expect(isFeatureFlagEnabled(FeatureFlags.subscription)).toBe(false)
   })
 })
+
+describe('FeatureFlags.mcp', () => {
+  beforeEach(() => {
+    useAppStore.setState(useAppStore.getInitialState(), true)
+    delete (window as any).__APP_CONFIG__
+  })
+
+  it('stays hidden unless the deployment explicitly enables MCP', () => {
+    expect(FeatureFlags.mcp.key).toBe('mcp_enabled')
+    expect(FeatureFlags.mcp.mode).toBe('opt-in')
+    expect(isFeatureFlagEnabled(FeatureFlags.mcp)).toBe(false)
+    expect(resolveFeatureFlag({} as PublicSettings, FeatureFlags.mcp)).toBe(false)
+    expect(resolveFeatureFlag({ mcp_enabled: false } as PublicSettings, FeatureFlags.mcp)).toBe(false)
+    expect(resolveFeatureFlag({ mcp_enabled: true } as PublicSettings, FeatureFlags.mcp)).toBe(true)
+  })
+})
