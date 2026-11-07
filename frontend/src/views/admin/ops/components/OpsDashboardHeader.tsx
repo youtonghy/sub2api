@@ -421,9 +421,9 @@ export default function OpsDashboardHeader(props: OpsDashboardHeaderProps) {
   const realtimeTickerMetrics = useMemo<TickerMetric[]>(
     () => [
       { id: 'qps', label: 'QPS', value: displayRealTimeQps, format: { minimumFractionDigits: 1, maximumFractionDigits: 1 }, delta: 'absolute' },
-      { id: 'tps', label: t('admin.ops.tps'), value: displayRealTimeTps, format: { minimumFractionDigits: 1, maximumFractionDigits: 1 }, delta: 'absolute' }
+      { id: 'tps', label: 'TPS', value: displayRealTimeTps, format: { minimumFractionDigits: 1, maximumFractionDigits: 1 }, delta: 'absolute' }
     ],
-    [displayRealTimeQps, displayRealTimeTps, t]
+    [displayRealTimeQps, displayRealTimeTps]
   )
   const realtimeQpsPeakLabel = fixed1(realtimeTrafficSummary?.qps?.peak)
   const realtimeTpsPeakLabel = fixed1(realtimeTrafficSummary?.tps?.peak)

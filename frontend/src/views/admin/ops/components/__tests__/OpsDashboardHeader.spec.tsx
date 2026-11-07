@@ -68,7 +68,7 @@ describe('OpsDashboardHeader realtime ticker', () => {
     const { unmount } = await mountHeader()
     const ticker = screen.getByRole('region', { name: 'admin.ops.current' })
     expect(ticker.querySelector('[aria-label^="QPS, 12.3"]')).not.toBeNull()
-    expect(ticker.querySelector('[aria-label^="admin.ops.tps, 3,456.7"]')).not.toBeNull()
+    expect(ticker.querySelector('[aria-label^="TPS, 3,456.7"]')).not.toBeNull()
     unmount()
   })
 })
