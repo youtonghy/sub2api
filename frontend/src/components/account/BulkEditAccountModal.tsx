@@ -48,6 +48,13 @@ import {
 import GrokBaseUrlPresets from './GrokBaseUrlPresets'
 import HeaderOverrideEditor from './HeaderOverrideEditor'
 import ModelWhitelistSelector from './ModelWhitelistSelector'
+import OpenAIImageSizeTiersField from './OpenAIImageSizeTiersField'
+import {
+  OPENAI_IMAGE_SIZE_TIERS,
+  OPENAI_IMAGE_SIZE_TIERS_EXTRA_KEY,
+  openAIImageSizeTiersPayload,
+  type OpenAIImageSizeTier
+} from './openaiImageSizeTiers'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
 
 export interface BulkEditTarget {
@@ -94,6 +101,7 @@ interface BulkEditState {
   enableOpenAIPassthrough: boolean
   enableOpenAIFlattenNamespaces: boolean
   enableOpenAILongContextBilling: boolean
+  enableOpenAIImageSizeTiers: boolean
   enableOpenAIEndpointCapabilities: boolean
   enableOpenAIResponsesMode: boolean
   enableOpenAIWSMode: boolean
@@ -126,6 +134,7 @@ interface BulkEditState {
   // Codex namespace 工具摊平兼容开关（仅 OAuth），缺省关闭即原样保留
   openaiFlattenNamespacesEnabled: boolean
   openAILongContextBillingEnabled: boolean
+  openAIImageSizeTiers: OpenAIImageSizeTier[]
   openAIEndpointCapabilities: OpenAIEndpointCapability[]
   openAIResponsesMode: OpenAIResponsesMode
   openaiOAuthResponsesWebSocketV2Mode: OpenAIWSMode
@@ -158,6 +167,7 @@ const createInitialState = (): BulkEditState => ({
   enableOpenAIPassthrough: false,
   enableOpenAIFlattenNamespaces: false,
   enableOpenAILongContextBilling: false,
+  enableOpenAIImageSizeTiers: false,
   enableOpenAIEndpointCapabilities: false,
   enableOpenAIResponsesMode: false,
   enableOpenAIWSMode: false,
@@ -187,6 +197,7 @@ const createInitialState = (): BulkEditState => ({
   openaiPassthroughEnabled: false,
   openaiFlattenNamespacesEnabled: false,
   openAILongContextBillingEnabled: false,
+  openAIImageSizeTiers: [...OPENAI_IMAGE_SIZE_TIERS],
   openAIEndpointCapabilities: ['chat_completions', 'embeddings'],
   openAIResponsesMode: 'auto',
   openaiOAuthResponsesWebSocketV2Mode: OPENAI_WS_MODE_OFF,
@@ -643,6 +654,11 @@ export default function BulkEditAccountModal({
       extra.openai_long_context_billing_enabled = form.openAILongContextBillingEnabled
     }
 
+    if (form.enableOpenAIImageSizeTiers && allOpenAIPassthroughCapable) {
+      // extra 按 JSONB 合并写入，不限档位用空列表覆盖旧值。
+      ensureExtra()[OPENAI_IMAGE_SIZE_TIERS_EXTRA_KEY] = openAIImageSizeTiersPayload(form.openAIImageSizeTiers) ?? []
+    }
+
     if (applyOpenAIEndpointCapabilities) {
       credentials.openai_capabilities =
         form.openAIEndpointCapabilities.length === 2 && !form.openAIEndpointCapabilities.includes('seedance')
@@ -909,6 +925,7 @@ export default function BulkEditAccountModal({
       form.enableOpenAIPassthrough ||
       form.enableOpenAIFlattenNamespaces ||
       (form.enableOpenAILongContextBilling && allOpenAIPassthroughCapable) ||
+      (form.enableOpenAIImageSizeTiers && allOpenAIPassthroughCapable) ||
       (form.enableOpenAIEndpointCapabilities && allOpenAIAPIKey) ||
       (form.enableOpenAIResponsesMode && allOpenAIAPIKey) ||
       form.enableModelRestriction ||
@@ -1126,6 +1143,33 @@ export default function BulkEditAccountModal({
                   {t('admin.accounts.bulkEdit.longContextShadowHint')}
                 </p>
               </FormNotice>
+            </BulkField>
+          ) : null}
+
+          {/* OpenAI images: size tier routing */}
+          {allOpenAIPassthroughCapable ? (
+            <BulkField
+              id="bulk-edit-openai-image-size-tiers"
+              label={t('admin.accounts.openai.imageSizeTiers')}
+              ariaLabel={t('admin.accounts.openai.imageSizeTiers')}
+              enabled={form.enableOpenAIImageSizeTiers}
+              onEnabledChange={(v) => update({ enableOpenAIImageSizeTiers: v })}
+              controls="bulk-edit-openai-image-size-tiers-body"
+            >
+              <FieldBody
+                id="bulk-edit-openai-image-size-tiers-body"
+                enabled={form.enableOpenAIImageSizeTiers}
+                group
+                labelledBy="bulk-edit-openai-image-size-tiers-label"
+              >
+                <OpenAIImageSizeTiersField
+                  value={form.openAIImageSizeTiers}
+                  onChange={(tiers) => update({ openAIImageSizeTiers: tiers })}
+                  disabled={!form.enableOpenAIImageSizeTiers}
+                  hideLabel
+                  testIdPrefix="bulk-edit-openai-image-size-tier"
+                />
+              </FieldBody>
             </BulkField>
           ) : null}
 

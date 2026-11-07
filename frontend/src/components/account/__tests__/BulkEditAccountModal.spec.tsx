@@ -517,6 +517,41 @@ describe('BulkEditAccountModal', () => {
     })
   })
 
+  it('生图尺寸档位独立启用，全选时提交空列表表示不限', async () => {
+    const restricted = mountModal({
+      selectedPlatforms: ['openai'],
+      selectedTypes: ['oauth', 'apikey']
+    })
+    enable('bulk-edit-openai-image-size-tiers-enabled')
+    fireEvent.click(screen.getByTestId('bulk-edit-openai-image-size-tier-4K'))
+    await submit()
+
+    expect(adminAPI.accounts.bulkUpdate).toHaveBeenLastCalledWith([1, 2], {
+      extra: { openai_image_size_tiers: ['1K', '2K'] }
+    })
+    restricted.unmount()
+
+    vi.mocked(adminAPI.accounts.bulkUpdate).mockClear()
+    const unrestricted = mountModal({
+      selectedPlatforms: ['openai'],
+      selectedTypes: ['apikey']
+    })
+    expect((screen.getByTestId('bulk-edit-openai-image-size-tier-1K') as HTMLButtonElement).disabled).toBe(true)
+    enable('bulk-edit-openai-image-size-tiers-enabled')
+    await submit()
+
+    expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], {
+      extra: { openai_image_size_tiers: [] }
+    })
+    unrestricted.unmount()
+
+    mountModal({
+      selectedPlatforms: ['openai', 'anthropic'],
+      selectedTypes: ['apikey']
+    })
+    expect(exists('bulk-edit-openai-image-size-tiers-enabled')).toBe(false)
+  })
+
   it('端点能力默认值提交 null，表示恢复两个默认端点', async () => {
     mountModal({
       selectedPlatforms: ['openai'],

@@ -3,7 +3,7 @@
  * 池模式与临时不可调度规则。状态全部由 EditAccountModal 持有，这里只负责渲染与回调。
  */
 import { ArrowRight, ChevronDown, ChevronUp, Info, Plus, RefreshCw, Trash2, X } from 'lucide-react'
-import { useId, type ReactNode } from 'react'
+import { useId, type ReactNode, type Ref } from 'react'
 
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
@@ -22,7 +22,7 @@ import {
   type NumInput,
   type TempUnschedRuleForm
 } from './EditAccountModal.state'
-import ModelWhitelistSelector from './ModelWhitelistSelector'
+import ModelWhitelistSelector, { type ModelWhitelistSelectorHandle } from './ModelWhitelistSelector'
 
 const cx = (...names: Array<string | false | null | undefined>) => names.filter(Boolean).join(' ')
 
@@ -196,6 +196,8 @@ export interface MappingRowsEditorProps {
   toPlaceholder: string
   /** 通配符校验（Antigravity）：请求模型只允许末尾 *，实际模型不允许 * */
   validateWildcard?: (pattern: string) => boolean
+  /** 紧凑表格布局（Grok）：列标题、逐行无障碍名称与 data-testid */
+  compact?: boolean
 }
 
 /** 模型映射行（请求模型 → 实际模型），行内编辑、删除 */
@@ -205,23 +207,36 @@ export function MappingRowsEditor({
   keyPrefix,
   fromPlaceholder,
   toPlaceholder,
-  validateWildcard
+  validateWildcard,
+  compact = false
 }: MappingRowsEditorProps) {
   const { t } = useI18n()
-  if (rows.length === 0) return null
+  const header = compact ? (
+    <div className={styles.compactMappingHeader}>
+      <span>{t('admin.accounts.grokModelDiagnostics.requestColumn')}</span>
+      <span />
+      <span>{t('admin.accounts.grokModelDiagnostics.targetColumn')}</span>
+    </div>
+  ) : null
+  if (rows.length === 0) return header
   const patch = (index: number, value: Partial<ModelMapping>) => onChange(patchRowAt(rows, index, value))
   return (
     <div className={formStyles.editRows}>
+      {header}
       {rows.map((mapping, index) => {
         const fromInvalid = validateWildcard ? !validateWildcard(mapping.from) : false
         const toInvalid = validateWildcard ? mapping.to.includes('*') : false
         return (
           <div key={rowKey(mapping, keyPrefix)} className={formStyles.stackTight}>
-            <div className={formStyles.editRow}>
+            <div
+              className={cx(formStyles.editRow, compact && styles.compactMappingRow)}
+              data-testid={compact ? 'grok-model-mapping-row' : undefined}
+            >
               <input
                 type="text"
-                className={formStyles.input}
+                className={cx(formStyles.input, compact && styles.compactMappingInput)}
                 value={mapping.from}
+                aria-label={compact ? t('admin.accounts.grokModelDiagnostics.mappingFromAria', { index: index + 1 }) : undefined}
                 placeholder={fromPlaceholder}
                 aria-invalid={fromInvalid || undefined}
                 onChange={(event) => patch(index, { from: event.target.value })}
@@ -229,8 +244,9 @@ export function MappingRowsEditor({
               <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" className={styles.arrow} />
               <input
                 type="text"
-                className={formStyles.input}
+                className={cx(formStyles.input, compact && styles.compactMappingInput)}
                 value={mapping.to}
+                aria-label={compact ? t('admin.accounts.grokModelDiagnostics.mappingTargetAria', { index: index + 1 }) : undefined}
                 placeholder={toPlaceholder}
                 aria-invalid={toInvalid || undefined}
                 onChange={(event) => patch(index, { to: event.target.value })}
@@ -238,8 +254,8 @@ export function MappingRowsEditor({
               <button
                 type="button"
                 className={formStyles.iconButton}
-                data-tone="danger"
-                aria-label={t('common.delete')}
+                data-tone={compact ? undefined : 'danger'}
+                aria-label={compact ? t('admin.accounts.grokModelDiagnostics.removeMappingAria', { index: index + 1 }) : t('common.delete')}
                 onClick={() => onChange(rows.filter((_, i) => i !== index))}
               >
                 <Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />
@@ -280,6 +296,14 @@ export interface ModelRestrictionEditorProps {
   keyPrefix: string
   /** Bedrock 版本使用 fromModel / toModel 占位文案且不显示映射说明 */
   variant?: 'default' | 'bedrock'
+  /** 模式切换下方、两种模式共享的内容（Grok 模型目录诊断） */
+  sharedContent?: ReactNode
+  /** Grok：紧凑映射表格；白名单选择器在映射模式下保持挂载以便共享同步 */
+  grokLayout?: boolean
+  whitelistRef?: Ref<ModelWhitelistSelectorHandle | null>
+  showSyncButton?: boolean
+  onUpstreamSyncFinished?: () => void
+  onWhitelistSyncingChange?: (syncing: boolean) => void
 }
 
 /** 模型限制：白名单 / 映射两种模式（对应 Vue 版多处重复的 Model Restriction 区块） */
@@ -295,12 +319,34 @@ export function ModelRestrictionEditor({
   presets,
   onPreset,
   keyPrefix,
-  variant = 'default'
+  variant = 'default',
+  sharedContent,
+  grokLayout = false,
+  whitelistRef,
+  showSyncButton,
+  onUpstreamSyncFinished,
+  onWhitelistSyncingChange
 }: ModelRestrictionEditorProps) {
   const { t } = useI18n()
   const bedrock = variant === 'bedrock'
+  // 白名单选择器在两种模式下都保持挂载（Vue 版 v-show），映射模式下进行中的同步仍能完成并回调
+  const whitelistSelector = (
+    <div hidden={mode !== 'whitelist'}>
+      <ModelWhitelistSelector
+        ref={whitelistRef}
+        value={allowedModels}
+        onChange={onAllowedModelsChange}
+        modelMappings={mappings}
+        platform={platform}
+        accountId={accountId}
+        showSyncButton={showSyncButton}
+        onUpstreamSyncFinished={onUpstreamSyncFinished}
+        onSyncingChange={onWhitelistSyncingChange}
+      />
+    </div>
+  )
   return (
-    <div className={formStyles.stack}>
+    <div className={formStyles.stack} data-testid={grokLayout ? 'grok-model-settings' : undefined}>
       <SegmentedControl
         label={t('admin.accounts.modelRestriction')}
         options={[
@@ -311,23 +357,22 @@ export function ModelRestrictionEditor({
         onValueChange={(value) => onModeChange(value as 'whitelist' | 'mapping')}
       />
 
+      {sharedContent}
+
+      {whitelistSelector}
+
       {mode === 'whitelist' ? (
         <div className={formStyles.stackTight}>
-          <ModelWhitelistSelector
-            value={allowedModels}
-            onChange={onAllowedModelsChange}
-            modelMappings={mappings}
-            platform={platform}
-            accountId={accountId}
-          />
           <p className={formStyles.hint}>
             {t('admin.accounts.selectedModels', { count: allowedModels.length })}
             {allowedModels.length === 0 && mappings.length === 0 ? <span> {t('admin.accounts.supportsAllModels')}</span> : null}
           </p>
         </div>
       ) : (
-        <div className={formStyles.stack}>
-          {!bedrock ? (
+        <div className={formStyles.stack} data-testid={grokLayout ? 'grok-model-mapping-editor' : undefined}>
+          {grokLayout ? (
+            <p className={formStyles.hint}>{t('admin.accounts.mapRequestModels')}</p>
+          ) : !bedrock ? (
             <FormNotice tone="info">
               <p className={styles.noticeLine}>
                 <Info size={14} strokeWidth={1.75} aria-hidden="true" />
@@ -341,8 +386,13 @@ export function ModelRestrictionEditor({
             keyPrefix={keyPrefix}
             fromPlaceholder={t(bedrock ? 'admin.accounts.fromModel' : 'admin.accounts.requestModel')}
             toPlaceholder={t(bedrock ? 'admin.accounts.toModel' : 'admin.accounts.actualModel')}
+            compact={grokLayout}
           />
-          <AddRowButton label={t('admin.accounts.addMapping')} onClick={() => onMappingsChange([...mappings, { from: '', to: '' }])} />
+          <AddRowButton
+            label={t('admin.accounts.addMapping')}
+            testId={grokLayout ? 'grok-model-mapping-add' : undefined}
+            onClick={() => onMappingsChange([...mappings, { from: '', to: '' }])}
+          />
           {/* Quick Add Buttons */}
           <PresetMappingButtons presets={presets} onSelect={onPreset} />
         </div>
@@ -351,9 +401,9 @@ export function ModelRestrictionEditor({
   )
 }
 
-export function AddRowButton({ label, onClick }: { label: string; onClick: () => void }) {
+export function AddRowButton({ label, onClick, testId }: { label: string; onClick: () => void; testId?: string }) {
   return (
-    <button type="button" className={styles.addRow} onClick={onClick}>
+    <button type="button" className={styles.addRow} data-testid={testId} onClick={onClick}>
       <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
       {label}
     </button>

@@ -270,6 +270,26 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
 
   afterEach(() => vi.useRealTimers())
 
+  it('omits image size tiers by default and sends restricted tiers when set', async () => {
+    await submitApiKeyAccount('openai')
+    expect(createAccountMock.mock.calls[0]?.[0]?.extra).not.toHaveProperty('openai_image_size_tiers')
+    cleanup()
+
+    createAccountMock.mockClear()
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'OpenAI')
+    await selectButtonByText(wrapper, 'API Key')
+    await setValue(textInput(wrapper), 'openai account')
+    await setValue(passwordInput(wrapper), 'test-api-key')
+    await click(screen.getByTestId('openai-image-size-tier-1K'))
+    await click(screen.getByTestId('openai-image-size-tier-2K'))
+    await submit(wrapper)
+    await flushPromises()
+
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    expect(createAccountMock.mock.calls[0]?.[0]?.extra?.openai_image_size_tiers).toEqual(['4K'])
+  })
+
   it('sets month and year expiry presets without submitting the account form', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-01-31T12:34:00'))

@@ -62,6 +62,12 @@ import {
   type OpenCodeAccountMode,
   type OpenCodeGoProtocolRule
 } from './credentialsBuilder'
+import {
+  OPENAI_IMAGE_SIZE_TIERS,
+  applyOpenAIImageSizeTiersToExtra,
+  readOpenAIImageSizeTiers,
+  type OpenAIImageSizeTier
+} from './openaiImageSizeTiers'
 
 /** Vue 版 v-model.number：可解析为数字时为数字，清空输入时为 ''，初始值可为 null */
 export type NumInput = number | '' | null
@@ -225,6 +231,8 @@ export interface EditState {
   openAIResponsesMode: OpenAIResponsesMode
   // Images 非流式响应缺 b64_json 时由网关下载 url 回填（仅 OpenAI API Key）。
   openAIImagesUrlToB64JsonEnabled: boolean
+  /** OpenAI 账号允许的图片尺寸档位（三档全选即不限） */
+  openAIImageSizeTiers: OpenAIImageSizeTier[]
   openAIEndpointCapabilities: OpenAIEndpointCapability[]
   openaiOAuthResponsesWebSocketV2Mode: OpenAIWSMode
   openaiAPIKeyResponsesWebSocketV2Mode: OpenAIWSMode
@@ -347,6 +355,7 @@ export function createInitialEditState(): EditState {
     openAICompactMode: 'auto',
     openAIResponsesMode: 'auto',
     openAIImagesUrlToB64JsonEnabled: false,
+    openAIImageSizeTiers: [...OPENAI_IMAGE_SIZE_TIERS],
     openAIEndpointCapabilities: ['chat_completions', 'embeddings'],
     openaiOAuthResponsesWebSocketV2Mode: OPENAI_WS_MODE_OFF,
     openaiAPIKeyResponsesWebSocketV2Mode: OPENAI_WS_MODE_OFF,
@@ -656,6 +665,48 @@ function loadModelRestrictionFromMapping(rawMapping?: Record<string, unknown>) {
 const buildModelRestrictionMapping = (state: EditState) =>
   buildModelMappingObject('combined', state.allowedModels, state.modelMappings)
 
+// ── Grok 模型目录诊断：判断表单是否偏离已保存配置（诊断只反映已保存配置） ──
+export const GROK_API_KEY_DEFAULT_BASE_URL = 'https://api.x.ai/v1'
+
+function normalizedGrokMapping(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object') return {}
+  const mapping: Record<string, string> = {}
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof raw !== 'string') continue
+    const from = key.trim()
+    const to = raw.trim()
+    if (!from || !to) continue
+    mapping[from] = to
+  }
+  return mapping
+}
+
+function sameGrokMapping(left: Record<string, string>, right: Record<string, string>): boolean {
+  const leftKeys = Object.keys(left).sort()
+  const rightKeys = Object.keys(right).sort()
+  return leftKeys.length === rightKeys.length && leftKeys.every((key, index) => key === rightKeys[index] && left[key] === right[key])
+}
+
+export function isGrokDiagnosticsDirty(state: EditState, account: Account | null): boolean {
+  if (account?.platform !== 'grok') return false
+  const credentials = (account.credentials as Record<string, unknown> | undefined) || {}
+  if (!sameGrokMapping(normalizedGrokMapping(credentials.model_mapping), normalizedGrokMapping(buildModelRestrictionMapping(state)))) {
+    return true
+  }
+  const savedBase = typeof credentials.base_url === 'string' ? credentials.base_url.trim() : ''
+  if (account.type === 'oauth') {
+    const savedCustom = isCustomGrokBaseUrl(savedBase)
+    if (state.grokOAuthCustomBaseUrlEnabled !== savedCustom) return true
+    return state.grokOAuthCustomBaseUrlEnabled && state.grokOAuthBaseUrl.trim() !== savedBase
+  }
+  if (account.type === 'apikey') {
+    const savedEffective = savedBase || GROK_API_KEY_DEFAULT_BASE_URL
+    const current = state.editBaseUrl.trim() || GROK_API_KEY_DEFAULT_BASE_URL
+    return current !== savedEffective
+  }
+  return false
+}
+
 function loadTempUnschedRules(credentials?: Record<string, unknown>): Pick<EditState, 'tempUnschedEnabled' | 'tempUnschedRules'> {
   const tempUnschedEnabled = credentials?.temp_unschedulable_enabled === true
   const rawRules = credentials?.temp_unschedulable_rules
@@ -837,6 +888,7 @@ export function syncEditStateFromAccount(prev: EditState, newAccount: Account): 
   s.allowOverages = extra?.allow_overages === true
   s.upstreamRequestIdHeader = readUpstreamRequestIdHeader(extra)
   s.openAIImagesUrlToB64JsonEnabled = extra?.images_url_to_b64_json === true
+  s.openAIImageSizeTiers = readOpenAIImageSizeTiers(extra)
   s.autoPause5hThreshold = typeof extra?.auto_pause_5h_threshold === 'number' ? extra.auto_pause_5h_threshold * 100 : null
   s.autoPause7dThreshold = typeof extra?.auto_pause_7d_threshold === 'number' ? extra.auto_pause_7d_threshold * 100 : null
   s.autoPause5hDisabled = extra?.auto_pause_5h_disabled === true
@@ -1976,6 +2028,7 @@ export function buildEditUpdatePayload(s: EditState, account: Account, deps: Bui
         newExtra.web_search_emulation = s.webSearchEmulationMode
       }
     }
+    applyOpenAIImageSizeTiersToExtra(newExtra, s.openAIImageSizeTiers)
     if (s.autoPause5hThreshold != null && (s.autoPause5hThreshold as number) > 0) {
       newExtra.auto_pause_5h_threshold = (s.autoPause5hThreshold as number) / 100
     } else {

@@ -27,6 +27,7 @@ import type {
   CheckMixedChannelResponse,
   GrokMediaEligibilityMode,
   GrokMediaEligibilityState,
+  GrokModelDiagnostics,
   Group,
   OllamaCloudUsageState,
   OpenAICompactMode,
@@ -81,6 +82,7 @@ import {
   isBedrockAPIKeyMode,
   isCNApiKeyAccount,
   isGenericMultiProtocolAccount,
+  isGrokDiagnosticsDirty,
   isGrokOAuthAccount,
   isSparkShadowAccount,
   isVertexAPIKeyMode,
@@ -109,10 +111,13 @@ import {
 } from './credentialsBuilder'
 import CnBaseUrlPresets from './CnBaseUrlPresets'
 import GrokBaseUrlPresets from './GrokBaseUrlPresets'
+import GrokModelDiagnosticsPanel from './GrokModelDiagnosticsPanel'
 import HeaderOverrideEditor from './HeaderOverrideEditor'
 import { allSelectedGroupsEnableLongContextPricing } from './longContextBilling'
 import OllamaCloudUsageSettings from './OllamaCloudUsageSettings'
 import OpenCodeGoProtocolRulesEditor from './OpenCodeGoProtocolRulesEditor'
+import OpenAIImageSizeTiersField from './OpenAIImageSizeTiersField'
+import type { ModelWhitelistSelectorHandle } from './ModelWhitelistSelector'
 import QuotaLimitCard, { type QuotaLimitCardValues } from './QuotaLimitCard'
 import UpstreamRequestIdHeaderField from './UpstreamRequestIdHeaderField'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
@@ -509,6 +514,131 @@ export default function EditAccountModal({ show, account, proxies, groups, onClo
     void loadTLSProfiles()
   })
 
+  // ── Grok 模型目录诊断（只反映已保存配置；同步与刷新都按账号与打开次数隔离） ──
+  const [grokDiagnostics, setGrokDiagnostics] = useState<GrokModelDiagnostics | null>(null)
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false)
+  const [diagnosticsRefreshFailed, setDiagnosticsRefreshFailed] = useState(false)
+  const [grokDiagnosticsSyncing, setGrokDiagnosticsSyncing] = useState(false)
+  const [grokWhitelistSyncing, setGrokWhitelistSyncing] = useState(false)
+  const diagnosticsGeneration = useRef(0)
+  const grokDiagnosticsSyncVersion = useRef(0)
+  const grokDiagnosticsSyncingRef = useRef(false)
+  const grokWhitelistRef = useRef<ModelWhitelistSelectorHandle | null>(null)
+  const grokLive = useRef({ show, accountId: account?.id, platform: account?.platform })
+  useLayoutEffect(() => {
+    grokLive.current = { show, accountId: account?.id, platform: account?.platform }
+  })
+  const isGrokTarget = (id: number) =>
+    grokLive.current.show && grokLive.current.platform === 'grok' && grokLive.current.accountId === id
+
+  const grokDiagnosticsDirty = isGrokDiagnosticsDirty(s, account)
+  const isGrokCatalogSyncing = grokDiagnosticsSyncing || grokWhitelistSyncing
+
+  const resetGrokDiagnostics = () => {
+    diagnosticsGeneration.current += 1
+    grokDiagnosticsSyncVersion.current += 1
+    grokDiagnosticsSyncingRef.current = false
+    setGrokDiagnostics(null)
+    setDiagnosticsLoading(false)
+    setDiagnosticsRefreshFailed(false)
+    setGrokDiagnosticsSyncing(false)
+  }
+
+  const refreshGrokDiagnostics = async () => {
+    const id = grokLive.current.accountId
+    if (!id || !isGrokTarget(id)) return
+    const generation = ++diagnosticsGeneration.current
+    setDiagnosticsLoading(true)
+    setDiagnosticsRefreshFailed(false)
+    try {
+      const fresh = await adminAPI.accounts.getById(id)
+      if (generation !== diagnosticsGeneration.current || !isGrokTarget(id)) return
+      setGrokDiagnostics(fresh.grok_model_diagnostics ?? null)
+    } catch {
+      // 刷新失败保留上一次的诊断，只提示无法获取最新状态
+      if (generation === diagnosticsGeneration.current) setDiagnosticsRefreshFailed(true)
+    } finally {
+      if (generation === diagnosticsGeneration.current) setDiagnosticsLoading(false)
+    }
+  }
+
+  /** 映射模式下按已保存配置同步上游目录：不改动表单草稿，结束后刷新诊断 */
+  const syncGrokDiagnostics = async () => {
+    const id = grokLive.current.accountId
+    if (!id || !isGrokTarget(id) || grokDiagnosticsSyncingRef.current) return
+    const syncVersion = grokDiagnosticsSyncVersion.current
+    const isCurrentSync = () => syncVersion === grokDiagnosticsSyncVersion.current && isGrokTarget(id)
+    const appStore = useAppStore.getState()
+    grokDiagnosticsSyncingRef.current = true
+    setGrokDiagnosticsSyncing(true)
+    try {
+      const result = await adminAPI.accounts.syncUpstreamModels(id)
+      if (!isCurrentSync()) return
+      const warnings = result.warnings ?? []
+      if (result.discovery_source === 'configured_fallback') {
+        appStore.showWarning(t('admin.accounts.grokModelDiagnostics.configuredFallback'))
+      }
+      const hasIncompleteMetadata = warnings.some((warning) => warning.code === 'upstream_model_metadata_incomplete')
+      const hasPartialMetadata = warnings.some((warning) => warning.code === 'upstream_model_metadata_partial')
+      if (hasIncompleteMetadata) {
+        appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataIncomplete'))
+      } else if (hasPartialMetadata) {
+        appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataPartial'))
+      }
+    } catch (error) {
+      if (!isCurrentSync()) return
+      const message = extractApiErrorMessage(error, t('admin.accounts.syncUpstreamModelsFailed'))
+      appStore.showError(t('admin.accounts.syncUpstreamModelsError', { message }))
+    } finally {
+      if (isCurrentSync()) {
+        grokDiagnosticsSyncingRef.current = false
+        setGrokDiagnosticsSyncing(false)
+        await refreshGrokDiagnostics()
+      }
+    }
+  }
+
+  /** 诊断面板的同步按钮：白名单模式交给选择器（会追加模型），映射模式只同步已保存配置 */
+  const requestGrokCatalogSync = async () => {
+    if (!show || account?.platform !== 'grok' || !account.id) return
+    if (diagnosticsLoading || grokDiagnosticsSyncingRef.current || grokWhitelistRef.current?.isSyncingUpstream) return
+    if (s.modelRestrictionMode === 'whitelist') {
+      const selector = grokWhitelistRef.current
+      if (!selector) return
+      await selector.syncUpstreamModels()
+      return
+    }
+    await syncGrokDiagnostics()
+  }
+
+  // 对应 Vue 版 watch([show, account.id, account.platform], ..., { immediate: true })
+  const accountPlatform = account?.platform
+  const prevGrokWatch = useRef<{ show: boolean; id: number | undefined } | null>(null)
+  const syncGrokDiagnosticsWatch = useEffectEvent(() => {
+    const previous = prevGrokWatch.current
+    prevGrokWatch.current = { show, id: accountId }
+    if (!show || accountPlatform !== 'grok' || !accountId) {
+      resetGrokDiagnostics()
+      return
+    }
+    if (!previous?.show || accountId !== previous.id) {
+      resetGrokDiagnostics()
+      void refreshGrokDiagnostics()
+    }
+  })
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 对应 Vue 版 watch：打开或换账号时重置并加载诊断
+    syncGrokDiagnosticsWatch()
+  }, [show, accountId, accountPlatform])
+  useEffect(() => {
+    return () => {
+      // 卸载后丢弃进行中的刷新与同步结果；StrictMode 重新挂载时按首次打开重新加载
+      diagnosticsGeneration.current += 1
+      grokDiagnosticsSyncVersion.current += 1
+      prevGrokWatch.current = null
+    }
+  }, [])
+
   // 对应 Vue 版 watch([show, account], ..., { immediate: true })：打开或换账号时回填
   const prevShowRef = useRef(false)
   const prevAccountRef = useRef<Account | null>(null)
@@ -896,26 +1026,48 @@ export default function EditAccountModal({ show, account, proxies, groups, onClo
   const fieldId = (name: string) => `${idPrefix}-${name}`
 
   // ── 渲染 ──
-  const renderModelRestriction = (variant: 'default' | 'bedrock' = 'default', keyPrefix = 'edit-model-mapping') => (
-    <ModelRestrictionEditor
-      mode={s.modelRestrictionMode}
-      onModeChange={(mode) => update({ modelRestrictionMode: mode })}
-      allowedModels={s.allowedModels}
-      onAllowedModelsChange={(models) => update({ allowedModels: models })}
-      mappings={s.modelMappings}
-      onMappingsChange={(rows) => update({ modelMappings: rows })}
-      platform={variant === 'bedrock' ? 'anthropic' : account?.platform || 'anthropic'}
-      accountId={variant === 'bedrock' ? undefined : account?.id}
-      presets={variant === 'bedrock' ? bedrockPresets : presetMappings}
-      onPreset={
-        variant === 'bedrock'
-          ? (from, to) => update({ modelMappings: [...s.modelMappings, { from, to }] })
-          : addPresetMapping
-      }
-      keyPrefix={keyPrefix}
-      variant={variant}
-    />
-  )
+  const renderModelRestriction = (variant: 'default' | 'bedrock' = 'default', keyPrefix = 'edit-model-mapping') => {
+    const grokRestriction = variant === 'default' && account?.platform === 'grok'
+    return (
+      <ModelRestrictionEditor
+        mode={s.modelRestrictionMode}
+        onModeChange={(mode) => update({ modelRestrictionMode: mode })}
+        allowedModels={s.allowedModels}
+        onAllowedModelsChange={(models) => update({ allowedModels: models })}
+        mappings={s.modelMappings}
+        onMappingsChange={(rows) => update({ modelMappings: rows })}
+        platform={variant === 'bedrock' ? 'anthropic' : account?.platform || 'anthropic'}
+        accountId={variant === 'bedrock' ? undefined : account?.id}
+        presets={variant === 'bedrock' ? bedrockPresets : presetMappings}
+        onPreset={
+          variant === 'bedrock'
+            ? (from, to) => update({ modelMappings: [...s.modelMappings, { from, to }] })
+            : addPresetMapping
+        }
+        keyPrefix={keyPrefix}
+        variant={variant}
+        grokLayout={grokRestriction}
+        whitelistRef={grokRestriction ? grokWhitelistRef : undefined}
+        showSyncButton={!grokRestriction || !account?.id}
+        onUpstreamSyncFinished={grokRestriction ? () => void refreshGrokDiagnostics() : undefined}
+        onWhitelistSyncingChange={grokRestriction ? setGrokWhitelistSyncing : undefined}
+        sharedContent={
+          grokRestriction && account ? (
+            <GrokModelDiagnosticsPanel
+              key={`grok-diagnostics-${account.id}`}
+              diagnostics={grokDiagnostics}
+              loading={diagnosticsLoading}
+              dirty={grokDiagnosticsDirty}
+              refreshFailed={diagnosticsRefreshFailed}
+              canSync={Boolean(account.id)}
+              syncing={isGrokCatalogSyncing}
+              onSync={() => void requestGrokCatalogSync()}
+            />
+          ) : undefined
+        }
+      />
+    )
+  }
 
   const apiKeyPlaceholder =
     account?.platform === 'openai'
@@ -2008,6 +2160,16 @@ export default function EditAccountModal({ show, account, proxies, groups, onClo
                   checked={s.openAIImagesUrlToB64JsonEnabled}
                   onChange={(value) => update({ openAIImagesUrlToB64JsonEnabled: value })}
                   testId="openai-images-url-to-b64-json-toggle"
+                />
+              </FormSection>
+            ) : null}
+
+            {/* OpenAI images: size tier routing */}
+            {account.platform === 'openai' ? (
+              <FormSection>
+                <OpenAIImageSizeTiersField
+                  value={s.openAIImageSizeTiers}
+                  onChange={(tiers) => update({ openAIImageSizeTiers: tiers })}
                 />
               </FormSection>
             ) : null}

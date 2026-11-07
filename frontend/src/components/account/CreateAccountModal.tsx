@@ -98,6 +98,7 @@ import HeaderOverrideEditor from './HeaderOverrideEditor'
 import { allSelectedGroupsEnableLongContextPricing } from './longContextBilling'
 import ModelWhitelistSelector from './ModelWhitelistSelector'
 import OAuthAuthorizationFlow, { type OAuthFlowHandle } from './OAuthAuthorizationFlow'
+import OpenAIImageSizeTiersField from './OpenAIImageSizeTiersField'
 import OpenCodeGoProtocolRulesEditor from './OpenCodeGoProtocolRulesEditor'
 import QuotaLimitCard, { type QuotaLimitCardValues } from './QuotaLimitCard'
 import UpstreamRequestIdHeaderField from './UpstreamRequestIdHeaderField'
@@ -2548,6 +2549,13 @@ export default function CreateAccountModal({ show, proxies, groups, onClose, onC
             checked={s.openAIImagesUrlToB64JsonEnabled}
             onChange={(value) => set({ openAIImagesUrlToB64JsonEnabled: value })}
           />
+        </FormSection>
+      ) : null}
+
+      {/* OpenAI images: size tier routing */}
+      {platform === 'openai' ? (
+        <FormSection>
+          <OpenAIImageSizeTiersField value={s.openAIImageSizeTiers} onChange={(tiers) => set({ openAIImageSizeTiers: tiers })} />
         </FormSection>
       ) : null}
 

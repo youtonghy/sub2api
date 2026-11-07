@@ -61,6 +61,11 @@ import {
   type OpenCodeAccountMode,
   type OpenCodeGoProtocolRule
 } from './credentialsBuilder'
+import {
+  OPENAI_IMAGE_SIZE_TIERS,
+  applyOpenAIImageSizeTiersToExtra,
+  type OpenAIImageSizeTier
+} from './openaiImageSizeTiers'
 
 type TFn = (key: string, ...args: unknown[]) => string
 
@@ -197,6 +202,8 @@ const createInitialState = (show: boolean) => ({
   openAIResponsesMode: 'auto' as OpenAIResponsesMode,
   // Images 非流式响应缺 b64_json 时由网关下载 url 回填（仅 OpenAI API Key）。
   openAIImagesUrlToB64JsonEnabled: false,
+  // 允许的图片尺寸档位，三档全选即不限
+  openAIImageSizeTiers: [...OPENAI_IMAGE_SIZE_TIERS] as OpenAIImageSizeTier[],
   openAIEndpointCapabilities: ['chat_completions', 'embeddings'] as OpenAIEndpointCapability[],
   openaiOAuthResponsesWebSocketV2Mode: OPENAI_WS_MODE_OFF as OpenAIWSMode,
   openaiAPIKeyResponsesWebSocketV2Mode: OPENAI_WS_MODE_OFF as OpenAIWSMode,
@@ -802,6 +809,7 @@ export function createCreateAccountController(deps: CreateAccountControllerDeps)
         headerOverrideEnabled: false,
         headerOverrideRows: [],
         openAIImagesUrlToB64JsonEnabled: false,
+        openAIImageSizeTiers: [...OPENAI_IMAGE_SIZE_TIERS],
         grokOAuthCustomBaseUrlEnabled: false,
         grokOAuthBaseUrl: ''
       })
@@ -1217,6 +1225,7 @@ export function createCreateAccountController(deps: CreateAccountControllerDeps)
       headerOverrideEnabled: false,
       headerOverrideRows: [],
       openAIImagesUrlToB64JsonEnabled: false,
+      openAIImageSizeTiers: [...OPENAI_IMAGE_SIZE_TIERS],
       grokOAuthCustomBaseUrlEnabled: false,
       grokOAuthBaseUrl: '',
       interceptWarmupRequests: false,
@@ -1354,6 +1363,7 @@ export function createCreateAccountController(deps: CreateAccountControllerDeps)
     } else {
       delete extra.images_url_to_b64_json
     }
+    applyOpenAIImageSizeTiersToExtra(extra, s.openAIImageSizeTiers)
 
     return Object.keys(extra).length > 0 ? extra : undefined
   }

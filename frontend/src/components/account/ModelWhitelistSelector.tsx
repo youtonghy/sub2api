@@ -1,5 +1,5 @@
 import { Check, ChevronDown, Copy, X } from 'lucide-react'
-import { useState, useSyncExternalStore } from 'react'
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type Ref } from 'react'
 
 import { accountsAPI } from '@/api/admin/accounts'
 import type { SyncUpstreamPreviewParams } from '@/api/admin/accounts'
@@ -30,8 +30,21 @@ export interface ModelWhitelistSelectorProps {
   platforms?: string[]
   accountId?: number
   syncCredentials?: ModelWhitelistSyncCredentials
-  /** Vue 版 upstream-synced */
+  /** 是否显示内置的“同步上游模型”按钮；隐藏后父组件仍可通过 ref 触发同步 */
+  showSyncButton?: boolean
+  /** Vue 版 upstream-synced（仅创建预览成功时） */
   onUpstreamSynced?: () => void
+  /** Vue 版 upstream-sync-finished：已保存账号的同步结束（含失败），用于刷新诊断 */
+  onUpstreamSyncFinished?: () => void
+  /** 同步状态变化，供父组件合并展示忙碌状态（Vue 版通过 defineExpose 暴露的响应式 isSyncingUpstream） */
+  onSyncingChange?: (syncing: boolean) => void
+  /** Vue 版 defineExpose({ syncUpstreamModels, isSyncingUpstream }) */
+  ref?: Ref<ModelWhitelistSelectorHandle | null>
+}
+
+export interface ModelWhitelistSelectorHandle {
+  syncUpstreamModels: () => Promise<void>
+  readonly isSyncingUpstream: boolean
 }
 
 /** 模型白名单多选：下拉选择、填充相关模型、同步上游模型、自定义模型 */
@@ -43,7 +56,11 @@ export default function ModelWhitelistSelector({
   platforms,
   accountId,
   syncCredentials,
-  onUpstreamSynced
+  showSyncButton = true,
+  onUpstreamSynced,
+  onUpstreamSyncFinished,
+  onSyncingChange,
+  ref
 }: ModelWhitelistSelectorProps) {
   const { t } = useI18n()
   const { copyToClipboard } = useClipboard()
@@ -54,7 +71,42 @@ export default function ModelWhitelistSelector({
   const [searchQuery, setSearchQuery] = useState('')
   const [customModel, setCustomModel] = useState('')
   const [isComposing, setIsComposing] = useState(false)
-  const [isSyncingUpstream, setIsSyncingUpstream] = useState(false)
+  const [isSyncingUpstream, setIsSyncingUpstreamState] = useState(false)
+  // 同步请求的世代号：切换账号或卸载后，旧请求的结果不再写回当前草稿
+  const upstreamSyncVersion = useRef(0)
+  const syncingRef = useRef(false)
+  // 同步完成时追加到最新的已选列表（Vue 版读取的是响应式 props.modelValue）
+  const valueRef = useRef(value)
+  const onChangeRef = useRef(onChange)
+  const onSyncingChangeRef = useRef(onSyncingChange)
+  useLayoutEffect(() => {
+    valueRef.current = value
+    onChangeRef.current = onChange
+    onSyncingChangeRef.current = onSyncingChange
+  })
+
+  const setIsSyncingUpstream = (syncing: boolean) => {
+    syncingRef.current = syncing
+    setIsSyncingUpstreamState(syncing)
+  }
+
+  const previousAccountId = useRef(accountId)
+  useEffect(() => {
+    if (previousAccountId.current === accountId) return
+    previousAccountId.current = accountId
+    upstreamSyncVersion.current += 1
+    setIsSyncingUpstream(false)
+  }, [accountId])
+
+  useEffect(() => {
+    return () => {
+      upstreamSyncVersion.current += 1
+    }
+  }, [])
+
+  useEffect(() => {
+    onSyncingChangeRef.current?.(isSyncingUpstream)
+  }, [isSyncingUpstream])
 
   const rawPlatforms = platforms && platforms.length > 0 ? platforms : platform ? [platform] : []
   const normalizedPlatforms = Array.from(
@@ -148,17 +200,27 @@ export default function ModelWhitelistSelector({
   }
 
   const syncUpstreamModels = async () => {
-    if (isSyncingUpstream || !canSyncUpstream) return
+    if (syncingRef.current || !canSyncUpstream) return
 
     const appStore = useAppStore.getState()
+    const syncVersion = upstreamSyncVersion.current
+    const previewCredentials = syncCredentials
+    const isCurrentSync = () => syncVersion === upstreamSyncVersion.current
     setIsSyncingUpstream(true)
     try {
       let result
       if (accountId) {
         result = await accountsAPI.syncUpstreamModels(accountId)
-      } else if (syncCredentials) {
-        result = await accountsAPI.syncUpstreamModelsPreview(syncCredentials as SyncUpstreamPreviewParams)
+      } else if (previewCredentials) {
+        result = await accountsAPI.syncUpstreamModelsPreview(previewCredentials as SyncUpstreamPreviewParams)
       } else {
+        return
+      }
+      if (!isCurrentSync()) return
+
+      // 只拿到已配置的回退模型时不追加，避免把未经上游确认的 ID 写进白名单
+      if (result.discovery_source === 'configured_fallback') {
+        appStore.showWarning(t('admin.accounts.grokModelDiagnostics.configuredFallback'))
         return
       }
 
@@ -172,7 +234,7 @@ export default function ModelWhitelistSelector({
         onUpstreamSynced?.()
       }
 
-      const newModels = [...value]
+      const newModels = [...valueRef.current]
       let addedCount = 0
       for (const model of upstreamModels) {
         if (!newModels.includes(model)) {
@@ -181,7 +243,7 @@ export default function ModelWhitelistSelector({
         }
       }
 
-      onChange(newModels)
+      onChangeRef.current(newModels)
       const warnings = result.warnings ?? []
       const hasPartialMetadata = warnings.some((warning) => warning.code === 'upstream_model_metadata_partial')
       const hasIncompleteMetadata = warnings.some((warning) => warning.code === 'upstream_model_metadata_incomplete')
@@ -200,12 +262,25 @@ export default function ModelWhitelistSelector({
         appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataPartial'))
       }
     } catch (error) {
+      if (!isCurrentSync()) return
       const message = extractApiErrorMessage(error, t('admin.accounts.syncUpstreamModelsFailed'))
       appStore.showError(t('admin.accounts.syncUpstreamModelsError', { message }))
     } finally {
-      setIsSyncingUpstream(false)
+      if (isCurrentSync()) {
+        setIsSyncingUpstream(false)
+        if (accountId) {
+          onUpstreamSyncFinished?.()
+        }
+      }
     }
   }
+
+  useImperativeHandle(ref, () => ({
+    syncUpstreamModels,
+    get isSyncingUpstream() {
+      return syncingRef.current
+    }
+  }))
 
   const clearAll = () => {
     onChange([])
@@ -311,8 +386,15 @@ export default function ModelWhitelistSelector({
         <Button type="button" size="sm" variant="secondary" onClick={fillRelated}>
           {t('admin.accounts.fillRelatedModels')}
         </Button>
-        {canSyncUpstream ? (
-          <Button type="button" size="sm" variant="secondary" disabled={isSyncingUpstream} onClick={() => void syncUpstreamModels()}>
+        {canSyncUpstream && showSyncButton ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            data-testid="sync-upstream-models"
+            disabled={isSyncingUpstream}
+            onClick={() => void syncUpstreamModels()}
+          >
             {isSyncingUpstream ? t('admin.accounts.syncUpstreamModelsLoading') : t('admin.accounts.syncUpstreamModels')}
           </Button>
         ) : null}
