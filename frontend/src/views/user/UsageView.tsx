@@ -89,6 +89,28 @@ const ERR_ALWAYS_VISIBLE = ['status', 'created_at']
 const ERR_DEFAULT_HIDDEN_COLUMNS = ['user_agent']
 const ERR_HIDDEN_COLUMNS_KEY = 'user-usage-error-hidden-columns'
 
+const EXPORT_PAGE_SIZE = 1000
+const EXPORT_RATE_LIMIT_MAX_RETRIES = 3
+const EXPORT_RATE_LIMIT_MAX_WAIT_SECONDS = 60
+
+// 导出逐页请求计入按用户的重查询限流；429 时按 Retry-After 等待后重试同一页。
+const queryExportPage = async (params: UsageQueryParams, onRateLimited: (waitSeconds: number) => void) => {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await usageAPI.query(params)
+    } catch (error) {
+      const apiError = error as { status?: number; retry_after_seconds?: number } | null
+      if (apiError?.status !== 429 || attempt >= EXPORT_RATE_LIMIT_MAX_RETRIES) throw error
+      const waitSeconds = Math.min(
+        Math.max(apiError.retry_after_seconds ?? EXPORT_RATE_LIMIT_MAX_WAIT_SECONDS, 1),
+        EXPORT_RATE_LIMIT_MAX_WAIT_SECONDS
+      )
+      onRateLimited(waitSeconds)
+      await new Promise((resolve) => setTimeout(resolve, waitSeconds * 1000))
+    }
+  }
+}
+
 const loadSavedHidden = (storageKey: string, defaults: string[]): Set<string> => {
   try {
     const saved = localStorage.getItem(storageKey)
@@ -547,11 +569,12 @@ export default function UsageView() {
     appStore.showInfo(t('usage.preparingExport'))
     try {
       const allLogs: UsageLog[] = []
-      const pageSize = 100
-      const exportParams = buildUsageListParams(1, pageSize)
-      const totalPages = Math.ceil(paginationRef.current.total / pageSize)
+      const exportParams = buildUsageListParams(1, EXPORT_PAGE_SIZE)
+      const totalPages = Math.ceil(paginationRef.current.total / EXPORT_PAGE_SIZE)
       for (let page = 1; page <= totalPages; page++) {
-        const response = await usageAPI.query({ ...exportParams, page })
+        const response = await queryExportPage({ ...exportParams, page }, (seconds) =>
+          appStore.showInfo(t('usage.exportRateLimited', { seconds }))
+        )
         allLogs.push(...response.items)
       }
       if (allLogs.length === 0) {

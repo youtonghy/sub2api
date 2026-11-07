@@ -31,6 +31,7 @@ import {
   newRulePricingEntry,
   platformDisplayLabel,
   validateChannelForm,
+  WEB_SEARCH_EMULATION_PLATFORMS,
   type ChannelFormState,
   type FormPricingRule,
   type PlatformSection
@@ -683,7 +684,7 @@ export default function ChannelFormDrawer({
         </FormSection>
 
         {/* Web Search Emulation (Anthropic only, hidden when global disabled) */}
-        {section.platform === 'anthropic' && webSearchGlobalEnabled && (
+        {WEB_SEARCH_EMULATION_PLATFORMS.has(section.platform) && webSearchGlobalEnabled && (
           <FormSection>
             <ToggleRow
               label={t('admin.channels.form.webSearchEmulation')}

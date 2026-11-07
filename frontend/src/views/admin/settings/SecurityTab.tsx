@@ -8,6 +8,7 @@ import { Info } from 'lucide-react'
 import { adminAPI } from '@/api'
 import type { PanelRateLimitSettings } from '@/api/admin/settings'
 import AdminAccessKeysSettings from '@/components/admin/settings/AdminAccessKeysSettings'
+import RegistrationEmailBlacklistEditor from '@/components/admin/settings/RegistrationEmailBlacklistEditor'
 import { Field, Notice, SettingsRegion, ToggleRow } from '@/components/admin/settings/SettingsLayout'
 import s from '@/components/admin/settings/SettingsLayout.module.css'
 import { cx, numberInputValue } from '@/components/admin/settings/settingsUtils'
@@ -105,6 +106,7 @@ function RegistrationSection() {
         checked={form.registration_email_domain_quota_enabled}
         onChange={(value) => updateForm({ registration_email_domain_quota_enabled: value })}
       />
+      <RegistrationEmailBlacklistEditor />
       {toggle('promo_code_enabled', 'promoCode')}
       {toggle('invitation_code_enabled', 'invitationCode')}
       {form.email_verify_enabled ? (

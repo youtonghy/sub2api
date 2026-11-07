@@ -90,7 +90,7 @@ export default function UseKeyModal({
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<string>('unix')
   const [activeClientTab, setActiveClientTab] = useState<string>(() => defaultClientTabFor(platform, claudeCodeOnly))
-  const [codexAuthMode, setCodexAuthMode] = useState<CodexAuthMode>('legacy')
+  const [codexAuthMode, setCodexAuthMode] = useState<CodexAuthMode>('api-key')
   const [codexModelManifestState, setCodexModelManifestState] = useState<CodexModelManifestState>('idle')
   const [codexModelManifestContent, setCodexModelManifestContent] = useState('')
   const [codexModelManifestModelCount, setCodexModelManifestModelCount] = useState(0)
@@ -107,7 +107,7 @@ export default function UseKeyModal({
     setPrevPlatformKey(platformKey)
     setActiveTab('unix')
     setActiveClientTab(defaultClientTabFor(platform, claudeCodeOnly))
-    setCodexAuthMode('legacy')
+    setCodexAuthMode('api-key')
   }
 
   const codexModelCatalogOversized = codexModelManifestResponseBytes > 1024 * 1024
@@ -142,7 +142,7 @@ export default function UseKeyModal({
     previousShow.current = show
     if (show) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- 对应 Vue 版 watch(show)：打开时重置
-      setCodexAuthMode('legacy')
+      setCodexAuthMode('api-key')
     } else {
       resetCodexModelManifest()
     }

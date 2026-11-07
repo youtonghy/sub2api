@@ -7,12 +7,18 @@ import { getAllIncludingInactive } from '@/api/admin/groups'
 import AdminAccessKeysSettings from '../AdminAccessKeysSettings'
 
 vi.mock('@/i18n/useI18n', () => {
+  const lookup = (key: string) =>
+    key
+      .replace('adminAccessKeys.', '')
+      .split('.')
+      .reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], zh)
   const t = (key: string, values: Record<string, unknown> = {}) => {
-    const message = zh[key.replace('adminAccessKeys.', '') as keyof typeof zh]
-    if (!message) throw new Error(`缺少翻译：${key}`)
+    const message = lookup(key)
+    if (typeof message !== 'string') throw new Error(`缺少翻译：${key}`)
     return message.replace(/\{(\w+)\}/g, (_: string, name: string) => String(values[name]))
   }
-  return { useI18n: () => ({ t, te: () => true, locale: 'zh', setLocale: vi.fn() }) }
+  const te = (key: string) => typeof lookup(key) === 'string'
+  return { useI18n: () => ({ t, te, locale: 'zh', setLocale: vi.fn() }) }
 })
 
 const mocks = vi.hoisted(() => ({
@@ -219,7 +225,7 @@ describe('管理员受限密钥配置', () => {
     await type(byTest('name'), '新名称')
     expect(text()).not.toContain('kiro')
     await click(byTest('save'))
-    expect(mocks.update).toHaveBeenCalledWith('key-2', expect.objectContaining({ name: '新名称', allowed_ips: [], policy: { rules, global_permissions: [] } }))
+    expect(mocks.update).toHaveBeenCalledWith('key-2', expect.objectContaining({ name: '新名称', allowed_ips: [], policy: { rules, global_permissions: [], full_access: false } }))
   })
 
   it('空数组返回 null 时仍可创建默认无权限密钥', async () => {
@@ -276,5 +282,73 @@ describe('管理员受限密钥配置', () => {
     await save()
     expect(mocks.create).toHaveBeenLastCalledWith(expect.objectContaining({ expires_at: expected }))
     view.unmount()
+  })
+})
+
+const fullAccessToggle = () => byTest('full-access') as HTMLInputElement
+
+describe('全权兼容模式', () => {
+  it('默认关闭，取消不会授权，输入确认文字后才允许保存全权', async () => {
+    mocks.create.mockResolvedValue({ key: 'once', item: { id: '1' } })
+    await mountSettings()
+    await click(byTest('create'))
+    await type(byTest('name'), '兼容工具')
+    expect(fullAccessToggle().checked).toBe(false)
+    await click(fullAccessToggle())
+    expect(byTest('full-access-confirm')).toBeDisabled()
+    await click(byTest('full-access-cancel'))
+    expect(fullAccessToggle().checked).toBe(false)
+    await click(fullAccessToggle())
+    await type(byTest('full-access-phrase'), '开启全权访问')
+    await click(byTest('full-access-confirm'))
+    expect(text()).toContain('资源规则已暂停')
+    await click(byTest('save'))
+    expect(mocks.create.mock.calls[0]![0]).toMatchObject({ policy: { full_access: true }, confirm_full_access: true })
+  })
+
+  it('关闭后保留原规则，并清除确认状态', async () => {
+    const item = { id: 'key-1', name: '兼容', enabled: true, allowed_ips: [], policy: { full_access: true, rules: [{ permissions: ['accounts.read'], group_ids: [7], account_types: ['oauth'], platforms: ['openai'] }], global_permissions: [] } }
+    mocks.list.mockResolvedValueOnce({ items: [item], permissions: [] })
+    mocks.update.mockResolvedValueOnce(item)
+    await mountSettings()
+    expect(text()).toContain('全权访问')
+    await click(buttonByText('编辑权限'))
+    expect(fullAccessToggle().checked).toBe(true)
+    await click(fullAccessToggle())
+    await click(byTest('save'))
+    const input = mocks.update.mock.calls[0]![1]
+    expect(input.policy.full_access).toBe(false)
+    expect(input.policy.rules[0].permissions).toEqual(['accounts.read'])
+    expect(input.confirm_full_access).not.toBe(true)
+  })
+})
+
+describe('全权确认失败与重复开启', () => {
+  it('取消确认仍可保存受限配置，不能借确认弹窗直接保存', async () => {
+    mocks.create.mockResolvedValue({ key: 'once', item: { id: '1' } })
+    await mountSettings()
+    await click(byTest('create'))
+    await type(byTest('name'), '受限工具')
+    await click(fullAccessToggle())
+    expect(byTest('save')).toBeDisabled()
+    await click(byTest('save'))
+    expect(mocks.create).not.toHaveBeenCalled()
+    await click(byTest('full-access-cancel'))
+    await click(byTest('save'))
+    expect(mocks.create.mock.calls[0]![0].policy.full_access).not.toBe(true)
+    expect(mocks.create.mock.calls[0]![0].confirm_full_access).toBe(false)
+  })
+
+  it('关闭后再次开启需要重新输入确认文字', async () => {
+    await mountSettings()
+    await click(byTest('create'))
+    await click(fullAccessToggle())
+    await type(byTest('full-access-phrase'), '开启全权访问')
+    await click(byTest('full-access-confirm'))
+    expect(document.querySelector('input[value="accounts.read"]')!.closest('fieldset[disabled]')).not.toBeNull()
+    await click(fullAccessToggle())
+    await click(fullAccessToggle())
+    expect((byTest('full-access-phrase') as HTMLInputElement).value).toBe('')
+    expect(byTest('full-access-confirm')).toBeDisabled()
   })
 })

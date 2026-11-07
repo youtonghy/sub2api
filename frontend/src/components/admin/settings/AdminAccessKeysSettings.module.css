@@ -21,3 +21,8 @@
 .permissionGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
 @media (max-width: 40rem) { .permissionGrid { grid-template-columns: minmax(0, 1fr); } }
 .itemName { margin: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }
+.rulesGroup { display: flex; min-width: 0; flex-direction: column; gap: var(--space-4); margin: 0; border: 0; padding: 0; }
+.rulesGroup:disabled { opacity: .6; }
+.fullAccess { display: flex; flex-direction: column; gap: var(--space-2); border: 1px solid var(--danger); border-radius: var(--radius-control); padding: var(--space-3) var(--space-4); }
+.fullAccessWarning { margin: 0; color: var(--danger); font-size: var(--text-sm); line-height: var(--leading-body); }
+.fullAccessBadge { margin: 0; color: var(--danger); font-size: var(--text-xs); font-weight: 500; }

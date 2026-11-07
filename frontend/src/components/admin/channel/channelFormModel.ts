@@ -172,6 +172,20 @@ export function accountStatsRulesToAPI(platforms: PlatformSection[]): AccountSta
   return rules
 }
 
+/**
+ * 支持账号级 Web Search 模拟开关的平台（须与后端 backend/internal/service/account.go
+ * webSearchEmulationPlatformEnabled 的白名单保持一致）。渲染与提交都使用此集合，
+ * 后端白名单新增平台后这里同步加入即可配置。
+ */
+export const WEB_SEARCH_EMULATION_PLATFORMS: ReadonlySet<string> = new Set([
+  'anthropic',
+  'openai',
+  'command_code',
+  'opencode_go',
+  'minimax',
+  'zhipu',
+])
+
 // ── Form ↔ API conversion ──
 export function formToAPI(
   platforms: PlatformSection[],
@@ -222,15 +236,12 @@ export function formToAPI(
   }
   const uniqueGroupIds = Array.from(new Set(group_ids))
 
-  // Collect web_search_emulation (only anthropic platform supports it)
-  // Always write the key so that disabling in the UI correctly sets platform to false,
-  // rather than leaving a stale true value from the cloned features_config.
+  // Collect web_search_emulation（仅白名单平台：界面是唯一来源，每个白名单平台分区都显式写入，
+  // 包括 false，避免停用的分区残留克隆自 features_config 的旧 true 值）。
   const wsEmulation: Record<string, boolean> = {}
   for (const section of platforms) {
-    if (!section.enabled) continue
-    if (section.platform === 'anthropic') {
-      wsEmulation[section.platform] = !!section.web_search_emulation
-    }
+    if (!WEB_SEARCH_EMULATION_PLATFORMS.has(section.platform)) continue
+    wsEmulation[section.platform] = section.enabled ? !!section.web_search_emulation : false
   }
   if (Object.keys(wsEmulation).length > 0) {
     featuresConfig.web_search_emulation = wsEmulation

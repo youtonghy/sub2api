@@ -2,7 +2,7 @@
  * 管理员受限访问密钥（对应 Vue 版 AdminAccessKeysSettings.vue）。
  * 列表在区域内展示，新建与编辑权限的长表单放在右侧 Arc 抽屉中。
  */
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/arc/button/button'
 import { Drawer, DrawerContent } from '@/components/arc/drawer/drawer'
@@ -10,7 +10,9 @@ import * as api from '@/api/admin/adminAccessKeys'
 import type { AccessRule, AdminKey, AdminKeyInput, Permission } from '@/api/admin/adminAccessKeys'
 import { getAllIncludingInactive } from '@/api/admin/groups'
 import TotpStepUpDialog from '@/components/auth/TotpStepUpDialog'
+import BaseDialog from '@/components/common/BaseDialog'
 import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'
+import { useAdminAccessKeyPermissions } from '@/composables/useAdminAccessKeyPermissions'
 import { useMountOnce } from '@/composables/useMountOnce'
 import { isStepUpCancelled, useStepUp } from '@/composables/useStepUp'
 import { useI18n } from '@/i18n/useI18n'
@@ -27,6 +29,7 @@ function normalizeItem(item: AdminKey): AdminKey {
     ...item,
     allowed_ips: item.allowed_ips ?? [],
     policy: {
+      full_access: item.policy?.full_access ?? false,
       global_permissions: item.policy?.global_permissions ?? [],
       rules: (item.policy?.rules ?? []).map((rule) => ({
         ...rule,
@@ -49,7 +52,8 @@ function toggleValue<T>(list: T[], value: T, checked: boolean): T[] {
 }
 
 export default function AdminAccessKeysSettings() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
+  const { permissionLabel, permissionCategory } = useAdminAccessKeyPermissions()
   const stepUp = useStepUp()
   const [items, setItems] = useState<AdminKey[]>([])
   const [permissions, setPermissions] = useState<Permission[]>([])
@@ -66,17 +70,35 @@ export default function AdminAccessKeysSettings() {
   const [initialExpiration, setInitialExpiration] = useState('')
   const [ips, setIps] = useState('')
   const [now] = useState(() => Date.now())
+  const [fullAccessPrompt, setFullAccessPrompt] = useState(false)
+  const [fullAccessPhrase, setFullAccessPhrase] = useState('')
+  // 本次编辑中是否已输入确认文字开启全权；只影响提交，不参与渲染。
+  const fullAccessConfirmed = useRef(false)
+  const localeRef = useRef(locale)
+
+  // 切换语言后重新阅读当前语言的风险说明，不能复用尚未保存的扩权确认。
+  useEffect(() => {
+    if (localeRef.current === locale) return
+    localeRef.current = locale
+    if (fullAccessConfirmed.current) {
+      setDraft((prev) => (prev ? { ...prev, policy: { ...prev.policy, full_access: false } } : prev))
+    }
+    fullAccessConfirmed.current = false
+    setFullAccessPrompt(false)
+    setFullAccessPhrase('')
+  }, [locale])
 
   const accountPermissions = useMemo(() => permissions.filter((p) => p.scope === 'account'), [permissions])
   const groupPermissions = useMemo(() => permissions.filter((p) => p.scope === 'group'), [permissions])
-  const globalCategories = useMemo(() => {
+  // 分类名称随语言变化，每次渲染重新分组（权限数量很少）
+  const globalCategories = (() => {
     const categories = new Map<string, Permission[]>()
     for (const permission of permissions.filter((p) => p.scope === 'global')) {
-      const name = permission.category || t('adminAccessKeys.other')
+      const name = permissionCategory(permission)
       categories.set(name, [...(categories.get(name) || []), permission])
     }
     return Array.from(categories, ([name, perms]) => ({ name, permissions: perms }))
-  }, [permissions, t])
+  })()
 
   const report = useCallback(
     (e: unknown) => {
@@ -108,10 +130,10 @@ export default function AdminAccessKeysSettings() {
       ? t('adminAccessKeys.allGroupsSummary')
       : rule.group_ids
           .map((id) => groups.find((group) => group.id === id)?.name || t('adminAccessKeys.groupFallback', { id }))
-          .join('、') || t('adminAccessKeys.noGroups')
+          .join(t('adminAccessKeys.listSeparator')) || t('adminAccessKeys.noGroups')
     const groupLabel = selectedGroups + (rule.include_ungrouped ? t('adminAccessKeys.ungroupedSummary') : '')
-    const types = rule.account_types.join('、') || t('adminAccessKeys.noAccountTypes')
-    const platforms = rule.platforms.join('、') || t('adminAccessKeys.anyPlatform')
+    const types = rule.account_types.join(t('adminAccessKeys.listSeparator')) || t('adminAccessKeys.noAccountTypes')
+    const platforms = rule.platforms.join(t('adminAccessKeys.listSeparator')) || t('adminAccessKeys.anyPlatform')
     return t('adminAccessKeys.ruleSummary', { groups: groupLabel, types, platforms, count: rule.permissions.length })
   }
 
@@ -119,6 +141,8 @@ export default function AdminAccessKeysSettings() {
     setError('')
     setNotice('')
     setSecret('')
+    cancelFullAccess()
+    fullAccessConfirmed.current = false
     setEditingID(item?.id || '')
     setDraft(
       item
@@ -141,6 +165,29 @@ export default function AdminAccessKeysSettings() {
     setIps(item?.allowed_ips.join('\n') || '')
   }
 
+  function changeFullAccess(checked: boolean) {
+    if (!draft || busy) return
+    if (checked) {
+      setFullAccessPhrase('')
+      setFullAccessPrompt(true)
+    } else {
+      setDraft((prev) => (prev ? { ...prev, policy: { ...prev.policy, full_access: false } } : prev))
+      fullAccessConfirmed.current = false
+    }
+  }
+
+  function cancelFullAccess() {
+    setFullAccessPrompt(false)
+    setFullAccessPhrase('')
+  }
+
+  function confirmFullAccess() {
+    if (!draft || fullAccessPhrase !== t('adminAccessKeys.fullAccessPhrase')) return
+    setDraft((prev) => (prev ? { ...prev, policy: { ...prev.policy, full_access: true } } : prev))
+    fullAccessConfirmed.current = true
+    cancelFullAccess()
+  }
+
   async function mutate(action: () => Promise<void>) {
     setBusy(true)
     setError('')
@@ -160,7 +207,7 @@ export default function AdminAccessKeysSettings() {
   }
 
   async function save() {
-    if (!draft) return
+    if (!draft || busy || fullAccessPrompt) return
     if (!draft.name.trim()) {
       setError(t('adminAccessKeys.nameRequired'))
       return
@@ -171,6 +218,7 @@ export default function AdminAccessKeysSettings() {
       return
     }
     const input: AdminKeyInput = JSON.parse(JSON.stringify(draft))
+    input.confirm_full_access = !!input.policy.full_access && fullAccessConfirmed.current
     input.name = input.name.trim()
     // 未修改日期时保留服务端原值，避免丢失秒数、微秒或时区精度。
     if (expiration !== initialExpiration) input.expires_at = date?.toISOString() || null
@@ -280,7 +328,7 @@ export default function AdminAccessKeysSettings() {
           checked={rule.permissions.includes(permission.id)}
           onChange={(e) => updateRule(index, { permissions: toggleValue(rule.permissions, permission.id, e.target.checked) })}
         />
-        {permission.label} <span className={s.hint}>{permission.id}</span>
+        {permissionLabel(permission)} <span className={s.hint}>{permission.id}</span>
       </label>
     )
   }
@@ -337,6 +385,7 @@ export default function AdminAccessKeysSettings() {
               {t('adminAccessKeys.lastUsed', { value: item.last_used_at || t('adminAccessKeys.neverUsed') })} {item.last_used_ip}
             </p>
             <div className={s.columnTight} aria-label={t('adminAccessKeys.summaryLabel')}>
+              {item.policy.full_access ? <p className={styles.fullAccessBadge}>{t('adminAccessKeys.fullAccessLabel')}</p> : null}
               <p className={s.hint}>
                 {t('adminAccessKeys.summary', {
                   globals: item.policy.global_permissions.length,
@@ -435,171 +484,187 @@ export default function AdminAccessKeysSettings() {
                   <input type="checkbox" checked={draft.enabled} onChange={(e) => updateDraft({ enabled: e.target.checked })} />
                   {t('adminAccessKeys.enabled')}
                 </label>
-
-                {draft.policy.rules.map((rule, index) => (
-                  <fieldset key={index} className={styles.fieldset}>
-                    <legend className={styles.legend}>{t('adminAccessKeys.ruleLegend', { index: index + 1 })}</legend>
-                    <label className={s.checkboxLabel}>
-                      <input
-                        type="checkbox"
-                        checked={rule.all_groups}
-                        onChange={(e) => updateRule(index, { all_groups: e.target.checked })}
-                      />
-                      {t('adminAccessKeys.allGroups')}
-                    </label>
-                    <label className={s.field}>
-                      <span className={s.label}>{t('adminAccessKeys.groups')}</span>
-                      <select
-                        data-test={`groups-${index}`}
-                        multiple
-                        className={cx(s.select, styles.multiSelect)}
-                        disabled={rule.all_groups}
-                        value={rule.group_ids.map(String)}
-                        onChange={(e) =>
-                          updateRule(index, {
-                            group_ids: Array.from(e.target.selectedOptions, (option) => Number(option.value))
-                          })
-                        }
-                      >
-                        {groups.map((group) => (
-                          <option key={group.id} value={group.id}>
-                            {group.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className={s.checkboxLabel}>
-                      <input
-                        type="checkbox"
-                        checked={rule.include_ungrouped}
-                        onChange={(e) => updateRule(index, { include_ungrouped: e.target.checked })}
-                      />
-                      {t('adminAccessKeys.includeUngrouped')}
-                    </label>
-                    <div className={s.columnTight}>
-                      <span className={s.label}>{t('adminAccessKeys.accountTypes')}</span>
-                      <div className={s.inline}>
-                        {accountTypes.map((type) => (
-                          <label key={type} className={s.checkboxLabel}>
-                            <input
-                              type="checkbox"
-                              value={type}
-                              checked={rule.account_types.includes(type)}
-                              onChange={(e) =>
-                                updateRule(index, { account_types: toggleValue(rule.account_types, type, e.target.checked) })
-                              }
-                            />
-                            {type}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                    <label className={s.field}>
-                      <span className={s.label}>{t('adminAccessKeys.platforms')}</span>
-                      <select
-                        multiple
-                        className={cx(s.select, styles.multiSelect)}
-                        value={rule.platforms}
-                        onChange={(e) =>
-                          updateRule(index, { platforms: Array.from(e.target.selectedOptions, (option) => option.value) })
-                        }
-                      >
-                        {CONCRETE_PLATFORM_OPTIONS.map((platform) => (
-                          <option key={platform.value} value={platform.value}>
-                            {platform.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <div className={s.columnTight}>
-                      <span className={s.label}>{t('adminAccessKeys.accountOperations')}</span>
-                      <div className={styles.permissionGrid}>
-                        {accountPermissions.map((permission) => permissionCheckbox(rule, index, permission))}
-                      </div>
-                    </div>
-                    {groupPermissions.length ? (
-                      <Notice tone="warning">
-                        <p>{t('adminAccessKeys.groupOperations')}</p>
-                        <p className={s.hint}>{t('adminAccessKeys.modelAllowlistHint')}</p>
-                        <div className={styles.permissionGrid}>
-                          {groupPermissions.map((permission) => permissionCheckbox(rule, index, permission))}
-                        </div>
-                      </Notice>
-                    ) : null}
-                    <div>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() =>
-                          setDraft((prev) =>
-                            prev
-                              ? { ...prev, policy: { ...prev.policy, rules: prev.policy.rules.filter((_, i) => i !== index) } }
-                              : prev
-                          )
-                        }
-                      >
-                        {t('adminAccessKeys.removeRule')}
-                      </Button>
-                    </div>
-                  </fieldset>
-                ))}
-                <div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    data-test="add-rule"
-                    onClick={() =>
-                      setDraft((prev) =>
-                        prev ? { ...prev, policy: { ...prev.policy, rules: [...prev.policy.rules, emptyRule()] } } : prev
-                      )
-                    }
-                  >
-                    {t('adminAccessKeys.addRule')}
-                  </Button>
+                <div className={styles.fullAccess}>
+                  <label className={s.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      data-test="full-access"
+                      checked={!!draft.policy.full_access || fullAccessPrompt}
+                      disabled={busy}
+                      onChange={(e) => changeFullAccess(e.target.checked)}
+                    />
+                    {t('adminAccessKeys.fullAccessLabel')}
+                  </label>
+                  <p className={styles.fullAccessWarning}>{t('adminAccessKeys.fullAccessWarning')}</p>
+                  {draft.policy.full_access ? <p className={s.hint}>{t('adminAccessKeys.rulesSuspended')}</p> : null}
                 </div>
-                <fieldset className={styles.fieldset}>
-                  <legend className={styles.legend}>{t('adminAccessKeys.globalPermissions')}</legend>
-                  {globalCategories.map((category) => (
-                    <fieldset key={category.name} className={styles.fieldset}>
-                      <legend className={styles.legend}>{category.name}</legend>
-                      {category.permissions.map((permission) => (
-                        <label key={permission.id} className={s.checkboxLabel}>
-                          <input
-                            type="checkbox"
-                            value={permission.id}
-                            checked={draft.policy.global_permissions.includes(permission.id)}
-                            onChange={(e) =>
-                              setDraft((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      policy: {
-                                        ...prev.policy,
-                                        global_permissions: toggleValue(
-                                          prev.policy.global_permissions,
-                                          permission.id,
-                                          e.target.checked
-                                        )
-                                      }
-                                    }
-                                  : prev
-                              )
-                            }
-                          />
-                          {permission.label} <span className={s.hint}>{permission.id}</span>
-                        </label>
-                      ))}
+
+                <fieldset disabled={busy || !!draft.policy.full_access} className={styles.rulesGroup}>
+                  {draft.policy.rules.map((rule, index) => (
+                    <fieldset key={index} className={styles.fieldset}>
+                      <legend className={styles.legend}>{t('adminAccessKeys.ruleLegend', { index: index + 1 })}</legend>
+                      <label className={s.checkboxLabel}>
+                        <input
+                          type="checkbox"
+                          checked={rule.all_groups}
+                          onChange={(e) => updateRule(index, { all_groups: e.target.checked })}
+                        />
+                        {t('adminAccessKeys.allGroups')}
+                      </label>
+                      <label className={s.field}>
+                        <span className={s.label}>{t('adminAccessKeys.groups')}</span>
+                        <select
+                          data-test={`groups-${index}`}
+                          multiple
+                          className={cx(s.select, styles.multiSelect)}
+                          disabled={rule.all_groups}
+                          value={rule.group_ids.map(String)}
+                          onChange={(e) =>
+                            updateRule(index, {
+                              group_ids: Array.from(e.target.selectedOptions, (option) => Number(option.value))
+                            })
+                          }
+                        >
+                          {groups.map((group) => (
+                            <option key={group.id} value={group.id}>
+                              {group.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className={s.checkboxLabel}>
+                        <input
+                          type="checkbox"
+                          checked={rule.include_ungrouped}
+                          onChange={(e) => updateRule(index, { include_ungrouped: e.target.checked })}
+                        />
+                        {t('adminAccessKeys.includeUngrouped')}
+                      </label>
+                      <div className={s.columnTight}>
+                        <span className={s.label}>{t('adminAccessKeys.accountTypes')}</span>
+                        <div className={s.inline}>
+                          {accountTypes.map((type) => (
+                            <label key={type} className={s.checkboxLabel}>
+                              <input
+                                type="checkbox"
+                                value={type}
+                                checked={rule.account_types.includes(type)}
+                                onChange={(e) =>
+                                  updateRule(index, { account_types: toggleValue(rule.account_types, type, e.target.checked) })
+                                }
+                              />
+                              {type}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      <label className={s.field}>
+                        <span className={s.label}>{t('adminAccessKeys.platforms')}</span>
+                        <select
+                          multiple
+                          className={cx(s.select, styles.multiSelect)}
+                          value={rule.platforms}
+                          onChange={(e) =>
+                            updateRule(index, { platforms: Array.from(e.target.selectedOptions, (option) => option.value) })
+                          }
+                        >
+                          {CONCRETE_PLATFORM_OPTIONS.map((platform) => (
+                            <option key={platform.value} value={platform.value}>
+                              {platform.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className={s.columnTight}>
+                        <span className={s.label}>{t('adminAccessKeys.accountOperations')}</span>
+                        <div className={styles.permissionGrid}>
+                          {accountPermissions.map((permission) => permissionCheckbox(rule, index, permission))}
+                        </div>
+                      </div>
+                      {groupPermissions.length ? (
+                        <Notice tone="warning">
+                          <p>{t('adminAccessKeys.groupOperations')}</p>
+                          <p className={s.hint}>{t('adminAccessKeys.modelAllowlistHint')}</p>
+                          <div className={styles.permissionGrid}>
+                            {groupPermissions.map((permission) => permissionCheckbox(rule, index, permission))}
+                          </div>
+                        </Notice>
+                      ) : null}
+                      <div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() =>
+                            setDraft((prev) =>
+                              prev
+                                ? { ...prev, policy: { ...prev.policy, rules: prev.policy.rules.filter((_, i) => i !== index) } }
+                                : prev
+                            )
+                          }
+                        >
+                          {t('adminAccessKeys.removeRule')}
+                        </Button>
+                      </div>
                     </fieldset>
                   ))}
+                  <div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      data-test="add-rule"
+                      onClick={() =>
+                        setDraft((prev) =>
+                          prev ? { ...prev, policy: { ...prev.policy, rules: [...prev.policy.rules, emptyRule()] } } : prev
+                        )
+                      }
+                    >
+                      {t('adminAccessKeys.addRule')}
+                    </Button>
+                  </div>
+                  <fieldset className={styles.fieldset}>
+                    <legend className={styles.legend}>{t('adminAccessKeys.globalPermissions')}</legend>
+                    {globalCategories.map((category) => (
+                      <fieldset key={category.name} className={styles.fieldset}>
+                        <legend className={styles.legend}>{category.name}</legend>
+                        {category.permissions.map((permission) => (
+                          <label key={permission.id} className={s.checkboxLabel}>
+                            <input
+                              type="checkbox"
+                              value={permission.id}
+                              checked={draft.policy.global_permissions.includes(permission.id)}
+                              onChange={(e) =>
+                                setDraft((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        policy: {
+                                          ...prev.policy,
+                                          global_permissions: toggleValue(
+                                            prev.policy.global_permissions,
+                                            permission.id,
+                                            e.target.checked
+                                          )
+                                        }
+                                      }
+                                    : prev
+                                )
+                              }
+                            />
+                            {permissionLabel(permission)} <span className={s.hint}>{permission.id}</span>
+                          </label>
+                        ))}
+                      </fieldset>
+                    ))}
+                  </fieldset>
                 </fieldset>
               </div>
               <div className={styles.drawerFooter}>
                 <Button type="button" variant="secondary" disabled={busy} onClick={() => setDraft(null)}>
                   {t('adminAccessKeys.cancel')}
                 </Button>
-                <Button type="button" data-test="save" disabled={busy} onClick={() => void save()}>
+                <Button type="button" data-test="save" disabled={busy || fullAccessPrompt} onClick={() => void save()}>
                   {busy ? t('adminAccessKeys.processing') : t('adminAccessKeys.save')}
                 </Button>
               </div>
@@ -609,6 +674,44 @@ export default function AdminAccessKeysSettings() {
           )}
         </DrawerContent>
       </Drawer>
+      <BaseDialog
+        show={fullAccessPrompt}
+        title={t('adminAccessKeys.fullAccessConfirmTitle')}
+        width="normal"
+        onClose={cancelFullAccess}
+        footer={
+          <>
+            <Button type="button" variant="secondary" data-test="full-access-cancel" onClick={cancelFullAccess}>
+              {t('adminAccessKeys.cancel')}
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              data-test="full-access-confirm"
+              disabled={fullAccessPhrase !== t('adminAccessKeys.fullAccessPhrase')}
+              onClick={confirmFullAccess}
+            >
+              {t('adminAccessKeys.fullAccessConfirmTitle')}
+            </Button>
+          </>
+        }
+      >
+        <div className={s.column}>
+          <p className={styles.fullAccessWarning}>{t('adminAccessKeys.fullAccessWarning')}</p>
+          <label className={s.field}>
+            <span className={s.label}>
+              {t('adminAccessKeys.fullAccessPhraseHint', { phrase: t('adminAccessKeys.fullAccessPhrase') })}
+            </span>
+            <input
+              data-test="full-access-phrase"
+              className={s.input}
+              autoComplete="off"
+              value={fullAccessPhrase}
+              onChange={(e) => setFullAccessPhrase(e.target.value)}
+            />
+          </label>
+        </div>
+      </BaseDialog>
       <TotpStepUpDialog controller={stepUp} />
     </SettingsRegion>
   )

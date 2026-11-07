@@ -262,6 +262,20 @@ describe('RegisterView', () => {
     )
   })
 
+  it('shows the localized blacklisted email message returned by the backend', async () => {
+    getPublicSettingsMock.mockResolvedValueOnce({ ...publicSettings, turnstile_enabled: false })
+    registerMock.mockRejectedValueOnce({ reason: 'EMAIL_BLOCKED', message: 'raw backend message' })
+
+    mountRegister()
+    await flushPromises()
+    setValue(field('email'), 'blocked@example.com')
+    setValue(field('password'), 'secret-123')
+    setValue(field('confirmPassword'), 'secret-123')
+    await submit()
+
+    expect(showErrorMock).toHaveBeenCalledWith('auth.errors.EMAIL_BLOCKED')
+  })
+
   // 域名限量注册开关默认关闭：恢复 PR5423 之前的客户端白名单预检，非白名单域名不发起注册请求。
   it('rejects a non-whitelist email domain locally when the domain quota switch is disabled', async () => {
     getPublicSettingsMock.mockResolvedValueOnce({
