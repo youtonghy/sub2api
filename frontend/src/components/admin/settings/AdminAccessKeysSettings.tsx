@@ -13,6 +13,7 @@ import TotpStepUpDialog from '@/components/auth/TotpStepUpDialog'
 import BaseDialog from '@/components/common/BaseDialog'
 import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'
 import { useAdminAccessKeyPermissions } from '@/composables/useAdminAccessKeyPermissions'
+import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import { useMountOnce } from '@/composables/useMountOnce'
 import { isStepUpCancelled, useStepUp } from '@/composables/useStepUp'
 import { useI18n } from '@/i18n/useI18n'
@@ -53,6 +54,7 @@ function toggleValue<T>(list: T[], value: T, checked: boolean): T[] {
 
 export default function AdminAccessKeysSettings() {
   const { t, locale } = useI18n()
+  const { confirm, confirmDialog } = useConfirmDialog()
   const { permissionLabel, permissionCategory } = useAdminAccessKeyPermissions()
   const stepUp = useStepUp()
   const [items, setItems] = useState<AdminKey[]>([])
@@ -255,7 +257,7 @@ export default function AdminAccessKeysSettings() {
   }
 
   async function rotateKey(item: AdminKey) {
-    if (!confirm(t('adminAccessKeys.rotateConfirm', { name: item.name }))) return
+    if (!(await confirm(t('adminAccessKeys.rotateConfirm', { name: item.name })))) return
     await mutate(async () => {
       const result = await api.rotate(item.id)
       replace(result.item)
@@ -265,7 +267,7 @@ export default function AdminAccessKeysSettings() {
   }
 
   async function revokeKey(item: AdminKey) {
-    if (!confirm(t('adminAccessKeys.revokeConfirm', { name: item.name }))) return
+    if (!(await confirm(t('adminAccessKeys.revokeConfirm', { name: item.name }), { danger: true }))) return
     await mutate(async () => {
       await api.revoke(item.id)
       replace({ ...item, enabled: false, revoked_at: new Date().toISOString() })
@@ -276,7 +278,7 @@ export default function AdminAccessKeysSettings() {
 
   async function deleteRecord(item: AdminKey) {
     if (busy || !item.revoked_at) return
-    if (!confirm(t('adminAccessKeys.deleteConfirm', { name: item.name }))) return
+    if (!(await confirm(t('adminAccessKeys.deleteConfirm', { name: item.name }), { danger: true }))) return
     await mutate(async () => {
       await api.deleteRecord(item.id)
       setItems((prev) => prev.filter((key) => key.id !== item.id))
@@ -712,6 +714,7 @@ export default function AdminAccessKeysSettings() {
           </label>
         </div>
       </BaseDialog>
+      {confirmDialog}
       <TotpStepUpDialog controller={stepUp} />
     </SettingsRegion>
   )

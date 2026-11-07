@@ -13,6 +13,8 @@ vi.mock('@/i18n/useI18n', () => {
       .split('.')
       .reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], zh)
   const t = (key: string, values: Record<string, unknown> = {}) => {
+    // 共享组件（如确认框标题）用到的通用键原样返回，只严格检查本模块文案
+    if (!key.startsWith('adminAccessKeys.')) return key
     const message = lookup(key)
     if (typeof message !== 'string') throw new Error(`缺少翻译：${key}`)
     return message.replace(/\{(\w+)\}/g, (_: string, name: string) => String(values[name]))
@@ -33,6 +35,17 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/api/admin/adminAccessKeys', () => mocks)
 vi.mock('@/api/admin/groups', () => ({ getAllIncludingInactive: vi.fn().mockResolvedValue([{ id: 7, name: '测试分组' }]) }))
 vi.mock('@/components/auth/TotpStepUpDialog', () => ({ default: () => <div /> }))
+// 应用内确认框换成桩：显示消息并提供确认、取消按钮
+vi.mock('@/components/common/ConfirmDialog', () => ({
+  default: ({ show, message, onConfirm, onCancel }: { show: boolean; message: string; onConfirm?: () => void; onCancel?: () => void }) =>
+    show ? (
+      <div data-test="confirm-dialog">
+        <p data-test="confirm-message">{message}</p>
+        <button type="button" data-test="confirm-yes" onClick={() => onConfirm?.()} />
+        <button type="button" data-test="confirm-no" onClick={() => onCancel?.()} />
+      </div>
+    ) : null
+}))
 vi.mock('@/composables/useStepUp', () => ({ useStepUp: () => ({ run: mocks.stepUp }), isStepUpCancelled: () => false }))
 
 const flush = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
@@ -48,6 +61,11 @@ const click = async (el: Element | null | undefined) => {
   expect(el).toBeTruthy()
   await act(async () => { fireEvent.click(el!) })
   await flush()
+}
+/** 点击触发确认的按钮，再回答确认框 */
+const clickAndConfirm = async (el: Element | null | undefined, accept = true) => {
+  await click(el)
+  await click(byTest(accept ? 'confirm-yes' : 'confirm-no'))
 }
 const type = async (el: Element | null, value: string) => {
   expect(el).toBeTruthy()
@@ -154,22 +172,20 @@ describe('管理员受限密钥配置', () => {
     mocks.update.mockResolvedValueOnce({ ...item, enabled: false })
     await click(buttonByText('停用'))
     expect(text()).toContain('已停用')
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     mocks.rotate.mockResolvedValueOnce({ item: { ...item, enabled: false }, key: 'rotated-once' })
-    await click(buttonByText('轮换'))
+    await clickAndConfirm(buttonByText('轮换'))
     expect(mocks.rotate).toHaveBeenCalledWith('key-1')
     expect(text()).toContain('rotated-once')
     mocks.revoke.mockRejectedValueOnce(new Error('撤销失败'))
-    await click(buttonByText('永久撤销'))
+    await clickAndConfirm(buttonByText('永久撤销'))
     expect(text()).toContain('自动化')
     expect(text()).toContain('撤销失败')
     mocks.revoke.mockResolvedValueOnce({ message: 'ok' })
-    await click(buttonByText('永久撤销'))
+    await clickAndConfirm(buttonByText('永久撤销'))
     expect(text()).toContain('adm_sc_1')
     expect(text()).toContain('已撤销')
     expect(buttonByText('删除记录')).toBeDefined()
     expect(mocks.stepUp).toHaveBeenCalledTimes(5)
-    confirmSpy.mockRestore()
   })
 
   it('删除已撤销记录时提示历史保留，取消和失败不移除，服务器确认后才移除', async () => {
@@ -179,22 +195,22 @@ describe('管理员受限密钥配置', () => {
     const remove = () => buttonByText('删除记录')!
     expect(remove()).toBeDefined()
     expect(buttonByText('永久撤销')).toBeUndefined()
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
     try {
       await click(remove())
-      expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('删除只是从列表移除，历史操作记录仍会继续保留'))
+      expect(byTest('confirm-message')?.textContent).toContain('删除只是从列表移除，历史操作记录仍会继续保留')
+      await click(byTest('confirm-no'))
       expect(mocks.deleteRecord).not.toHaveBeenCalled()
       expect(text()).toContain('revoked-prefix')
 
-      confirmSpy.mockReturnValue(true)
       mocks.deleteRecord.mockRejectedValueOnce(new Error('删除失败'))
-      await click(remove())
+      await clickAndConfirm(remove())
       expect(text()).toContain('删除失败')
       expect(text()).toContain('revoked-prefix')
 
       let resolve!: (value: { message: string }) => void
       mocks.deleteRecord.mockReturnValueOnce(new Promise((r) => { resolve = r }))
-      await act(async () => { fireEvent.click(remove()) })
+      await click(remove())
+      await act(async () => { fireEvent.click(byTest('confirm-yes')!) })
       expect(remove()).toBeDisabled()
       expect(text()).toContain('revoked-prefix')
       await act(async () => { resolve({ message: 'ok' }) })
@@ -204,7 +220,6 @@ describe('管理员受限密钥配置', () => {
       expect(text()).not.toContain('revoked-prefix')
       expect(text()).toContain('历史操作记录仍会继续保留')
     } finally {
-      confirmSpy.mockRestore()
       view.unmount()
     }
   })
