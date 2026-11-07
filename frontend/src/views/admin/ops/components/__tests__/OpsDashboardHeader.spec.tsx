@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { act, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import OpsDashboardHeader from '../OpsDashboardHeader'
+import { opsAPI } from '@/api/admin/ops'
 import type { OpsDashboardOverview } from '@/api/admin/ops'
 
 vi.mock('@/api', () => ({ adminAPI: { groups: { getAll: vi.fn().mockResolvedValue([]) } } }))
@@ -56,4 +57,18 @@ describe('OpsDashboardHeader output TPS', () => {
     unmount()
   })
 
+})
+
+describe('OpsDashboardHeader realtime ticker', () => {
+  it('names each live metric with its current value', async () => {
+    vi.mocked(opsAPI.getRealtimeTrafficSummary).mockResolvedValueOnce({
+      enabled: true,
+      summary: { window: '1min', start_time: '', end_time: '', platform: '', qps: { current: 12.34, peak: 20, avg: 10 }, tps: { current: 3456.7, peak: 4000, avg: 3000 } }
+    })
+    const { unmount } = await mountHeader()
+    const ticker = screen.getByRole('region', { name: 'admin.ops.current' })
+    expect(ticker.querySelector('[aria-label^="QPS, 12.3"]')).not.toBeNull()
+    expect(ticker.querySelector('[aria-label^="admin.ops.tps, 3,456.7"]')).not.toBeNull()
+    unmount()
+  })
 })

@@ -79,6 +79,17 @@ export default {
       highestHeader: 'Highest',
       lowestHeader: 'Lowest',
       valueOn: '{value} on {day}'
+    },
+    metricTicker: {
+      up: 'up',
+      down: 'down',
+      lastUpdates: 'Last {count} updates',
+      trendingUp: 'Trending up',
+      trendingDown: 'Trending down',
+      flat: 'Flat',
+      low: 'Low',
+      high: 'High',
+      points: 'pts'
     }
   }
 }

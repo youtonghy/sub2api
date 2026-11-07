@@ -3,6 +3,7 @@ import { AlertTriangle, Bell, Info, Lightbulb, Maximize2, RefreshCw, Settings, X
 
 import { Button } from '@/components/arc/button/button'
 import { MetricCard } from '@/components/arc/metric-card/metric-card'
+import { MetricTicker, type TickerMetric } from '@/components/arc/metric-ticker/metric-ticker'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 import BaseDialog from '@/components/common/BaseDialog'
 import HelpTooltip from '@/components/common/HelpTooltip'
@@ -10,6 +11,7 @@ import Input from '@/components/common/Input'
 import Select, { type SelectValue } from '@/components/common/Select'
 import { adminAPI } from '@/api'
 import { opsAPI, type OpsDashboardOverview, type OpsMetricThresholds, type OpsRealtimeTrafficSummary } from '@/api/admin/ops'
+import { useMetricTickerLabels } from '@/components/charts/useArcChartLabels'
 import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'
 import { getPlatformCatalog, subscribePlatformCatalog } from '@/constants/platformCatalog'
 import { useI18n } from '@/i18n/useI18n'
@@ -138,7 +140,8 @@ export default function OpsDashboardHeader(props: OpsDashboardHeaderProps) {
     onOpenAlertRules,
     onEnterFullscreen
   } = props
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
+  const tickerLabels = useMetricTickerLabels()
   const opsRealtimeMonitoringEnabled = useAdminSettingsStore((s) => s.opsRealtimeMonitoringEnabled)
   // 平台目录变化时重新渲染（CONCRETE_PLATFORM_OPTIONS 会被原地重建）
   useSyncExternalStore(subscribePlatformCatalog, getPlatformCatalog, getPlatformCatalog)
@@ -414,6 +417,14 @@ export default function OpsDashboardHeader(props: OpsDashboardHeaderProps) {
 
   const displayRealTimeQps = finiteOrNull(realtimeTrafficSummary?.qps?.current) ?? 0
   const displayRealTimeTps = finiteOrNull(realtimeTrafficSummary?.tps?.current) ?? 0
+  // 当前 QPS/TPS 随仪表盘刷新滚动更新，悬停可看自打开页面以来的走势
+  const realtimeTickerMetrics = useMemo<TickerMetric[]>(
+    () => [
+      { id: 'qps', label: 'QPS', value: displayRealTimeQps, format: { minimumFractionDigits: 1, maximumFractionDigits: 1 }, delta: 'absolute' },
+      { id: 'tps', label: t('admin.ops.tps'), value: displayRealTimeTps, format: { minimumFractionDigits: 1, maximumFractionDigits: 1 }, delta: 'absolute' }
+    ],
+    [displayRealTimeQps, displayRealTimeTps, t]
+  )
   const realtimeQpsPeakLabel = fixed1(realtimeTrafficSummary?.qps?.peak)
   const realtimeTpsPeakLabel = fixed1(realtimeTrafficSummary?.tps?.peak)
   const realtimeQpsAvgLabel = fixed1(realtimeTrafficSummary?.qps?.avg)
@@ -959,16 +970,14 @@ export default function OpsDashboardHeader(props: OpsDashboardHeaderProps) {
                 {/* Row 1: Current */}
                 <div>
                   <div className={styles.realtimeLabel}>{t('admin.ops.current')}</div>
-                  <div className={styles.currentRow}>
-                    <span className={styles.bigValue}>
-                      {displayRealTimeQps.toFixed(1)}
-                      <span className={styles.bigUnit}>QPS</span>
-                    </span>
-                    <span className={styles.bigValue}>
-                      {displayRealTimeTps.toFixed(1)}
-                      <span className={styles.bigUnit}>{t('admin.ops.tps')}</span>
-                    </span>
-                  </div>
+                  <MetricTicker
+                    className={styles.currentTicker}
+                    metrics={realtimeTickerMetrics}
+                    overflow="scroll"
+                    locale={locale}
+                    label={t('admin.ops.current')}
+                    labels={tickerLabels}
+                  />
                 </div>
                 {/* Row 2: Peak + Average */}
                 <div className={styles.peakAvg}>

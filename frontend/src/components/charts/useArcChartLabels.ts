@@ -1,8 +1,9 @@
 /**
- * Arc Pro 图表（分段条、旭日图、实时流、地平线图）的翻译文案，按当前语言组装成各组件的 labels。
+ * Arc Pro 图表（分段条、旭日图、实时流、地平线图、指标滚动条）的翻译文案，按当前语言组装成各组件的 labels。
  */
 import { useMemo } from 'react'
 import type { HorizonChartLabels } from '@/components/arc/blocks/horizon-chart/horizon-chart'
+import type { MetricTickerLabels } from '@/components/arc/metric-ticker/metric-ticker'
 import type { RealtimeStreamLabels } from '@/components/arc/realtime-stream/realtime-stream'
 import type { SplitBarLabels } from '@/components/arc/split-bar/split-bar'
 import type { SunburstLabels } from '@/components/arc/sunburst/sunburst'
@@ -110,6 +111,25 @@ export function useHorizonChartLabels(): HorizonChartLabels {
       highestHeader: t('chartsUi.horizon.highestHeader'),
       lowestHeader: t('chartsUi.horizon.lowestHeader'),
       valueOn: (value: string, day: string) => t('chartsUi.horizon.valueOn', { value, day })
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, locale]
+  )
+}
+
+export function useMetricTickerLabels(): MetricTickerLabels {
+  const { t, locale } = useI18n()
+  return useMemo(
+    () => ({
+      up: t('chartsUi.metricTicker.up'),
+      down: t('chartsUi.metricTicker.down'),
+      lastUpdates: (count: number) => t('chartsUi.metricTicker.lastUpdates', { count }),
+      trendingUp: t('chartsUi.metricTicker.trendingUp'),
+      trendingDown: t('chartsUi.metricTicker.trendingDown'),
+      flat: t('chartsUi.metricTicker.flat'),
+      low: t('chartsUi.metricTicker.low'),
+      high: t('chartsUi.metricTicker.high'),
+      points: t('chartsUi.metricTicker.points')
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [t, locale]

@@ -79,6 +79,17 @@ export default {
       highestHeader: '最高',
       lowestHeader: '最低',
       valueOn: '{value}（{day}）'
+    },
+    metricTicker: {
+      up: '上升',
+      down: '下降',
+      lastUpdates: '最近 {count} 次更新',
+      trendingUp: '呈上升趋势',
+      trendingDown: '呈下降趋势',
+      flat: '持平',
+      low: '最低',
+      high: '最高',
+      points: '个百分点'
     }
   }
 }

@@ -162,36 +162,18 @@
   gap: var(--space-4);
 }
 
+.currentTicker {
+  margin-top: var(--space-1);
+}
+
 .realtimeLabel {
   color: var(--text-secondary);
   font-size: var(--text-xs);
 }
 
-.currentRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-2) var(--space-5);
-  margin-top: var(--space-1);
-}
 
-.bigValue {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  color: var(--foreground);
-  font-size: var(--text-2xl);
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
 
-.root[data-fullscreen] .bigValue { font-size: var(--text-4xl); }
 
-.bigUnit {
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
-  font-weight: 400;
-}
 
 .peakAvg {
   display: grid;
