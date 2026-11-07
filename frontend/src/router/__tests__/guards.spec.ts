@@ -96,6 +96,18 @@ describe('路由守卫', () => {
     it('未知路径与 Vue 版一致，需要登录', async () => {
       expect(await navigate('/does-not-exist')).toBe('/login?redirect=%2Fdoes-not-exist')
     })
+
+    it('MCP OAuth 授权页要求登录，并在 redirect 中原样保留整个授权查询串', async () => {
+      const path = '/oauth/mcp/authorize?' + new URLSearchParams({
+        response_type: 'code', client_id: 'desktop', redirect_uri: 'http://127.0.0.1:54321/callback',
+        resource: 'https://api.example.com/api/v1/mcp', state: 'a+b&x=1',
+        code_challenge: 'a'.repeat(43), code_challenge_method: 'S256'
+      }).toString()
+      const target = await navigate(path)
+      const redirect = new URL(target!, 'http://localhost')
+      expect(redirect.pathname).toBe('/login')
+      expect(redirect.searchParams.get('redirect')).toBe(path)
+    })
   })
 
   describe('已认证普通用户', () => {

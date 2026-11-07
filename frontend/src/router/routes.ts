@@ -194,6 +194,20 @@ export const appRoutes: AppRouteDef[] = [
     view: () => import('@/views/user/AvailableChannelsView'),
   },
   {
+    path: '/settings/mcp',
+    name: 'MCP',
+    layout: 'app',
+    meta: { requiresAuth: true, requiresAdmin: false, title: 'MCP Connection', titleKey: 'mcp.title', descriptionKey: 'mcp.description' },
+    view: () => import('@/views/user/MCPView'),
+  },
+  {
+    path: '/oauth/mcp/authorize',
+    name: 'MCPOAuthAuthorize',
+    layout: 'none',
+    meta: { requiresAuth: true, requiresAdmin: false, title: 'Authorize MCP Application', titleKey: 'mcp.consentTitle' },
+    view: () => import('@/views/auth/MCPOAuthAuthorizeView'),
+  },
+  {
     path: '/profile',
     name: 'Profile',
     layout: 'app',

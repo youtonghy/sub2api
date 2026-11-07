@@ -33,6 +33,7 @@ import {
 } from 'lucide-react'
 
 import type { SidebarEntry, SidebarSection } from '@/components/arc/blocks/sidebar-rail/sidebar-rail'
+import McpIcon from '@/components/common/McpIcon'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 import { useI18n } from '@/i18n/useI18n'
 import { useAdminSettingsStore } from '@/stores/adminSettings'
@@ -127,6 +128,7 @@ export function useAppNavigation(): AppNavigation {
   const flagAffiliate = flag(FeatureFlags.affiliate)
   const flagRiskControl = flag(FeatureFlags.riskControl)
   const flagPluginManagement = flag(FeatureFlags.pluginManagement)
+  const flagMCP = flag(FeatureFlags.mcp)
 
   // 购买入口文案随站点计费模式切换：仅充值 → 「充值」，仅订阅 → 「订阅」，否则「充值/订阅」
   const purchaseNavLabel = (() => {
@@ -166,6 +168,7 @@ export function useAppNavigation(): AppNavigation {
       { path: '/redeem', label: t('nav.redeem'), icon: Gift, hideInSimpleMode: true },
       { path: '/affiliate', label: t('nav.affiliate'), icon: Users, hideInSimpleMode: true, featureFlag: flagAffiliate },
       { path: '/profile', label: t('nav.profile'), icon: User },
+      { path: '/settings/mcp', label: t('mcp.title'), icon: McpIcon, featureFlag: flagMCP },
       ...customMenuNav(userCustomItems),
     )
     return items
@@ -244,6 +247,7 @@ export function useAppNavigation(): AppNavigation {
     const items = isSimpleMode ? visible.filter((item) => !item.hideInSimpleMode) : visible
     if (isSimpleMode) {
       items.push({ path: '/keys', label: t('nav.apiKeys'), icon: KeyRound })
+      if (flagMCP()) items.push({ path: '/settings/mcp', label: t('mcp.title'), icon: McpIcon })
     }
     items.push({ path: '/admin/settings', label: t('nav.settings'), icon: Settings })
     items.push(...customMenuNav(adminCustomItems))
