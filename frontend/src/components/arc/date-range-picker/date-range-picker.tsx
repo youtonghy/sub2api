@@ -394,8 +394,12 @@ export function DateRangePicker({ labels, value, defaultValue = null, onChange, 
     });
     return () => cancelAnimationFrame(frame);
   }, [open, reduced]);
+  // Only after a real close: on mount `open` is already false and the trigger may sit below the fold.
+  const wasOpen = useRef(false);
   useEffect(() => {
-    if (open) return;
+    if (open) { wasOpen.current = true; return; }
+    if (!wasOpen.current) return;
+    wasOpen.current = false;
     const trigger = triggerRef.current;
     if (!trigger) return;
     const rect = trigger.getBoundingClientRect();
