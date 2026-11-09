@@ -44,6 +44,7 @@ type OpenAIGatewayHandler struct {
 	errorPassthroughService    *service.ErrorPassthroughService
 	contentModerationService   *service.ContentModerationService
 	securityAuditCoordinator   *securityaudit.Coordinator
+	privacyFilterService       *service.PrivacyFilterService
 	grokMediaEligibilityProber grokMediaEligibilityProber
 	opsService                 *service.OpsService
 	concurrencyHelper          *ConcurrencyHelper
@@ -543,6 +544,13 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 
 	setOpsRequestContext(c, reqModel, reqStream)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
+
+	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolOpenAIResponses, body)
+	if filterErr != nil {
+		h.errorResponse(c, http.StatusInternalServerError, "api_error", privacyFilterClientMessage)
+		return
+	}
+	body = filteredBody
 
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIResponses, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.openAISecurityAuditError(c, decision)
@@ -1244,6 +1252,13 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 	setOpsRequestContext(c, reqModel, reqStream)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
+
+	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolAnthropicMessages, body)
+	if filterErr != nil {
+		h.anthropicErrorResponse(c, http.StatusInternalServerError, "api_error", privacyFilterClientMessage)
+		return
+	}
+	body = filteredBody
 
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolAnthropicMessages, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.anthropicSecurityAuditError(c, decision)
@@ -2619,6 +2634,13 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	setOpsRequestContext(c, reqModel, true)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeWSV2))
 
+	filteredFirstMessage, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolOpenAIResponses, firstMessage)
+	if filterErr != nil {
+		closeOpenAIClientWS(wsConn, coderws.StatusInternalError, privacyFilterClientMessage)
+		return
+	}
+	firstMessage = filteredFirstMessage
+
 	if decision := h.checkSecurityAuditStage(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIResponses, reqModel, firstMessage, "first_turn"); decision != nil && !decision.AllowNextStage {
 		writeSecurityAuditWSError(ctx, wsConn, decision)
 		closeOpenAIClientWS(wsConn, securityAuditWSCloseStatus(decision), securityAuditWSCloseReason(decision))
@@ -3017,6 +3039,13 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			MaxReasoningEffortOverLimit: maxReasoningEffortOverLimit,
 			ReasoningEffortMappings:     reasoningEffortMappings,
 			TurnStarted:                 recordTurnStart,
+			RewriteClientPayload: func(payload []byte) ([]byte, error) {
+				filtered, err := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolOpenAIResponses, payload)
+				if err != nil {
+					return nil, service.NewOpenAIWSClientCloseError(coderws.StatusInternalError, privacyFilterClientMessage, nil)
+				}
+				return filtered, nil
+			},
 			BeforeRequest: func(turn int, payload []byte, originalModel string) error {
 				c.Set(securityAuditWSTurnContextKey, turn)
 				service.BeginOpsStreamTurn(c, turn)

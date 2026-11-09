@@ -28,3 +28,10 @@ See https://uiarc.dev/license.
 
 Free Arc components under frontend/src/components/arc/ are distributed
 under their own license from https://uiarc.dev.
+
+Privacy filter rules
+--------------------
+backend/internal/pkg/privacyfilter/rules/gitleaks.toml is the default ruleset of
+gitleaks (https://github.com/gitleaks/gitleaks), Copyright (c) 2019 Zachary Rice,
+used under the MIT License. The detection approach in that package draws on
+privacy-filter (https://github.com/packyme/privacy-filter), also MIT licensed.

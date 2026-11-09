@@ -399,6 +399,13 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		return
 	}
 
+	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolGemini, body)
+	if filterErr != nil {
+		googleError(c, http.StatusInternalServerError, privacyFilterClientMessage)
+		return
+	}
+	body = filteredBody
+
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, authSubject, service.ContentModerationProtocolGemini, reqModel, body); decision != nil && !decision.AllowNextStage {
 		googleSecurityAuditError(c, decision)
 		return

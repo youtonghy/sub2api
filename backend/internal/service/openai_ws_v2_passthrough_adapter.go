@@ -1077,6 +1077,13 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 			}
 			requestModelForThisFrame := ""
 			if isResponseCreate {
+				if hooks != nil && hooks.RewriteClientPayload != nil {
+					rewritten, rewriteErr := hooks.RewriteClientPayload(payload)
+					if rewriteErr != nil {
+						return payload, nil, rewriteErr
+					}
+					payload = rewritten
+				}
 				requestModelForThisFrame = usageMeta.requestModelForFrame(payload)
 				if requestModelForThisFrame == "" {
 					requestModelForThisFrame = capturedSessionModel

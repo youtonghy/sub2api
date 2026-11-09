@@ -529,6 +529,9 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				nil,
 			)
 		}
+		if hooks != nil && hooks.RewriteClientPayload != nil {
+			return hooks.RewriteClientPayload(payload)
+		}
 		return payload, nil
 	}
 

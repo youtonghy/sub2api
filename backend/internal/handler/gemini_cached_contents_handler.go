@@ -106,6 +106,13 @@ func (h *GatewayHandler) GeminiCachedContentsCreate(c *gin.Context) {
 	if !ok {
 		return
 	}
+	// 解析前脱敏：req 持有的 contents 才是实际写入上游缓存的内容。
+	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolGemini, body)
+	if filterErr != nil {
+		googleError(c, http.StatusInternalServerError, privacyFilterClientMessage)
+		return
+	}
+	body = filteredBody
 	req, err := service.ParseGeminiCachedContentCreateRequest(body, svc.Now(), svc.MaxTTL())
 	if err != nil {
 		googleError(c, http.StatusBadRequest, err.Error())

@@ -105,6 +105,13 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 	setOpsRequestContext(c, reqModel, reqStream)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
 
+	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolOpenAIChat, body)
+	if filterErr != nil {
+		h.errorResponse(c, http.StatusInternalServerError, "api_error", privacyFilterClientMessage)
+		return
+	}
+	body = filteredBody
+
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIChat, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.openAISecurityAuditError(c, decision)
 		return

@@ -67,6 +67,13 @@ func (h *OpenAIGatewayHandler) ResponsesInputTokens(c *gin.Context) {
 
 	setOpsRequestContext(c, reqModel, false)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(false, false)))
+	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolOpenAIResponses, body)
+	if filterErr != nil {
+		h.errorResponse(c, http.StatusInternalServerError, "api_error", privacyFilterClientMessage)
+		return
+	}
+	body = filteredBody
+
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIResponses, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.openAISecurityAuditError(c, decision)
 		return
@@ -245,6 +252,13 @@ func (h *OpenAIGatewayHandler) CountTokens(c *gin.Context) {
 
 	setOpsRequestContext(c, reqModel, false)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(false, false)))
+
+	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolAnthropicMessages, body)
+	if filterErr != nil {
+		h.anthropicErrorResponse(c, http.StatusInternalServerError, "api_error", privacyFilterClientMessage)
+		return
+	}
+	body = filteredBody
 
 	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
 	mappedBodyForMessages := newOpenAIModelMappedBodyCache(body, h.gatewayService.ReplaceModelInBody)

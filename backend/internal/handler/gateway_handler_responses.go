@@ -122,6 +122,13 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 
+	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolOpenAIResponses, body)
+	if filterErr != nil {
+		h.responsesErrorResponse(c, http.StatusInternalServerError, "api_error", privacyFilterClientMessage)
+		return
+	}
+	body = filteredBody
+
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIResponses, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.responsesSecurityAuditError(c, decision)
 		return

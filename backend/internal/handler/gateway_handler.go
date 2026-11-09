@@ -52,6 +52,7 @@ type GatewayHandler struct {
 	errorPassthroughService   *service.ErrorPassthroughService
 	contentModerationService  *service.ContentModerationService
 	securityAuditCoordinator  *securityaudit.Coordinator
+	privacyFilterService      *service.PrivacyFilterService
 	// geminiCachedContentService 管理 Gemini 显式缓存；为 nil 时相关接口不可用。
 	geminiCachedContentService *service.GeminiCachedContentService
 	concurrencyHelper          *ConcurrencyHelper
@@ -232,6 +233,13 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", service.ImageGenerationPermissionMessage())
 		return
 	}
+
+	filteredBody, filterErr := h.applyPrivacyFilterToParsed(c, reqLog, apiKey, service.ContentModerationProtocolAnthropicMessages, parsedReq)
+	if filterErr != nil {
+		h.errorResponse(c, http.StatusInternalServerError, "api_error", privacyFilterClientMessage)
+		return
+	}
+	body = filteredBody
 
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolAnthropicMessages, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.anthropicSecurityAuditError(c, decision)
@@ -2206,6 +2214,14 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 
 	setOpsRequestContext(c, parsedReq.Model, parsedReq.Stream)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(parsedReq.Stream, false)))
+
+	// count_tokens 同样会把内容发给上游，必须先脱敏。
+	filteredBody, filterErr := h.applyPrivacyFilterToParsed(c, reqLog, apiKey, service.ContentModerationProtocolAnthropicMessages, parsedReq)
+	if filterErr != nil {
+		h.errorResponse(c, http.StatusInternalServerError, "api_error", privacyFilterClientMessage)
+		return
+	}
+	body = filteredBody
 
 	// 获取订阅信息（可能为nil）
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
