@@ -1,4 +1,4 @@
-.trigger { display: inline-flex; height: var(--control-height-md); align-items: center; gap: var(--space-2); padding: 0 var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); color: var(--text-secondary); font: inherit; cursor: pointer; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
+.trigger { display: inline-flex; height: var(--control-height-sm); align-items: center; gap: var(--space-2); padding: 0 var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); color: var(--text-secondary); font: inherit; cursor: pointer; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
 .trigger[data-state="open"] { background: var(--surface-muted); color: var(--foreground); }
 @media (hover: hover) and (pointer: fine) { .trigger:hover { background: var(--surface-muted); color: var(--foreground); } }
 .dots { display: inline-flex; gap: 2px; }
