@@ -235,6 +235,42 @@ export default {
      },
 
     riskControl: {
+      privacyFilter: {
+        title: 'Privacy filter',
+        hint: 'Before forwarding to upstream accounts, replaces sensitive data in user text and tool results with [REDACTED:type]. This is best effort, not a security boundary, and does not cover text inside images or PDFs. Rules draw on gitleaks and Presidio.',
+        loadFailed: 'Failed to load privacy filter settings',
+        saveFailed: 'Failed to save privacy filter settings',
+        saved: 'Privacy filter settings saved',
+        save: 'Save privacy filter settings',
+        mode: 'Mode',
+        modes: { off: 'Off', observe: 'Count only', redact: 'Redact' },
+        modeHint: {
+          off: 'No requests are scanned.',
+          observe: 'Scans requests from the selected groups and counts matches by category. Requests are not changed and matched text is never recorded.',
+          redact: 'Replaces matches in requests from the selected groups. Replacement cannot be undone. If processing fails, the request is rejected instead of forwarded.'
+        },
+        redactWarning: 'Redaction cannot be undone. Once a coding agent sees a placeholder it may be unable to edit files against the original text or reach a hidden address. Consider starting with Count only.',
+        categoriesTitle: 'Categories',
+        categories: {
+          private_key: { label: 'Private keys', description: 'PEM and OpenSSH private key blocks, including truncated ones.' },
+          public_key: { label: 'Public keys', description: 'SSH public key lines, and PEM public keys or certificates.' },
+          credential: { label: 'Passwords and tokens', description: 'Passwords, API keys, access tokens and similar credentials in configs and URLs.' },
+          financial: { label: 'Payment cards and IBAN', description: 'Card numbers that pass Luhn and match a card network range, and IBANs that pass validation.' },
+          identity: { label: 'National IDs', description: 'IDs with a valid check digit or format: mainland China, Hong Kong, Taiwan, US SSN, UK, Singapore, South Korea, Spain, Brazil. Australian TFN and Medicare, Canadian SIN, Aadhaar, My Number and passports need an adjacent label.' },
+          proxy: { label: 'Proxy and VPN node credentials', description: 'Share links (vless://, vmess://, trojan://, ss:// and others), plus UUIDs, Reality short IDs, passwords and subscription tokens in proxy configs. Public keys stay visible.' },
+          email: { label: 'Email addresses', description: 'Email addresses, excluding SSH targets, noreply addresses and example domains.' },
+          ip: { label: 'IP addresses', description: 'IPv4 and IPv6 addresses, excluding loopback addresses and version-like numbers.' }
+        },
+        groups: 'Groups',
+        groupsHint: 'Applies only to the selected groups. With no group selected, no requests are processed.',
+        stats: {
+          scanned: 'Scanned {count}',
+          hit: 'Matched {count}',
+          redacted: 'Redacted {count}',
+          failed: 'Failed {count}',
+          category: '{count} matches on this instance.'
+        }
+      },
       engine: 'Audit engine',
       activeEngine: 'Active engine: {engine}',
       engineUnavailable: 'No usable Key for the active engine. API auditing is unavailable; failed checks fail open under the existing policy.',

@@ -306,6 +306,48 @@ export async function clearFlaggedHashes(): Promise<ClearFlaggedHashesResponse> 
   return data
 }
 
+export type PrivacyFilterMode = 'off' | 'observe' | 'redact'
+export type PrivacyFilterCategory =
+  | 'private_key'
+  | 'public_key'
+  | 'credential'
+  | 'financial'
+  | 'identity'
+  | 'proxy'
+  | 'email'
+  | 'ip'
+
+export interface PrivacyFilterConfig {
+  mode: PrivacyFilterMode
+  group_ids: number[]
+  categories: PrivacyFilterCategory[]
+}
+
+export interface PrivacyFilterStatus {
+  scanned_requests: number
+  hit_requests: number
+  redacted_requests: number
+  failed_requests: number
+  fields: number
+  category_counts: Partial<Record<PrivacyFilterCategory, number>>
+  started_at: string
+}
+
+export async function getPrivacyFilterConfig(): Promise<PrivacyFilterConfig> {
+  const { data } = await apiClient.get<PrivacyFilterConfig>('/admin/risk-control/privacy-filter/config')
+  return data
+}
+
+export async function updatePrivacyFilterConfig(payload: PrivacyFilterConfig): Promise<PrivacyFilterConfig> {
+  const { data } = await apiClient.put<PrivacyFilterConfig>('/admin/risk-control/privacy-filter/config', payload)
+  return data
+}
+
+export async function getPrivacyFilterStatus(): Promise<PrivacyFilterStatus> {
+  const { data } = await apiClient.get<PrivacyFilterStatus>('/admin/risk-control/privacy-filter/status')
+  return data
+}
+
 export const riskControlAPI = {
   getConfig,
   updateConfig,
@@ -315,6 +357,9 @@ export const riskControlAPI = {
   unbanUser,
   deleteFlaggedHash,
   clearFlaggedHashes,
+  getPrivacyFilterConfig,
+  updatePrivacyFilterConfig,
+  getPrivacyFilterStatus,
 }
 
 export default riskControlAPI

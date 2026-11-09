@@ -235,6 +235,42 @@ export default {
     },
 
     riskControl: {
+      privacyFilter: {
+        title: '隐私过滤',
+        hint: '转发到上游账号前，把请求里用户文本和工具结果中的敏感信息替换为 [REDACTED:类型]。这是尽力而为的措施，不是安全边界，也不覆盖图片和 PDF 中的文字。规则参考 gitleaks 和 Presidio。',
+        loadFailed: '加载隐私过滤配置失败',
+        saveFailed: '保存隐私过滤配置失败',
+        saved: '隐私过滤配置已保存',
+        save: '保存隐私过滤配置',
+        mode: '运行模式',
+        modes: { off: '关闭', observe: '仅统计', redact: '脱敏' },
+        modeHint: {
+          off: '不扫描任何请求。',
+          observe: '扫描所选分组的请求并按类别计数，请求内容不变。不记录命中的原文。',
+          redact: '替换所选分组请求中命中的内容，替换不可还原。处理失败时拒绝请求，不转发原文。'
+        },
+        redactWarning: '脱敏不可还原。编码 Agent 读到占位符后，可能无法按原文编辑文件或连接被隐藏的地址，建议先用“仅统计”观察。',
+        categoriesTitle: '识别类别',
+        categories: {
+          private_key: { label: '私钥', description: 'PEM 与 OpenSSH 私钥块，包括被截断的私钥。' },
+          public_key: { label: '公钥', description: 'SSH 公钥行，以及 PEM 公钥或证书。' },
+          credential: { label: '密码与令牌', description: '配置文件和 URL 中的密码、API 密钥、访问令牌等凭据。' },
+          financial: { label: '银行卡与 IBAN', description: '通过 Luhn 校验且符合卡组织号段的银行卡号，以及通过校验的 IBAN。' },
+          identity: { label: '身份证件号', description: '校验位或格式有效的证件号：中国大陆、香港、台湾、美国 SSN、英国、新加坡、韩国、西班牙、巴西；澳大利亚 TFN 与 Medicare、加拿大 SIN、Aadhaar、My Number 和护照号须带标注词。' },
+          proxy: { label: '代理与 VPN 节点凭据', description: '分享链接（vless://、vmess://、trojan://、ss:// 等），以及代理配置中的 UUID、Reality short-id、密码和订阅令牌。公钥保持可见。' },
+          email: { label: '邮箱地址', description: '邮箱地址，排除 SSH 目标、noreply 地址和示例域名。' },
+          ip: { label: 'IP 地址', description: 'IPv4 与 IPv6 地址，排除回环地址和形似版本号的数字。' }
+        },
+        groups: '生效分组',
+        groupsHint: '只对选中的分组生效。未选中任何分组时不处理任何请求。',
+        stats: {
+          scanned: '已扫描 {count}',
+          hit: '命中 {count}',
+          redacted: '已脱敏 {count}',
+          failed: '失败 {count}',
+          category: '当前实例累计命中 {count} 次。'
+        }
+      },
       engine: '审计引擎',
       activeEngine: '当前生效引擎：{engine}',
       engineUnavailable: '当前引擎没有可用 Key，API 审计不可用；失败请求按现有策略放行。',

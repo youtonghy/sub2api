@@ -108,6 +108,7 @@ import {
   type SettingsTab,
   type WorkerSlotState
 } from './riskControl/model'
+import PrivacyFilterPanel from './riskControl/PrivacyFilterPanel'
 import styles from './RiskControlView.module.css'
 
 type APIKeysWriteMode = 'append' | 'replace'
@@ -2198,6 +2199,8 @@ export default function RiskControlView() {
           </div>
         </section>
       ) : null}
+
+      <PrivacyFilterPanel groups={groups} />
 
       <section className={styles.region}>
         <div className={styles.regionHeader}>
