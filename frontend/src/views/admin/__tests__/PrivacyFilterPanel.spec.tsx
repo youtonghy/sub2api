@@ -35,6 +35,8 @@ const status = {
   redacted_requests: 0,
   failed_requests: 0,
   fields: 1,
+  restored_tokens: 2,
+  unresolved_tokens: 0,
   category_counts: {},
   started_at: '2026-11-09T00:00:00Z'
 }
@@ -68,6 +70,13 @@ describe('PrivacyFilterPanel', () => {
     getPrivacyFilterConfig.mockResolvedValue({ mode: 'redact', group_ids: [1], categories: ['credential'] })
     render(<PrivacyFilterPanel groups={groups} />)
     expect(await screen.findByText('admin.riskControl.privacyFilter.redactWarning')).toBeTruthy()
+  })
+
+  it('offers the restore mode and explains its limits', async () => {
+    getPrivacyFilterConfig.mockResolvedValue({ mode: 'restore', group_ids: [1], categories: ['credential'] })
+    render(<PrivacyFilterPanel groups={groups} />)
+    expect(await screen.findByText('admin.riskControl.privacyFilter.restoreNotice')).toBeTruthy()
+    expect(screen.getByText('admin.riskControl.privacyFilter.stats.restored')).toBeTruthy()
   })
 
   it('reports a load failure', async () => {

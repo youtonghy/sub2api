@@ -122,13 +122,18 @@ export default function PrivacyFilterPanel({ groups }: PrivacyFilterPanelProps) 
             options={[
               { value: 'off', label: t('admin.riskControl.privacyFilter.modes.off') },
               { value: 'observe', label: t('admin.riskControl.privacyFilter.modes.observe') },
-              { value: 'redact', label: t('admin.riskControl.privacyFilter.modes.redact') }
+              { value: 'redact', label: t('admin.riskControl.privacyFilter.modes.redact') },
+              { value: 'restore', label: t('admin.riskControl.privacyFilter.modes.restore') }
             ]}
             value={config.mode}
             onValueChange={(value) => patch({ mode: value as PrivacyFilterMode })}
             label={t('admin.riskControl.privacyFilter.mode')}
           />
         </div>
+
+        {config.mode === 'restore' ? (
+          <Alert tone="info" title={t('admin.riskControl.privacyFilter.restoreNotice')} role="status" />
+        ) : null}
 
         {config.mode === 'redact' ? (
           <Alert tone="warning" title={t('admin.riskControl.privacyFilter.redactWarning')} role="status" />
@@ -145,6 +150,14 @@ export default function PrivacyFilterPanel({ groups }: PrivacyFilterPanelProps) 
             <span className={styles.chip}>
               {t('admin.riskControl.privacyFilter.stats.redacted', { count: status.redacted_requests })}
             </span>
+            {status.restored_tokens > 0 || status.unresolved_tokens > 0 ? (
+              <span className={styles.chip}>
+                {t('admin.riskControl.privacyFilter.stats.restored', {
+                  restored: status.restored_tokens,
+                  unresolved: status.unresolved_tokens
+                })}
+              </span>
+            ) : null}
             <span className={status.failed_requests > 0 ? `${styles.chip} ${styles.chipDanger}` : styles.chip}>
               {t('admin.riskControl.privacyFilter.stats.failed', { count: status.failed_requests })}
             </span>

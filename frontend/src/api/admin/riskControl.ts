@@ -306,7 +306,7 @@ export async function clearFlaggedHashes(): Promise<ClearFlaggedHashesResponse> 
   return data
 }
 
-export type PrivacyFilterMode = 'off' | 'observe' | 'redact'
+export type PrivacyFilterMode = 'off' | 'observe' | 'redact' | 'restore'
 export type PrivacyFilterCategory =
   | 'private_key'
   | 'public_key'
@@ -329,6 +329,8 @@ export interface PrivacyFilterStatus {
   redacted_requests: number
   failed_requests: number
   fields: number
+  restored_tokens: number
+  unresolved_tokens: number
   category_counts: Partial<Record<PrivacyFilterCategory, number>>
   started_at: string
 }

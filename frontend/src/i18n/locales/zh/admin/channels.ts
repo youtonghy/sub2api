@@ -243,12 +243,14 @@ export default {
         saved: '隐私过滤配置已保存',
         save: '保存隐私过滤配置',
         mode: '运行模式',
-        modes: { off: '关闭', observe: '仅统计', redact: '脱敏' },
+        modes: { off: '关闭', observe: '仅统计', redact: '脱敏', restore: '可还原脱敏' },
         modeHint: {
           off: '不扫描任何请求。',
           observe: '扫描所选分组的请求并按类别计数，请求内容不变。不记录命中的原文。',
-          redact: '替换所选分组请求中命中的内容，替换不可还原。处理失败时拒绝请求，不转发原文。'
+          redact: '替换所选分组请求中命中的内容，替换不可还原。处理失败时拒绝请求，不转发原文。',
+          restore: '上游只看到占位符，回复在返回客户端前换回原值，Agent 可以直接使用。原值只保存在本次请求或本条 WebSocket 连接的内存中。处理失败时拒绝请求。'
         },
+        restoreNotice: 'thinking 和推理摘要中的占位符不还原；请求通过 previous_response_id 引用上游保存的历史时，其中的占位符也无法还原。',
         redactWarning: '脱敏不可还原。编码 Agent 读到占位符后，可能无法按原文编辑文件或连接被隐藏的地址，建议先用“仅统计”观察。',
         categoriesTitle: '识别类别',
         categories: {
@@ -268,6 +270,7 @@ export default {
           hit: '命中 {count}',
           redacted: '已脱敏 {count}',
           failed: '失败 {count}',
+          restored: '已还原 {restored}，未能还原 {unresolved}',
           category: '当前实例累计命中 {count} 次。'
         }
       },

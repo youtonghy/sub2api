@@ -243,12 +243,14 @@ export default {
         saved: 'Privacy filter settings saved',
         save: 'Save privacy filter settings',
         mode: 'Mode',
-        modes: { off: 'Off', observe: 'Count only', redact: 'Redact' },
+        modes: { off: 'Off', observe: 'Count only', redact: 'Redact', restore: 'Redact and restore' },
         modeHint: {
           off: 'No requests are scanned.',
           observe: 'Scans requests from the selected groups and counts matches by category. Requests are not changed and matched text is never recorded.',
-          redact: 'Replaces matches in requests from the selected groups. Replacement cannot be undone. If processing fails, the request is rejected instead of forwarded.'
+          redact: 'Replaces matches in requests from the selected groups. Replacement cannot be undone. If processing fails, the request is rejected instead of forwarded.',
+          restore: 'The upstream sees only placeholders. Responses get the original values back before they reach the client, so agents can use them directly. Originals stay in memory for the request or WebSocket connection only. If processing fails, the request is rejected.'
         },
+        restoreNotice: 'Placeholders in thinking and reasoning summaries are not restored, nor are those in history the upstream stores and the request refers to through previous_response_id.',
         redactWarning: 'Redaction cannot be undone. Once a coding agent sees a placeholder it may be unable to edit files against the original text or reach a hidden address. Consider starting with Count only.',
         categoriesTitle: 'Categories',
         categories: {
@@ -268,6 +270,7 @@ export default {
           hit: 'Matched {count}',
           redacted: 'Redacted {count}',
           failed: 'Failed {count}',
+          restored: 'Restored {restored}, unresolved {unresolved}',
           category: '{count} matches on this instance.'
         }
       },

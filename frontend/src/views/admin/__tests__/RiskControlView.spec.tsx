@@ -224,6 +224,8 @@ describe('admin RiskControlView', () => {
       redacted_requests: 0,
       failed_requests: 0,
       fields: 0,
+      restored_tokens: 0,
+      unresolved_tokens: 0,
       category_counts: {},
       started_at: '2026-11-09T00:00:00Z'
     })
