@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/privacyfilter"
 	coderws "github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -192,4 +193,107 @@ func TestPrivacyWSIngressRedactsFollowUpBeforeForwarding(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, string(raw), "abc12345")
 	require.Contains(t, string(raw), "[REDACTED:credential]")
+}
+
+func privacyWSRestoreHook(t *testing.T) (func([]byte) [][]byte, string) {
+	t.Helper()
+	vault := privacyfilter.NewVault([]byte("ws"))
+	token := vault.Token(privacyfilter.CategoryCredential, "abc12345")
+	restorer := NewPrivacyResponseRestorer(ContentModerationProtocolOpenAIResponses, vault)
+	return restorer.RestorePrivacyFrames, token
+}
+
+func TestPrivacyWSPassthroughRestoresDownstreamFrames(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	controlCtx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(context.Canceled)
+
+	restore, token := privacyWSRestoreHook(t)
+	upstream := newStagedPassthroughConn()
+	upstream.Send(`{"type":"response.output_text.delta","item_id":"m","output_index":0,"content_index":0,"delta":"key ` + token[:12] + `"}`)
+	upstream.Send(`{"type":"response.output_text.delta","item_id":"m","output_index":0,"content_index":0,"delta":"` + token[12:] + `!"}`)
+	upstream.Send(`{"type":"response.completed","response":{"id":"resp_1","model":"gpt-5.1","output":[{"type":"message","content":[{"type":"output_text","text":"key ` + token + `!"}]}],"usage":{"input_tokens":1,"output_tokens":1}}}`)
+
+	hooks := &OpenAIWSIngressHooks{RestoreServerPayload: restore}
+	server, _ := startPassthroughHookRecordingServer(t, controlCtx, newPassthroughLifecycleService(passthroughLifecycleConfig(), upstream), passthroughLifecycleAccount(), hooks)
+	defer server.Close()
+	clientConn := dialPassthroughLifecycleClient(t, server)
+	defer func() { _ = clientConn.CloseNow() }()
+	requirePassthroughUpstreamWrite(t, upstream, time.Second)
+
+	var text strings.Builder
+	for {
+		event, err := readPassthroughLifecycleFrame(t, clientConn, 3*time.Second)
+		require.NoError(t, err)
+		if gjson.GetBytes(event, "type").String() == "response.completed" {
+			require.Equal(t, "key abc12345!", gjson.GetBytes(event, "response.output.0.content.0.text").String())
+			break
+		}
+		text.WriteString(gjson.GetBytes(event, "delta").String())
+	}
+	require.Equal(t, "key abc12345!", text.String())
+}
+
+func TestPrivacyWSIngressRestoresDownstreamFrames(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cfg := &config.Config{}
+	cfg.Security.URLAllowlist.Enabled = false
+	cfg.Security.URLAllowlist.AllowInsecureHTTP = true
+	cfg.Gateway.OpenAIWS.Enabled = true
+	cfg.Gateway.OpenAIWS.OAuthEnabled = true
+	cfg.Gateway.OpenAIWS.APIKeyEnabled = true
+	cfg.Gateway.OpenAIWS.ResponsesWebsocketsV2 = true
+	cfg.Gateway.OpenAIWS.MaxConnsPerAccount = 1
+	cfg.Gateway.OpenAIWS.MaxIdlePerAccount = 1
+	cfg.Gateway.OpenAIWS.QueueLimitPerConn = 8
+	cfg.Gateway.OpenAIWS.DialTimeoutSeconds = 3
+	cfg.Gateway.OpenAIWS.ReadTimeoutSeconds = 3
+	cfg.Gateway.OpenAIWS.WriteTimeoutSeconds = 3
+
+	restore, token := privacyWSRestoreHook(t)
+	upstream := &openAIWSCaptureConn{events: [][]byte{
+		[]byte(`{"type":"response.output_text.delta","item_id":"m","output_index":0,"content_index":0,"delta":"v ` + token + `"}`),
+		[]byte(`{"type":"response.completed","response":{"id":"resp_r1","model":"gpt-5.1","usage":{"input_tokens":1,"output_tokens":1}}}`),
+	}}
+	pool := newOpenAIWSConnPool(cfg)
+	pool.setClientDialerForTest(&openAIWSQueueDialer{conns: []openAIWSClientConn{upstream}})
+	svc := &OpenAIGatewayService{cfg: cfg, httpUpstream: &httpUpstreamRecorder{}, cache: &stubGatewayCache{},
+		openaiWSResolver: NewOpenAIWSProtocolResolver(cfg), toolCorrector: NewCodexToolCorrector(), openaiWSPool: pool}
+	account := &Account{ID: 120, Name: "privacy-restore", Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+		Status: StatusActive, Schedulable: true, Concurrency: 1,
+		Credentials: map[string]any{"api_key": "sk-test"}, Extra: map[string]any{"responses_websockets_v2_enabled": true}}
+	hooks := &OpenAIWSIngressHooks{RestoreServerPayload: restore}
+
+	serverErr := make(chan error, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := coderws.Accept(w, r, &coderws.AcceptOptions{CompressionMode: coderws.CompressionContextTakeover})
+		if err != nil {
+			serverErr <- err
+			return
+		}
+		defer func() { _ = conn.CloseNow() }()
+		ginCtx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		ginCtx.Request = r.Clone(r.Context())
+		readCtx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+		_, first, err := conn.Read(readCtx)
+		cancel()
+		if err != nil {
+			serverErr <- err
+			return
+		}
+		serverErr <- svc.ProxyResponsesWebSocketFromClient(r.Context(), ginCtx, conn, account, "sk-test", first, hooks)
+	}))
+	defer server.Close()
+
+	dialCtx, cancelDial := context.WithTimeout(context.Background(), 3*time.Second)
+	client, _, err := coderws.Dial(dialCtx, "ws"+strings.TrimPrefix(server.URL, "http"), nil)
+	cancelDial()
+	require.NoError(t, err)
+	defer func() { _ = client.CloseNow() }()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	require.NoError(t, client.Write(ctx, coderws.MessageText, []byte(`{"type":"response.create","model":"gpt-5.1","stream":true}`)))
+	_, first, err := client.Read(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "v abc12345", gjson.GetBytes(first, "delta").String())
 }

@@ -42,7 +42,7 @@ func (s *privacySettingRepoStub) Set(_ context.Context, _ string, value string) 
 
 func newPrivacyTestService(t *testing.T, mode string, groups ...int64) *PrivacyFilterService {
 	t.Helper()
-	svc := NewPrivacyFilterService(&privacySettingRepoStub{})
+	svc := NewPrivacyFilterService(&privacySettingRepoStub{}, nil)
 	_, err := svc.UpdateConfig(context.Background(), PrivacyFilterConfig{
 		Mode: mode, GroupIDs: groups, Categories: defaultPrivacyFilterCategories(),
 	})
@@ -185,7 +185,7 @@ func TestPrivacyApplyScope(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("off by default", func(t *testing.T) {
-		svc := NewPrivacyFilterService(&privacySettingRepoStub{})
+		svc := NewPrivacyFilterService(&privacySettingRepoStub{}, nil)
 		result, err := svc.Apply(ctx, input(privacyGroup(7)))
 		require.NoError(t, err)
 		require.Equal(t, body, result.Body)
@@ -228,7 +228,7 @@ func TestPrivacyApplyScope(t *testing.T) {
 		require.EqualValues(t, 1, svc.GetStatus().RedactedRequests)
 	})
 	t.Run("category switches", func(t *testing.T) {
-		svc := NewPrivacyFilterService(&privacySettingRepoStub{})
+		svc := NewPrivacyFilterService(&privacySettingRepoStub{}, nil)
 		_, err := svc.UpdateConfig(ctx, PrivacyFilterConfig{Mode: PrivacyFilterModeRedact, GroupIDs: []int64{7}, Categories: []string{"financial"}})
 		require.NoError(t, err)
 		result, err := svc.Apply(ctx, input(privacyGroup(7)))
@@ -270,13 +270,13 @@ func TestPrivacyApplyFailsClosed(t *testing.T) {
 		require.EqualValues(t, 1, svc.GetStatus().FailedRequests)
 	})
 	t.Run("unreadable config with no snapshot rejected", func(t *testing.T) {
-		svc := NewPrivacyFilterService(&privacySettingRepoStub{err: errors.New("db down")})
+		svc := NewPrivacyFilterService(&privacySettingRepoStub{err: errors.New("db down")}, nil)
 		_, err := svc.Apply(ctx, validInput)
 		require.ErrorIs(t, err, ErrPrivacyFilterFailed)
 	})
 	t.Run("settings outage keeps last snapshot", func(t *testing.T) {
 		repo := &privacySettingRepoStub{}
-		svc := NewPrivacyFilterService(repo)
+		svc := NewPrivacyFilterService(repo, nil)
 		_, err := svc.UpdateConfig(ctx, PrivacyFilterConfig{Mode: PrivacyFilterModeRedact, GroupIDs: []int64{7}, Categories: defaultPrivacyFilterCategories()})
 		require.NoError(t, err)
 		stale := *svc.snapshot.Load()
@@ -293,7 +293,7 @@ func TestPrivacyApplyFailsClosed(t *testing.T) {
 
 func TestPrivacyConfig(t *testing.T) {
 	ctx := context.Background()
-	svc := NewPrivacyFilterService(&privacySettingRepoStub{})
+	svc := NewPrivacyFilterService(&privacySettingRepoStub{}, nil)
 
 	config, err := svc.GetConfig(ctx)
 	require.NoError(t, err)

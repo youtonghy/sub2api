@@ -17,74 +17,171 @@ type privacyRewriteOutput struct {
 	counts map[privacyfilter.Category]int
 }
 
+// privacyTarget is one JSON string to process. detect marks client-supplied
+// content that is scanned; other targets are assistant history that only gets
+// known values swapped back to their placeholders. jsonText marks strings that
+// hold JSON themselves, such as tool call arguments.
+type privacyTarget struct {
+	value    gjson.Result
+	detect   bool
+	jsonText bool
+}
+
+type privacyRewriteOptions struct {
+	detect func(string) []privacyfilter.Match
+	// vault switches to restorable placeholders. With a vault the assistant
+	// history is processed too: clients receive restored values, so they come
+	// back in the next request and must be replaced again.
+	vault *privacyfilter.Vault
+}
+
 type privacyPatch struct {
 	start, end  int
 	replacement []byte
 }
 
-// privacyRewriter edits only the JSON strings it is pointed at and leaves every
-// other byte alone. Signatures, encrypted reasoning, base64 media, IDs, tool
-// definitions and system prompts therefore reach the upstream unchanged.
-type privacyRewriter struct {
-	body    []byte
-	redact  func(string) privacyfilter.Result
-	patches []privacyPatch
-	counts  map[privacyfilter.Category]int
-	err     error
+// privacyCollector gathers the strings to process for one protocol and leaves
+// every other byte alone. Signatures, encrypted reasoning, base64 media, IDs,
+// tool definitions and system prompts therefore reach the upstream unchanged.
+type privacyCollector struct {
+	assistant bool
+	targets   []privacyTarget
 }
 
-// rewritePrivacyBody redacts the client-supplied text of a request: user messages
-// and tool results. Assistant turns are left alone, since thinking blocks are
-// signed and everything the model saw here was already redacted.
-func rewritePrivacyBody(protocol string, body []byte, redact func(string) privacyfilter.Result) (privacyRewriteOutput, error) {
+func (c *privacyCollector) add(value gjson.Result, detect, jsonText bool) {
+	if value.Type == gjson.String && value.Str != "" {
+		c.targets = append(c.targets, privacyTarget{value: value, detect: detect, jsonText: jsonText})
+	}
+}
+
+// rewritePrivacyBody redacts client-supplied text: user messages and tool
+// results. Thinking and reasoning are never touched because they are signed and
+// are never restored, so they still hold placeholders.
+func rewritePrivacyBody(protocol string, body []byte, options privacyRewriteOptions) (privacyRewriteOutput, error) {
 	if !gjson.ValidBytes(body) {
 		return privacyRewriteOutput{}, fmt.Errorf("request body is not valid JSON")
 	}
-	rewriter := &privacyRewriter{body: body, redact: redact, counts: make(map[privacyfilter.Category]int)}
+	collector := &privacyCollector{assistant: options.vault != nil}
 	switch protocol {
 	case ContentModerationProtocolAnthropicMessages:
-		rewriter.anthropicMessages(gjson.GetBytes(body, "messages"))
+		collector.anthropicMessages(gjson.GetBytes(body, "messages"))
 	case ContentModerationProtocolOpenAIChat:
-		rewriter.chatMessages(gjson.GetBytes(body, "messages"))
+		collector.chatMessages(gjson.GetBytes(body, "messages"))
 	case ContentModerationProtocolOpenAIResponses:
-		rewriter.responsesInput(gjson.GetBytes(body, "input"))
-		rewriter.responsesInput(gjson.GetBytes(body, "response.input"))
+		collector.responsesInput(gjson.GetBytes(body, "input"))
+		collector.responsesInput(gjson.GetBytes(body, "response.input"))
 	case ContentModerationProtocolGemini:
-		rewriter.geminiContents(gjson.GetBytes(body, "contents"))
+		collector.geminiContents(gjson.GetBytes(body, "contents"))
 	case PrivacyFilterProtocolEmbeddings:
-		rewriter.embeddingsInput(gjson.GetBytes(body, "input"))
+		collector.embeddingsInput(gjson.GetBytes(body, "input"))
 	default:
 		return privacyRewriteOutput{}, fmt.Errorf("unsupported protocol %q", protocol)
 	}
-	if rewriter.err != nil {
-		return privacyRewriteOutput{}, rewriter.err
+
+	counts := make(map[privacyfilter.Category]int)
+	texts := make([]string, len(collector.targets))
+	for i, target := range collector.targets {
+		texts[i] = target.value.Str
+		if !target.detect {
+			continue
+		}
+		matches := options.detect(texts[i])
+		if len(matches) == 0 {
+			continue
+		}
+		var result privacyfilter.Result
+		if options.vault != nil {
+			result = options.vault.RedactMatches(texts[i], matches)
+		} else {
+			result = privacyfilter.Replace(texts[i], matches, func(m privacyfilter.Match, _ string) string {
+				return privacyfilter.Placeholder(m.Category)
+			})
+		}
+		texts[i] = result.Text
+		for category, count := range result.Counts {
+			counts[category] += count
+		}
 	}
-	return rewriter.finish()
+	// Runs after every detection so a value found anywhere in the request is
+	// also replaced where it appears without the context that revealed it.
+	if options.vault != nil && options.vault.Len() > 0 {
+		for i, target := range collector.targets {
+			if target.jsonText {
+				texts[i], _ = options.vault.ReplaceKnownJSON(texts[i])
+			} else {
+				texts[i], _ = options.vault.ReplaceKnown(texts[i], target.detect)
+			}
+		}
+	}
+
+	patcher := newJSONPatcher(body)
+	for i, target := range collector.targets {
+		if texts[i] != target.value.Str {
+			patcher.set(target.value, texts[i])
+		}
+	}
+	rebuilt, err := patcher.apply()
+	if err != nil {
+		return privacyRewriteOutput{}, err
+	}
+	return privacyRewriteOutput{body: rebuilt, fields: patcher.count(), counts: counts}, nil
 }
 
-// text redacts one JSON string in place.
-func (r *privacyRewriter) text(value gjson.Result) {
-	if r.err != nil || value.Type != gjson.String || value.Str == "" {
-		return
-	}
-	result := r.redact(value.Str)
-	if !result.Changed {
+// jsonPatcher replaces string values in place, located by gjson offsets.
+type jsonPatcher struct {
+	body    []byte
+	patches []privacyPatch
+	err     error
+}
+
+func newJSONPatcher(body []byte) *jsonPatcher { return &jsonPatcher{body: body} }
+
+func (p *jsonPatcher) count() int { return len(p.patches) }
+
+func (p *jsonPatcher) set(value gjson.Result, text string) {
+	if p.err != nil {
 		return
 	}
 	end := value.Index + len(value.Raw)
-	if value.Index <= 0 || end > len(r.body) || string(r.body[value.Index:end]) != value.Raw {
-		r.err = fmt.Errorf("could not locate string value in request body")
+	if value.Index <= 0 || end > len(p.body) || string(p.body[value.Index:end]) != value.Raw {
+		p.err = fmt.Errorf("could not locate string value in JSON body")
 		return
 	}
-	encoded, err := encodePrivacyJSONString(result.Text)
+	encoded, err := encodePrivacyJSONString(text)
 	if err != nil {
-		r.err = err
+		p.err = err
 		return
 	}
-	r.patches = append(r.patches, privacyPatch{value.Index, end, encoded})
-	for category, count := range result.Counts {
-		r.counts[category] += count
+	p.patches = append(p.patches, privacyPatch{value.Index, end, encoded})
+}
+
+func (p *jsonPatcher) apply() ([]byte, error) {
+	if p.err != nil {
+		return nil, p.err
 	}
+	if len(p.patches) == 0 {
+		return p.body, nil
+	}
+	sort.Slice(p.patches, func(i, j int) bool { return p.patches[i].start < p.patches[j].start })
+	size := len(p.body)
+	for _, patch := range p.patches {
+		size += len(patch.replacement) - (patch.end - patch.start)
+	}
+	rebuilt := make([]byte, 0, size)
+	previous := 0
+	for _, patch := range p.patches {
+		if patch.start < previous {
+			return nil, fmt.Errorf("overlapping JSON patches")
+		}
+		rebuilt = append(rebuilt, p.body[previous:patch.start]...)
+		rebuilt = append(rebuilt, patch.replacement...)
+		previous = patch.end
+	}
+	rebuilt = append(rebuilt, p.body[previous:]...)
+	if !gjson.ValidBytes(rebuilt) {
+		return nil, fmt.Errorf("patching produced invalid JSON")
+	}
+	return rebuilt, nil
 }
 
 func encodePrivacyJSONString(text string) ([]byte, error) {
@@ -92,168 +189,150 @@ func encodePrivacyJSONString(text string) ([]byte, error) {
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(text); err != nil {
-		return nil, fmt.Errorf("encode redacted text: %w", err)
+		return nil, fmt.Errorf("encode JSON string: %w", err)
 	}
 	return bytes.TrimRight(buffer.Bytes(), "\n"), nil
 }
 
-func (r *privacyRewriter) finish() (privacyRewriteOutput, error) {
-	output := privacyRewriteOutput{body: r.body, fields: len(r.patches), counts: r.counts}
-	if len(r.patches) == 0 {
-		return output, nil
-	}
-	sort.Slice(r.patches, func(i, j int) bool { return r.patches[i].start < r.patches[j].start })
-
-	size := len(r.body)
-	for _, patch := range r.patches {
-		size += len(patch.replacement) - (patch.end - patch.start)
-	}
-	rebuilt := make([]byte, 0, size)
-	previous := 0
-	for _, patch := range r.patches {
-		if patch.start < previous {
-			return privacyRewriteOutput{}, fmt.Errorf("overlapping redaction patches")
-		}
-		rebuilt = append(rebuilt, r.body[previous:patch.start]...)
-		rebuilt = append(rebuilt, patch.replacement...)
-		previous = patch.end
-	}
-	rebuilt = append(rebuilt, r.body[previous:]...)
-	if !gjson.ValidBytes(rebuilt) {
-		return privacyRewriteOutput{}, fmt.Errorf("redaction produced invalid JSON")
-	}
-	output.body = rebuilt
-	return output, nil
-}
-
-func (r *privacyRewriter) anthropicMessages(messages gjson.Result) {
-	if !messages.IsArray() {
-		return
-	}
-	messages.ForEach(func(_, message gjson.Result) bool {
-		if message.Get("role").String() == "user" {
-			r.anthropicContent(message.Get("content"))
-		}
-		return r.err == nil
-	})
-}
-
-func (r *privacyRewriter) anthropicContent(content gjson.Result) {
-	if content.Type == gjson.String {
-		r.text(content)
-		return
-	}
-	if !content.IsArray() {
-		return
-	}
-	content.ForEach(func(_, block gjson.Result) bool {
-		switch block.Get("type").String() {
-		case "text":
-			r.text(block.Get("text"))
-		case "tool_result":
-			r.anthropicContent(block.Get("content"))
-		case "document":
-			if block.Get("source.type").String() == "text" {
-				r.text(block.Get("source.data"))
-			}
-		}
-		return r.err == nil
-	})
-}
-
-func (r *privacyRewriter) chatMessages(messages gjson.Result) {
-	if !messages.IsArray() {
-		return
-	}
-	messages.ForEach(func(_, message gjson.Result) bool {
-		switch message.Get("role").String() {
-		case "user", "tool", "function":
-			r.chatContent(message.Get("content"))
-		}
-		return r.err == nil
-	})
-}
-
-func (r *privacyRewriter) chatContent(content gjson.Result) {
-	if content.Type == gjson.String {
-		r.text(content)
-		return
-	}
-	if !content.IsArray() {
-		return
-	}
-	content.ForEach(func(_, part gjson.Result) bool {
-		if partType := part.Get("type").String(); partType == "text" || partType == "input_text" {
-			r.text(part.Get("text"))
-		}
-		return r.err == nil
-	})
-}
-
-func (r *privacyRewriter) responsesInput(input gjson.Result) {
-	if input.Type == gjson.String {
-		r.text(input)
-		return
-	}
-	if !input.IsArray() {
-		return
-	}
-	input.ForEach(func(_, item gjson.Result) bool {
-		itemType := item.Get("type").String()
-		switch {
-		case strings.HasSuffix(itemType, "_output"):
-			r.chatContent(item.Get("output"))
-		case item.Get("role").String() == "user":
-			r.chatContent(item.Get("content"))
-		}
-		return r.err == nil
-	})
-}
-
-func (r *privacyRewriter) geminiContents(contents gjson.Result) {
-	if !contents.IsArray() {
-		return
-	}
-	contents.ForEach(func(_, content gjson.Result) bool {
-		if content.Get("role").String() == "model" {
-			return true
-		}
-		content.Get("parts").ForEach(func(_, part gjson.Result) bool {
-			if !part.Get("thought").Bool() {
-				r.text(part.Get("text"))
-			}
-			r.stringLeaves(part.Get("functionResponse.response"))
-			return r.err == nil
-		})
-		return r.err == nil
-	})
-}
-
-// stringLeaves redacts every string value in a tool's structured response.
-func (r *privacyRewriter) stringLeaves(value gjson.Result) {
+// stringLeaves visits every string value of a structured value.
+func (c *privacyCollector) stringLeaves(value gjson.Result, detect bool) {
 	if value.Type == gjson.String {
-		r.text(value)
+		c.add(value, detect, false)
 		return
 	}
 	if !value.IsObject() && !value.IsArray() {
 		return
 	}
 	value.ForEach(func(_, child gjson.Result) bool {
-		r.stringLeaves(child)
-		return r.err == nil
+		c.stringLeaves(child, detect)
+		return true
 	})
 }
 
-func (r *privacyRewriter) embeddingsInput(input gjson.Result) {
-	if input.Type == gjson.String {
-		r.text(input)
+func (c *privacyCollector) anthropicMessages(messages gjson.Result) {
+	messages.ForEach(func(_, message gjson.Result) bool {
+		switch message.Get("role").String() {
+		case "user":
+			c.anthropicContent(message.Get("content"), true)
+		case "assistant":
+			if c.assistant {
+				c.anthropicContent(message.Get("content"), false)
+			}
+		}
+		return true
+	})
+}
+
+func (c *privacyCollector) anthropicContent(content gjson.Result, detect bool) {
+	if content.Type == gjson.String {
+		c.add(content, detect, false)
 		return
 	}
-	if !input.IsArray() {
+	content.ForEach(func(_, block gjson.Result) bool {
+		switch block.Get("type").String() {
+		case "text":
+			c.add(block.Get("text"), detect, false)
+		case "tool_result":
+			c.anthropicContent(block.Get("content"), detect)
+		case "document":
+			if block.Get("source.type").String() == "text" {
+				c.add(block.Get("source.data"), detect, false)
+			}
+		case "tool_use", "server_tool_use":
+			if !detect {
+				c.stringLeaves(block.Get("input"), false)
+			}
+		}
+		return true
+	})
+}
+
+func (c *privacyCollector) chatMessages(messages gjson.Result) {
+	messages.ForEach(func(_, message gjson.Result) bool {
+		switch message.Get("role").String() {
+		case "user", "tool", "function":
+			c.chatContent(message.Get("content"), true)
+		case "assistant":
+			if c.assistant {
+				c.chatContent(message.Get("content"), false)
+				message.Get("tool_calls").ForEach(func(_, call gjson.Result) bool {
+					c.add(call.Get("function.arguments"), false, true)
+					return true
+				})
+				c.add(message.Get("function_call.arguments"), false, true)
+			}
+		}
+		return true
+	})
+}
+
+func (c *privacyCollector) chatContent(content gjson.Result, detect bool) {
+	if content.Type == gjson.String {
+		c.add(content, detect, false)
+		return
+	}
+	content.ForEach(func(_, part gjson.Result) bool {
+		switch part.Get("type").String() {
+		case "text", "input_text", "output_text":
+			c.add(part.Get("text"), detect, false)
+		}
+		return true
+	})
+}
+
+func (c *privacyCollector) responsesInput(input gjson.Result) {
+	if input.Type == gjson.String {
+		c.add(input, true, false)
 		return
 	}
 	input.ForEach(func(_, item gjson.Result) bool {
-		r.text(item)
-		return r.err == nil
+		itemType := item.Get("type").String()
+		switch {
+		case strings.HasSuffix(itemType, "_output"):
+			c.chatContent(item.Get("output"), true)
+		case item.Get("role").String() == "user":
+			c.chatContent(item.Get("content"), true)
+		case !c.assistant:
+		case item.Get("role").String() == "assistant":
+			c.chatContent(item.Get("content"), false)
+		case itemType == "function_call":
+			c.add(item.Get("arguments"), false, true)
+		case itemType == "custom_tool_call":
+			c.add(item.Get("input"), false, false)
+		}
+		return true
+	})
+}
+
+func (c *privacyCollector) geminiContents(contents gjson.Result) {
+	contents.ForEach(func(_, content gjson.Result) bool {
+		detect := content.Get("role").String() != "model"
+		if !detect && !c.assistant {
+			return true
+		}
+		content.Get("parts").ForEach(func(_, part gjson.Result) bool {
+			if part.Get("thought").Bool() {
+				return true
+			}
+			c.add(part.Get("text"), detect, false)
+			if detect {
+				c.stringLeaves(part.Get("functionResponse.response"), true)
+			} else {
+				c.stringLeaves(part.Get("functionCall.args"), false)
+			}
+			return true
+		})
+		return true
+	})
+}
+
+func (c *privacyCollector) embeddingsInput(input gjson.Result) {
+	if input.Type == gjson.String {
+		c.add(input, true, false)
+		return
+	}
+	input.ForEach(func(_, item gjson.Result) bool {
+		c.add(item, true, false)
+		return true
 	})
 }

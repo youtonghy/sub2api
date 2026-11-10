@@ -240,6 +240,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		return
 	}
 	body = filteredBody
+	defer finishPrivacyRestore(c)
 
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolAnthropicMessages, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.anthropicSecurityAuditError(c, decision)
@@ -2222,6 +2223,7 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 		return
 	}
 	body = filteredBody
+	defer finishPrivacyRestore(c)
 
 	// 获取订阅信息（可能为nil）
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)

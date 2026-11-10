@@ -113,6 +113,7 @@ func (h *GatewayHandler) GeminiCachedContentsCreate(c *gin.Context) {
 		return
 	}
 	body = filteredBody
+	defer finishPrivacyRestore(c)
 	req, err := service.ParseGeminiCachedContentCreateRequest(body, svc.Now(), svc.MaxTTL())
 	if err != nil {
 		googleError(c, http.StatusBadRequest, err.Error())

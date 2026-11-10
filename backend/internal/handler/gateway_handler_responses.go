@@ -128,6 +128,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 	body = filteredBody
+	defer finishPrivacyRestore(c)
 
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIResponses, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.responsesSecurityAuditError(c, decision)

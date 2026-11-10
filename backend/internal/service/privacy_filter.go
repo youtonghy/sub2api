@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/json"
@@ -9,10 +11,12 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/privacyfilter"
 	"github.com/dgraph-io/ristretto"
@@ -22,6 +26,9 @@ const (
 	PrivacyFilterModeOff     = "off"
 	PrivacyFilterModeObserve = "observe"
 	PrivacyFilterModeRedact  = "redact"
+	// PrivacyFilterModeRestore redacts with restorable placeholders and puts the
+	// original values back into responses before they reach the client.
+	PrivacyFilterModeRestore = "restore"
 
 	// PrivacyFilterProtocolEmbeddings identifies /v1/embeddings bodies.
 	PrivacyFilterProtocolEmbeddings = "openai_embeddings"
@@ -47,8 +54,12 @@ type PrivacyFilterConfig struct {
 // PrivacyFilterInput describes one request body to process.
 type PrivacyFilterInput struct {
 	GroupID  *int64
+	APIKeyID int64
 	Protocol string
 	Body     []byte
+	// Vault carries placeholders across the turns of one WebSocket connection.
+	// When nil, restore mode creates one for this request.
+	Vault *privacyfilter.Vault
 }
 
 // PrivacyFilterResult carries the body to forward and category counts. It never
@@ -59,6 +70,9 @@ type PrivacyFilterResult struct {
 	Changed bool
 	Fields  int
 	Counts  map[string]int
+	// Vault is set in restore mode. It holds the original values for this
+	// request and must never be logged or stored.
+	Vault *privacyfilter.Vault
 }
 
 // PrivacyFilterStatus reports counters for this process since it started.
@@ -68,6 +82,8 @@ type PrivacyFilterStatus struct {
 	RedactedRequests int64            `json:"redacted_requests"`
 	FailedRequests   int64            `json:"failed_requests"`
 	Fields           int64            `json:"fields"`
+	RestoredTokens   int64            `json:"restored_tokens"`
+	UnresolvedTokens int64            `json:"unresolved_tokens"`
 	CategoryCounts   map[string]int64 `json:"category_counts"`
 	StartedAt        time.Time        `json:"started_at"`
 }
@@ -80,16 +96,18 @@ type privacyFilterSnapshot struct {
 }
 
 type privacyFilterCacheEntry struct {
-	text    string
-	changed bool
-	counts  map[privacyfilter.Category]int
+	matches []privacyfilter.Match
 }
 
 // PrivacyFilterService applies irreversible redaction for the groups an
 // administrator has opted in. Everything is off by default.
 type PrivacyFilterService struct {
 	settingRepo SettingRepository
+	cfg         *config.Config
 	detector    func() (*privacyfilter.Detector, error)
+
+	fallbackKeyOnce sync.Once
+	fallbackKey     []byte
 
 	snapshot  atomic.Pointer[privacyFilterSnapshot]
 	refreshMu sync.Mutex
@@ -98,19 +116,21 @@ type PrivacyFilterService struct {
 	cache     *ristretto.Cache
 
 	scanned, hit, redacted, failed, fields atomic.Int64
+	restoredTokens, unresolvedTokens       atomic.Int64
 	categoryCounts                         map[privacyfilter.Category]*atomic.Int64
 	startedAt                              time.Time
 }
 
 // NewPrivacyFilterService creates the service. Rules are compiled on first use,
 // so deployments that keep the feature off pay nothing.
-func NewPrivacyFilterService(settingRepo SettingRepository) *PrivacyFilterService {
+func NewPrivacyFilterService(settingRepo SettingRepository, cfg *config.Config) *PrivacyFilterService {
 	counts := make(map[privacyfilter.Category]*atomic.Int64)
 	for _, category := range privacyfilter.AllCategories() {
 		counts[category] = new(atomic.Int64)
 	}
 	return &PrivacyFilterService{
 		settingRepo:    settingRepo,
+		cfg:            cfg,
 		detector:       privacyfilter.Shared,
 		categoryCounts: counts,
 		startedAt:      time.Now(),
@@ -154,7 +174,7 @@ func parsePrivacyFilterConfig(raw string) (PrivacyFilterConfig, error) {
 
 func validatePrivacyFilterConfig(config PrivacyFilterConfig) error {
 	switch config.Mode {
-	case PrivacyFilterModeOff, PrivacyFilterModeObserve, PrivacyFilterModeRedact:
+	case PrivacyFilterModeOff, PrivacyFilterModeObserve, PrivacyFilterModeRedact, PrivacyFilterModeRestore:
 	default:
 		return infraerrors.BadRequest("INVALID_PRIVACY_FILTER_MODE", "隐私过滤模式无效")
 	}
@@ -236,6 +256,8 @@ func (s *PrivacyFilterService) GetStatus() PrivacyFilterStatus {
 		RedactedRequests: s.redacted.Load(),
 		FailedRequests:   s.failed.Load(),
 		Fields:           s.fields.Load(),
+		RestoredTokens:   s.restoredTokens.Load(),
+		UnresolvedTokens: s.unresolvedTokens.Load(),
 		CategoryCounts:   counts,
 		StartedAt:        s.startedAt,
 	}
@@ -296,7 +318,16 @@ func (s *PrivacyFilterService) Apply(ctx context.Context, input PrivacyFilterInp
 	result.Mode = snapshot.config.Mode
 	s.scanned.Add(1)
 
-	rewritten, err := s.rewrite(input.Protocol, input.Body, snapshot.categories)
+	var vault *privacyfilter.Vault
+	if snapshot.config.Mode == PrivacyFilterModeRestore {
+		vault = input.Vault
+		if vault == nil {
+			vault = privacyfilter.NewVault(s.tokenKey(input.APIKeyID))
+		}
+		result.Vault = vault
+	}
+
+	rewritten, err := s.rewrite(input.Protocol, input.Body, snapshot.categories, vault)
 	if err != nil {
 		s.failed.Add(1)
 		if snapshot.config.Mode == PrivacyFilterModeObserve {
@@ -307,6 +338,12 @@ func (s *PrivacyFilterService) Apply(ctx context.Context, input PrivacyFilterInp
 	}
 
 	result.Fields = rewritten.fields
+	if snapshot.config.Mode != PrivacyFilterModeObserve && rewritten.fields > 0 {
+		// Restore mode also swaps known values in history that detection
+		// alone would not count.
+		result.Body = rewritten.body
+		result.Changed = true
+	}
 	if len(rewritten.counts) == 0 {
 		return result, nil
 	}
@@ -319,9 +356,7 @@ func (s *PrivacyFilterService) Apply(ctx context.Context, input PrivacyFilterInp
 	}
 	s.hit.Add(1)
 	s.fields.Add(int64(rewritten.fields))
-	if snapshot.config.Mode == PrivacyFilterModeRedact {
-		result.Body = rewritten.body
-		result.Changed = true
+	if result.Changed {
 		s.redacted.Add(1)
 	}
 	return result, nil
@@ -329,7 +364,7 @@ func (s *PrivacyFilterService) Apply(ctx context.Context, input PrivacyFilterInp
 
 // rewrite converts panics into errors: a detector bug must surface through the
 // fail-closed path instead of taking the request down unaccounted for.
-func (s *PrivacyFilterService) rewrite(protocol string, body []byte, categories privacyfilter.CategorySet) (out privacyRewriteOutput, err error) {
+func (s *PrivacyFilterService) rewrite(protocol string, body []byte, categories privacyfilter.CategorySet, vault *privacyfilter.Vault) (out privacyRewriteOutput, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("panic while filtering: %v", recovered)
@@ -339,9 +374,46 @@ func (s *PrivacyFilterService) rewrite(protocol string, body []byte, categories 
 	if err != nil {
 		return privacyRewriteOutput{}, err
 	}
-	return rewritePrivacyBody(protocol, body, func(text string) privacyfilter.Result {
-		return s.redactCached(detector, text, categories)
+	return rewritePrivacyBody(protocol, body, privacyRewriteOptions{
+		detect: func(text string) []privacyfilter.Match { return s.detectCached(detector, text, categories) },
+		vault:  vault,
 	})
+}
+
+// tokenKey derives the placeholder key for an API key from the persisted JWT
+// secret, so placeholders survive restarts and differ between API keys.
+func (s *PrivacyFilterService) tokenKey(apiKeyID int64) []byte {
+	secret := ""
+	if s.cfg != nil {
+		secret = s.cfg.JWT.Secret
+	}
+	var base []byte
+	if secret != "" {
+		mac := hmac.New(sha256.New, []byte(secret))
+		mac.Write([]byte("sub2api/privacy-filter/placeholder/v1"))
+		base = mac.Sum(nil)
+	} else {
+		s.fallbackKeyOnce.Do(func() {
+			s.fallbackKey = make([]byte, 32)
+			if _, err := rand.Read(s.fallbackKey); err != nil {
+				panic(fmt.Sprintf("privacy filter key: %v", err))
+			}
+		})
+		base = s.fallbackKey
+	}
+	mac := hmac.New(sha256.New, base)
+	mac.Write([]byte(strconv.FormatInt(apiKeyID, 10)))
+	return mac.Sum(nil)
+}
+
+// RecordRestore adds a finished request's restore counts to the status.
+func (s *PrivacyFilterService) RecordRestore(vault *privacyfilter.Vault) {
+	if s == nil || vault == nil {
+		return
+	}
+	restored, unresolved := vault.Stats()
+	s.restoredTokens.Add(restored)
+	s.unresolvedTokens.Add(unresolved)
 }
 
 func (s *PrivacyFilterService) blockCache() *ristretto.Cache {
@@ -360,16 +432,16 @@ func (s *PrivacyFilterService) blockCache() *ristretto.Cache {
 	return s.cache
 }
 
-// redactCached memoises large blocks. Clients resend the whole conversation on
-// every turn, so most text was already scanned on a previous request. Only the
-// redacted output is held; a cached entry never contains an original value.
-func (s *PrivacyFilterService) redactCached(detector *privacyfilter.Detector, text string, categories privacyfilter.CategorySet) privacyfilter.Result {
+// detectCached memoises detections for large blocks. Clients resend the whole
+// conversation on every turn, so most text was already scanned on a previous
+// request. Only offsets and categories are cached, never text.
+func (s *PrivacyFilterService) detectCached(detector *privacyfilter.Detector, text string, categories privacyfilter.CategorySet) []privacyfilter.Match {
 	if len(text) < privacyFilterCacheMinBytes {
-		return detector.Redact(text, categories)
+		return detector.Detect(text, categories)
 	}
 	cache := s.blockCache()
 	if cache == nil {
-		return detector.Redact(text, categories)
+		return detector.Detect(text, categories)
 	}
 	var prefix [2]byte
 	binary.LittleEndian.PutUint16(prefix[:], uint16(categories))
@@ -380,19 +452,10 @@ func (s *PrivacyFilterService) redactCached(detector *privacyfilter.Detector, te
 
 	if value, found := cache.Get(key); found {
 		if entry, ok := value.(privacyFilterCacheEntry); ok {
-			if !entry.changed {
-				return privacyfilter.Result{Text: text}
-			}
-			return privacyfilter.Result{Text: entry.text, Changed: true, Counts: entry.counts}
+			return entry.matches
 		}
 	}
-	result := detector.Redact(text, categories)
-	entry := privacyFilterCacheEntry{changed: result.Changed, counts: result.Counts}
-	cost := int64(128)
-	if result.Changed {
-		entry.text = result.Text
-		cost += int64(len(result.Text))
-	}
-	cache.Set(key, entry, cost)
-	return result
+	matches := detector.Detect(text, categories)
+	cache.Set(key, privacyFilterCacheEntry{matches: matches}, int64(64+24*len(matches)))
+	return matches
 }

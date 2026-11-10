@@ -10,6 +10,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 type privacyHandlerSettingRepo struct {
@@ -46,7 +47,7 @@ func TestRunPrivacyFilter(t *testing.T) {
 		require.Equal(t, body, out)
 	})
 	t.Run("redacts for an opted-in group", func(t *testing.T) {
-		svc := service.NewPrivacyFilterService(&privacyHandlerSettingRepo{})
+		svc := service.NewPrivacyFilterService(&privacyHandlerSettingRepo{}, nil)
 		_, err := svc.UpdateConfig(context.Background(), service.PrivacyFilterConfig{Mode: service.PrivacyFilterModeRedact, GroupIDs: []int64{7}, Categories: []string{"credential"}})
 		require.NoError(t, err)
 		out, err := runPrivacyFilter(privacyTestContext(), nil, svc, apiKey, protocol, body)
@@ -54,8 +55,39 @@ func TestRunPrivacyFilter(t *testing.T) {
 		require.NotContains(t, string(out), "abc12345")
 	})
 	t.Run("surfaces failure so the caller can reject", func(t *testing.T) {
-		svc := service.NewPrivacyFilterService(&privacyHandlerSettingRepo{err: errors.New("db down")})
+		svc := service.NewPrivacyFilterService(&privacyHandlerSettingRepo{err: errors.New("db down")}, nil)
 		_, err := runPrivacyFilter(privacyTestContext(), nil, svc, apiKey, protocol, body)
 		require.ErrorIs(t, err, service.ErrPrivacyFilterFailed)
 	})
+}
+
+func TestRunPrivacyFilterRestoreModeInstallsWriter(t *testing.T) {
+	group := int64(7)
+	apiKey := &service.APIKey{ID: 3, GroupID: &group}
+	svc := service.NewPrivacyFilterService(&privacyHandlerSettingRepo{}, nil)
+	_, err := svc.UpdateConfig(context.Background(), service.PrivacyFilterConfig{Mode: service.PrivacyFilterModeRestore, GroupIDs: []int64{7}, Categories: []string{"credential"}})
+	require.NoError(t, err)
+
+	recorder := httptest.NewRecorder()
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	original := c.Writer
+
+	out, err := runPrivacyFilter(c, nil, svc, apiKey, service.ContentModerationProtocolAnthropicMessages,
+		[]byte(`{"messages":[{"role":"user","content":"password: abc12345"}]}`))
+	require.NoError(t, err)
+	require.NotContains(t, string(out), "abc12345")
+	require.NotEqual(t, original, c.Writer)
+
+	token := gjson.GetBytes(out, "messages.0.content").String()[len("password: "):]
+	c.Header("Content-Type", "application/json")
+	c.Status(http.StatusOK)
+	_, err = c.Writer.Write([]byte(`{"content":[{"type":"text","text":"got ` + token + `"}]}`))
+	require.NoError(t, err)
+	finishPrivacyRestore(c)
+
+	require.Equal(t, original, c.Writer)
+	require.Equal(t, "got abc12345", gjson.Get(recorder.Body.String(), "content.0.text").String())
+	require.EqualValues(t, 1, svc.GetStatus().RestoredTokens)
 }

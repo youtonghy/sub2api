@@ -265,6 +265,9 @@ type OpenAIWSIngressHooks struct {
 	// RewriteClientPayload may replace a client frame's content before any other
 	// hook observes it. An error closes the session without forwarding the frame.
 	RewriteClientPayload func(payload []byte) ([]byte, error)
+	// RestoreServerPayload may expand one upstream frame into the frames the
+	// client should receive, for example to restore privacy placeholders.
+	RestoreServerPayload func(payload []byte) [][]byte
 	BeforeRequest        func(turn int, payload []byte, originalModel string) error
 	// MapRequestModel resolves the current turn's client model to the model
 	// that must be written into the upstream response.create frame.

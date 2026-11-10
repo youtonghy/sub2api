@@ -29,6 +29,7 @@ type openAIWSClientFrameConn struct {
 	// model identifier they supplied for the current turn.
 	restoreResponseModel func([]byte) []byte
 	restoreToolNames     func([]byte) []byte
+	restorePrivacy       func([]byte) [][]byte
 }
 
 // openAIWSPolicyEnforcingFrameConn wraps a client-side FrameConn and runs
@@ -650,6 +651,14 @@ func (c *openAIWSClientFrameConn) WriteFrame(ctx context.Context, msgType coderw
 		if c.restoreToolNames != nil {
 			payload = c.restoreToolNames(payload)
 		}
+		if c.restorePrivacy != nil {
+			for _, frame := range c.restorePrivacy(payload) {
+				if err := c.conn.Write(ctx, msgType, frame); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
 	}
 	return c.conn.Write(ctx, msgType, payload)
 }
@@ -985,6 +994,9 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 		restoreToolNames: func(payload []byte) []byte {
 			return restoreCodexToolNamesFromContext(c, payload)
 		},
+	}
+	if hooks != nil && hooks.RestoreServerPayload != nil {
+		clientFrameConn.restorePrivacy = hooks.RestoreServerPayload
 	}
 	policyClientConn := &openAIWSPolicyEnforcingFrameConn{
 		inner: clientFrameConn,

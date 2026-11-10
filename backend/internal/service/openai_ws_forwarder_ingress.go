@@ -503,6 +503,14 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		writeCtx, cancel := newOpenAIWSDownstreamWriteContext(ctx, hooks, s.openAIWSWriteTimeout())
 		defer cancel()
 		message = restoreCodexToolNamesFromContext(c, message)
+		if hooks != nil && hooks.RestoreServerPayload != nil {
+			for _, frame := range hooks.RestoreServerPayload(message) {
+				if err := clientConn.Write(writeCtx, coderws.MessageText, frame); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
 		return clientConn.Write(writeCtx, coderws.MessageText, message)
 	}
 

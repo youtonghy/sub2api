@@ -130,13 +130,19 @@ func Shared() (*Detector, error) {
 // Placeholder returns the replacement text used for a category.
 func Placeholder(c Category) string { return "[REDACTED:" + string(c) + "]" }
 
-// Redact replaces every detection whose category is enabled.
-func (d *Detector) Redact(text string, enabled CategorySet) Result {
-	result := Result{Text: text}
-	if text == "" || enabled == 0 {
-		return result
-	}
+// Match is one merged detection. Offsets are UTF-8 byte offsets into the text
+// that was scanned; a Match never carries the matched value itself.
+type Match struct {
+	Start, End int
+	Category   Category
+}
 
+// Detect returns the merged detections for the enabled categories, ordered by
+// offset and never overlapping.
+func (d *Detector) Detect(text string, enabled CategorySet) []Match {
+	if text == "" || enabled == 0 {
+		return nil
+	}
 	var spans []span
 	if enabled.Has(CategoryPrivateKey) {
 		spans = appendPrivateKeySpans(spans, text)
@@ -163,24 +169,40 @@ func (d *Detector) Redact(text string, enabled CategorySet) Result {
 	if enabled.Has(CategoryIP) {
 		spans = appendIPSpans(spans, text)
 	}
-
 	merged := mergeSpans(spans)
 	if len(merged) == 0 {
+		return nil
+	}
+	matches := make([]Match, len(merged))
+	for i, s := range merged {
+		matches[i] = Match{Start: s.start, End: s.end, Category: s.category}
+	}
+	return matches
+}
+
+// Redact replaces every detection with its category placeholder.
+func (d *Detector) Redact(text string, enabled CategorySet) Result {
+	return Replace(text, d.Detect(text, enabled), func(m Match, _ string) string { return Placeholder(m.Category) })
+}
+
+// Replace rebuilds text with each match swapped for replacement(match, value).
+// matches must come from Detect on the same text.
+func Replace(text string, matches []Match, replacement func(Match, string) string) Result {
+	result := Result{Text: text}
+	if len(matches) == 0 {
 		return result
 	}
-
 	var b strings.Builder
 	b.Grow(len(text))
 	counts := make(map[Category]int, 2)
 	previous := 0
-	for _, s := range merged {
-		b.WriteString(text[previous:s.start])
-		b.WriteString(Placeholder(s.category))
-		previous = s.end
-		counts[s.category]++
+	for _, m := range matches {
+		b.WriteString(text[previous:m.Start])
+		b.WriteString(replacement(m, text[m.Start:m.End]))
+		previous = m.End
+		counts[m.Category]++
 	}
 	b.WriteString(text[previous:])
-
 	result.Text = b.String()
 	result.Changed = true
 	result.Counts = counts
