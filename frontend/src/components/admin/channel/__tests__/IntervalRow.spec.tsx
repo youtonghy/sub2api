@@ -32,3 +32,28 @@ describe('pricing interval token bounds', () => {
     expect(onUpdate.mock.calls[1]?.[0]).toMatchObject({ max_tokens: max })
   })
 })
+
+describe('pricing interval cache-write lifetimes', () => {
+  it('shows 30m and 12h cache-write prices for OpenAI instead of 5m and 1h', () => {
+    const onUpdate = vi.fn()
+    const { container } = render(<IntervalRow interval={interval} mode="token" platform="openai" onUpdate={onUpdate} />)
+    const text = container.textContent ?? ''
+    expect(text).toContain('admin.channels.form.cacheWrite30mPrice')
+    expect(text).toContain('admin.channels.form.cacheWrite12hPriceShort')
+    expect(text).not.toContain('admin.channels.form.cacheWrite5mPriceShort')
+    expect(text).not.toContain('admin.channels.form.cacheWrite1hPriceShort')
+    const input = [...container.querySelectorAll('label')]
+      .find((label) => label.textContent?.includes('cacheWrite12hPriceShort'))
+      ?.querySelector('input')
+    fireEvent.change(input!, { target: { value: '1.625' } })
+    expect(onUpdate.mock.calls[0]?.[0]).toMatchObject({ cache_write_12h_price: '1.625' })
+  })
+
+  it('keeps 5m and 1h cache-write prices for other platforms', () => {
+    const { container } = render(<IntervalRow interval={interval} mode="token" platform="anthropic" />)
+    const text = container.textContent ?? ''
+    expect(text).toContain('admin.channels.form.cacheWrite5mPriceShort')
+    expect(text).toContain('admin.channels.form.cacheWrite1hPriceShort')
+    expect(text).not.toContain('cacheWrite12hPriceShort')
+  })
+})

@@ -193,6 +193,19 @@ describe('admin UsageTable tooltip', () => {
     } as DOMRect)
   })
 
+  it('shows the two OpenAI cache-write buckets without Anthropic lifetime labels', async () => {
+    const row = { ...baseImageRow, image_count: 0, billing_mode: 'token', cache_creation_tokens: 2399, cache_creation_30m_tokens: 9, cache_creation_12h_tokens: 2390 }
+    mountTable([row], [], ['tokens'])
+    fireEvent.mouseEnter(screen.getByTestId('token-tooltip-trigger'))
+    await flushPromises()
+    const text = screen.getByTestId('usage-token-tooltip').textContent ?? ''
+    expect(text).toContain('30m')
+    expect(text).toContain('12h')
+    expect(text).toContain('2,390')
+    expect(text).not.toContain('5m')
+    expect(text).not.toMatch(/\b1h\b/)
+  })
+
   it('shows output TPS in the latency cell using total duration', () => {
     const row = { ...baseImageRow, image_count: 0, billing_mode: 'token', output_tokens: 1000, duration_ms: 20_000, first_token_ms: 10_000 }
     const { container } = mountTable(

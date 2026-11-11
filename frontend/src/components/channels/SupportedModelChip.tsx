@@ -193,6 +193,14 @@ export default function SupportedModelChip({
                           scale={perMillionScale}
                         />
                       )}
+                      {pricing.cache_write_12h_price != null && (
+                        <PricingRow
+                          label={t(prefixKey('cacheWrite12hPrice'))}
+                          value={pricing.cache_write_12h_price}
+                          unit={t(prefixKey('unitPerMillion'))}
+                          scale={perMillionScale}
+                        />
+                      )}
                       <PricingRow
                         label={t(prefixKey('cacheReadPrice'))}
                         value={pricing.cache_read_price}

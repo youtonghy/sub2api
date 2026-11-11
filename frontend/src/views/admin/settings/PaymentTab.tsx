@@ -20,6 +20,7 @@ import { useI18n } from '@/i18n/useI18n'
 import { useAppStore } from '@/stores'
 import type { ProviderInstance } from '@/types/payment'
 import { extractI18nErrorMessage } from '@/utils/apiError'
+import { formatBalanceRechargeMultiplier } from '@/utils/rechargeBonus'
 import { useSettings } from './settingsContext'
 
 type ProviderEnablementCandidate = Pick<ProviderInstance, 'id' | 'provider_key' | 'supported_types' | 'enabled' | 'name'>
@@ -363,15 +364,15 @@ export default function PaymentTab() {
                     {t('admin.settings.payment.balanceRechargeMultiplierHint')}
                     <br />
                     {t('admin.settings.payment.balanceRechargePreview', {
-                      usd: (Number(form.payment_balance_recharge_multiplier) || 1).toFixed(2)
+                      usd: formatBalanceRechargeMultiplier(Number(form.payment_balance_recharge_multiplier) || 1)
                     })}
                   </>
                 }
               >
                 <input
                   type="number"
-                  step="0.01"
-                  min="0.01"
+                  step="0.000001"
+                  min="0.000001"
                   className={s.input}
                   value={form.payment_balance_recharge_multiplier || ''}
                   onChange={(e) => updateForm({ payment_balance_recharge_multiplier: parseFloat(e.target.value) || 1 })}

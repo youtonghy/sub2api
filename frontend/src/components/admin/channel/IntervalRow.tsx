@@ -16,6 +16,7 @@ import styles from './IntervalRow.module.css'
 export interface IntervalRowProps {
   interval: IntervalFormEntry
   mode: BillingMode
+  platform?: string
   enableMultipliers?: boolean
   onUpdate?: (interval: IntervalFormEntry) => void
   onRemove?: () => void
@@ -36,8 +37,9 @@ function toIntOrNull(val: string): number | null {
 
 const isBlank = (value: unknown) => value == null || value === ''
 
-export default function IntervalRow({ interval, mode, enableMultipliers = false, onUpdate, onRemove }: IntervalRowProps) {
+export default function IntervalRow({ interval, mode, platform, enableMultipliers = false, onUpdate, onRemove }: IntervalRowProps) {
   const { t } = useI18n()
+  const isOpenAI = platform === 'openai'
 
   // 检测所有价格字段是否都为空
   const isEmpty =
@@ -45,6 +47,7 @@ export default function IntervalRow({ interval, mode, enableMultipliers = false,
     isBlank(interval.output_price) &&
     isBlank(interval.cache_write_price) &&
     isBlank(interval.cache_write_1h_price) &&
+    isBlank(interval.cache_write_12h_price) &&
     isBlank(interval.cache_read_price) &&
     isBlank(interval.input_multiplier) &&
     isBlank(interval.output_multiplier) &&
@@ -96,8 +99,15 @@ export default function IntervalRow({ interval, mode, enableMultipliers = false,
           {field(maxLabel, 'max_tokens', { min: '0', placeholder: '∞', parse: toIntOrNull })}
           {field(<>{t('admin.channels.form.inputPrice')} {star} {unit('$/M')}</>, 'input_price', { step: 'any', min: '0' })}
           {field(<>{t('admin.channels.form.outputPrice')} {star} {unit('$/M')}</>, 'output_price', { step: 'any', min: '0' })}
-          {field(<>{t('admin.channels.form.cacheWrite5mPriceShort')} {unit('$/M')}</>, 'cache_write_price', { step: 'any', min: '0' })}
-          {field(<>{t('admin.channels.form.cacheWrite1hPriceShort')} {unit('$/M')}</>, 'cache_write_1h_price', { step: 'any', min: '0' })}
+          {field(
+            <>{t(isOpenAI ? 'admin.channels.form.cacheWrite30mPrice' : 'admin.channels.form.cacheWrite5mPriceShort')} {unit('$/M')}</>,
+            'cache_write_price',
+            { step: 'any', min: '0' }
+          )}
+          {/* OpenAI 的缓存写入分 30 分钟与 12 小时两档，其他平台沿用 5 分钟与 1 小时 */}
+          {isOpenAI
+            ? field(<>{t('admin.channels.form.cacheWrite12hPriceShort')} {unit('$/M')}</>, 'cache_write_12h_price', { step: 'any', min: '0' })
+            : field(<>{t('admin.channels.form.cacheWrite1hPriceShort')} {unit('$/M')}</>, 'cache_write_1h_price', { step: 'any', min: '0' })}
           {field(<>{t('admin.channels.form.cacheReadPriceShort')} {unit('$/M')}</>, 'cache_read_price', { step: 'any', min: '0' })}
           {enableMultipliers && (
             <>

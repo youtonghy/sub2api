@@ -33,6 +33,8 @@ type AccountModelStatusItem = {
 
 const scopeAliases: Record<string, string> = {
   // Claude 系列
+  'claude-fable-5-2': 'CFable52',
+  'claude-mythos-5-2': 'CMythos52',
   'claude-fable-5-1': 'CFable51',
   'claude-fable-5': 'CFable5',
   'claude-opus-4-6': 'COpus46',

@@ -433,6 +433,11 @@ export default function UsageTable({
                         1h
                       </Badge>
                     ) : null}
+                    {(row.cache_creation_12h_tokens ?? 0) > 0 ? (
+                      <Badge tone="warning" size="sm">
+                        12h
+                      </Badge>
+                    ) : null}
                     {row.cache_ttl_overridden ? (
                       <Badge tone="danger" size="sm" title={t('usage.cacheTtlOverriddenHint')}>
                         R
@@ -564,8 +569,11 @@ export default function UsageTable({
                 : null}
               {hasImageOutputTokens(d) ? tooltipRow(t('usage.imageOutputTokens'), d.image_output_tokens.toLocaleString()) : null}
               {d.cache_creation_tokens > 0 ? (
-                d.cache_creation_5m_tokens > 0 || d.cache_creation_1h_tokens > 0 ? (
-                  // 有 5m/1h 明细时，展开显示
+                d.cache_creation_5m_tokens > 0 ||
+                d.cache_creation_1h_tokens > 0 ||
+                (d.cache_creation_30m_tokens ?? 0) > 0 ||
+                (d.cache_creation_12h_tokens ?? 0) > 0 ? (
+                  // 只展开上游实际报告的缓存时长明细（Anthropic 5m/1h，OpenAI 30m/12h）
                   <>
                     {d.cache_creation_5m_tokens > 0
                       ? tooltipRow(
@@ -591,6 +599,23 @@ export default function UsageTable({
                           '1h'
                         )
                       : null}
+                    {[
+                      { ttl: '30m', tokens: d.cache_creation_30m_tokens ?? 0 },
+                      { ttl: '12h', tokens: d.cache_creation_12h_tokens ?? 0 }
+                    ].map((bucket) =>
+                      bucket.tokens > 0
+                        ? tooltipRow(
+                            <>
+                              {t('admin.usage.cacheCreationTokens')}
+                              <Badge tone="warning" size="sm">
+                                {bucket.ttl}
+                              </Badge>
+                            </>,
+                            bucket.tokens.toLocaleString(),
+                            bucket.ttl
+                          )
+                        : null
+                    )}
                   </>
                 ) : (
                   // 无明细时，只显示聚合值

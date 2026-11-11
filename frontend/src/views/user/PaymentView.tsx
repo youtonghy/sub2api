@@ -42,7 +42,7 @@ import { FeatureFlags, resolveFeatureFlag } from '@/utils/featureFlags'
 import { renderSanitizedMarkdown } from '@/utils/markdown'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel, type PeakRateFields } from '@/utils/peak-rate'
 import { platformAccentColor, platformLabel } from '@/utils/platformColors'
-import { formatRechargeBonusNumber, normalizeRechargeBonusMode, normalizeRechargeBonusTiers, quoteRechargeBonus } from '@/utils/rechargeBonus'
+import { formatBalanceRechargeMultiplier, formatRechargeBonusNumber, normalizeRechargeBonusMode, normalizeRechargeBonusTiers, quoteRechargeBonus } from '@/utils/rechargeBonus'
 import { buildPaymentErrorToastMessage, describePaymentScenarioError } from './paymentUx'
 import {
   hasWechatResumeQuery,
@@ -1032,7 +1032,7 @@ export default function PaymentView() {
                   )}
                   {balanceRechargeMultiplier !== 1 && (
                     <p className={`${styles.rate} ${styles.divided}`}>
-                      {t('payment.rechargeRatePreview', { currency: selectedCurrency, usd: balanceRechargeMultiplier.toFixed(2) })}
+                      {t('payment.rechargeRatePreview', { currency: selectedCurrency, usd: formatBalanceRechargeMultiplier(balanceRechargeMultiplier) })}
                     </p>
                   )}
                 </div>

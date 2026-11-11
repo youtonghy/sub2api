@@ -69,11 +69,11 @@ function billingMode(m: PlazaModel): BillingMode {
 }
 
 function hasCachePricing(m: PlazaModel): boolean {
-  return m.pricing?.cache_write_price != null || m.pricing?.cache_write_1h_price != null || m.pricing?.cache_read_price != null
+  return m.pricing?.cache_write_price != null || m.pricing?.cache_write_1h_price != null || m.pricing?.cache_write_12h_price != null || m.pricing?.cache_read_price != null
 }
 
 function hasOfficialCache(o: NonNullable<PlazaModel['official_pricing']>): boolean {
-  return o.cache_write_price != null || o.cache_read_price != null || o.cache_write_1h_price != null
+  return o.cache_write_price != null || o.cache_read_price != null || o.cache_write_1h_price != null || o.cache_write_12h_price != null
 }
 
 /** 分时倍率时段（后端只给出倍率 ≠ 1 的时段，已升序）。 */
@@ -105,7 +105,7 @@ function officialIntervals(m: PlazaModel): UserPricingInterval[] {
 /** 任一档带缓存价才按档渲染缓存列；否则沿用平价的写入/读取两行。 */
 function hasTierCachePricing(intervals: UserPricingInterval[]): boolean {
   return intervals.some((iv) =>
-    iv.cache_write_price != null || iv.cache_write_1h_price != null || iv.cache_read_price != null ||
+    iv.cache_write_price != null || iv.cache_write_1h_price != null || iv.cache_write_12h_price != null || iv.cache_read_price != null ||
     iv.cache_write_multiplier != null || iv.cache_read_multiplier != null
   )
 }
@@ -142,7 +142,7 @@ function official(value: number | null | undefined): string {
 }
 
 function hasIntervalCache(iv: UserPricingInterval): boolean {
-  return iv.cache_write_price != null || iv.cache_write_1h_price != null || iv.cache_read_price != null
+  return iv.cache_write_price != null || iv.cache_write_1h_price != null || iv.cache_write_12h_price != null || iv.cache_read_price != null
 }
 
 export default function PlazaModelPricingTable({
@@ -269,7 +269,7 @@ export default function PlazaModelPricingTable({
   const muted = (text: ReactNode) => <span className={styles.muted}>{text}</span>
   const dash = <span className={styles.muted}>-</span>
 
-  /** 缓存列的写 / (1h) / 读 一行，供实付与官方阶梯共用 */
+  /** 缓存列的写 / (1h) / (12h) / 读 一行，供实付与官方阶梯共用 */
   function tierCacheLine(iv: UserPricingInterval, format: (value: number | null | undefined) => string) {
     if (!hasIntervalCache(iv)) return dash
     return (
@@ -279,6 +279,13 @@ export default function PlazaModelPricingTable({
           <>
             {muted(' (1h ')}
             {format(iv.cache_write_1h_price)}
+            {muted(')')}
+          </>
+        )}
+        {iv.cache_write_12h_price != null && (
+          <>
+            {muted(' (12h ')}
+            {format(iv.cache_write_12h_price)}
             {muted(')')}
           </>
         )}{' '}
@@ -357,6 +364,13 @@ export default function PlazaModelPricingTable({
                     {muted(')')}
                   </>
                 )}
+                {m.pricing?.cache_write_12h_price != null && (
+                  <>
+                    {muted(' (12h ')}
+                    {paid(m.pricing.cache_write_12h_price)}
+                    {muted(')')}
+                  </>
+                )}
               </div>
               <div>
                 <span className={styles.cacheLabel}>{t('modelPlaza.table.cacheRead')}</span> {paid(m.pricing?.cache_read_price)}
@@ -408,6 +422,13 @@ export default function PlazaModelPricingTable({
                   <>
                     {muted(' (1h ')}
                     {official(op.cache_write_1h_price)}
+                    {muted(')')}
+                  </>
+                )}
+                {op.cache_write_12h_price != null && (
+                  <>
+                    {muted(' (12h ')}
+                    {official(op.cache_write_12h_price)}
                     {muted(')')}
                   </>
                 )}

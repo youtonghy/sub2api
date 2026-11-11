@@ -47,6 +47,7 @@ const emptyInterval = (sortOrder: number, tierLabel = ''): IntervalFormEntry => 
   output_price: null,
   cache_write_price: null,
   cache_write_1h_price: null,
+  cache_write_12h_price: null,
   cache_read_price: null,
   per_request_price: null,
   input_multiplier: null,
@@ -146,6 +147,7 @@ export default function PricingEntryCard({
       e.output_price != null ||
       e.cache_write_price != null ||
       e.cache_write_1h_price != null ||
+      e.cache_write_12h_price != null ||
       e.cache_read_price != null
     if (hasPrice) return
 
@@ -161,6 +163,7 @@ export default function PricingEntryCard({
           output_price: perTokenToMTok(result.output_price ?? null),
           cache_write_price: perTokenToMTok(result.cache_write_price ?? null),
           cache_write_1h_price: perTokenToMTok(result.cache_write_1h_price ?? null),
+          cache_write_12h_price: perTokenToMTok(result.cache_write_12h_price ?? null),
           cache_read_price: perTokenToMTok(result.cache_read_price ?? null),
           image_input_price: perTokenToMTok(result.image_input_price ?? null),
           image_output_price: perTokenToMTok(result.image_output_price ?? null),
@@ -172,9 +175,15 @@ export default function PricingEntryCard({
     }
   }
 
-  const priceField = (label: string, field: keyof PricingFormEntry, min = '0', placeholderKey = 'admin.channels.form.pricePlaceholder') => (
+  const priceField = (
+    label: string,
+    field: keyof PricingFormEntry,
+    min = '0',
+    placeholderKey = 'admin.channels.form.pricePlaceholder',
+    title?: string
+  ) => (
     <label className={form.field}>
-      <span className={form.subLabel}>{label}</span>
+      <span className={form.subLabel} title={title}>{label}</span>
       <input
         className={inputClass}
         type="number"
@@ -201,6 +210,7 @@ export default function PricingEntryCard({
           <IntervalRow
             key={idx}
             interval={iv}
+            platform={platform}
             mode={entry.billing_mode}
             enableMultipliers={withMultipliers}
             onUpdate={(updated) => updateInterval(idx, updated)}
@@ -293,8 +303,20 @@ export default function PricingEntryCard({
               <div className={styles.priceGrid}>
                 {priceField(t('admin.channels.form.inputPrice'), 'input_price')}
                 {priceField(t('admin.channels.form.outputPrice'), 'output_price')}
-                {priceField(t('admin.channels.form.cacheWrite5mPrice'), 'cache_write_price')}
-                {priceField(t('admin.channels.form.cacheWrite1hPrice'), 'cache_write_1h_price')}
+                {priceField(
+                  t(platform === 'openai' ? 'admin.channels.form.cacheWrite30mPrice' : 'admin.channels.form.cacheWrite5mPrice'),
+                  'cache_write_price'
+                )}
+                {/* OpenAI 的缓存写入分 30 分钟与 12 小时两档，其他平台沿用 5 分钟与 1 小时 */}
+                {platform === 'openai'
+                  ? priceField(
+                      t('admin.channels.form.cacheWrite12hPrice'),
+                      'cache_write_12h_price',
+                      '0',
+                      'admin.channels.form.pricePlaceholder',
+                      t('admin.channels.form.cacheWrite12hHint')
+                    )
+                  : priceField(t('admin.channels.form.cacheWrite1hPrice'), 'cache_write_1h_price')}
                 {priceField(t('admin.channels.form.cacheReadPrice'), 'cache_read_price')}
                 {priceField(t('admin.channels.form.imageInputPrice'), 'image_input_price')}
                 {priceField(t('admin.channels.form.imageTokenPrice'), 'image_output_price')}
