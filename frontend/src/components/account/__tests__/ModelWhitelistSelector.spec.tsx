@@ -100,6 +100,20 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
+/** 同步结果不直接写入白名单：在确认窗口里切换勾选后应用 */
+function reviewOption(modelId: string) {
+  const option = screen
+    .getAllByTestId('sync-upstream-model-option')
+    .find((candidate) => candidate.textContent?.includes(modelId))
+  if (!option) throw new Error(`Review option not found: ${modelId}`)
+  return option
+}
+
+function applyReview(toggle: string[] = []) {
+  for (const model of toggle) fireEvent.click(reviewOption(model))
+  fireEvent.click(screen.getByTestId('sync-upstream-models-apply'))
+}
+
 function findModelRow(container: HTMLElement, modelId: string) {
   const row = within(container)
     .getAllByTestId('model-option')
@@ -257,9 +271,10 @@ describe('ModelWhitelistSelector', () => {
     fireEvent.click(syncButton!)
     await flushPromises()
 
-    expect(wrapper.emitted.update).toEqual([[['x-preview-f-free']]])
+    expect(wrapper.emitted.update).toEqual([])
     expect(showWarning).toHaveBeenCalledWith('admin.accounts.syncUpstreamModelsMetadataIncomplete')
-    expect(showSuccess).not.toHaveBeenCalled()
+    applyReview(['x-preview-f-free'])
+    expect(wrapper.emitted.update).toEqual([[['x-preview-f-free']]])
   })
 
   it('shows the backend message when upstream sync is rejected', async () => {
@@ -297,9 +312,10 @@ describe('ModelWhitelistSelector', () => {
     fireEvent.click(syncButton!)
     await flushPromises()
 
-    expect(wrapper.emitted.update).toEqual([[['gpt-6-astra', 'gpt-image-2']]])
-    expect(showSuccess).toHaveBeenCalledWith('admin.accounts.syncUpstreamModelsSuccess')
     expect(showWarning).toHaveBeenCalledWith('admin.accounts.syncUpstreamModelsMetadataPartial')
+    applyReview(['gpt-6-astra', 'gpt-image-2'])
+    expect(wrapper.emitted.update).toEqual([[['gpt-6-astra', 'gpt-image-2']]])
+    expect(showSuccess).toHaveBeenCalledWith('admin.accounts.syncUpstreamModelsApplied')
   })
 
   it('reports a successful preview so account creation can persist metadata', async () => {
@@ -329,6 +345,8 @@ describe('ModelWhitelistSelector', () => {
 
     expect(syncUpstreamModelsPreview).toHaveBeenCalledOnce()
     expect(wrapper.emitted.upstreamSynced).toEqual([[]])
+    expect(wrapper.emitted.update).toEqual([])
+    applyReview(['x-preview-f-free'])
     expect(wrapper.emitted.update).toEqual([[['x-preview-f-free']]])
   })
 
@@ -362,7 +380,7 @@ describe('ModelWhitelistSelector', () => {
     expect(wrapper.emitted.syncFinished).toHaveLength(1)
   })
 
-  it('still appends a real catalog when capability metadata is incomplete', async () => {
+  it('still offers a real catalog when capability metadata is incomplete', async () => {
     syncUpstreamModels.mockResolvedValue({
       models: ['grok-4.7'],
       discovery_source: 'upstream',
@@ -371,9 +389,9 @@ describe('ModelWhitelistSelector', () => {
     const wrapper = mountSelector({ platform: 'grok', accountId: 46, modelValue: ['grok-4'] })
     fireEvent.click(wrapper.findButton('admin.accounts.syncUpstreamModels')!)
     await flushPromises()
-    expect(wrapper.emitted.update).toEqual([[['grok-4', 'grok-4.7']]])
     expect(showWarning).toHaveBeenCalledWith('admin.accounts.syncUpstreamModelsMetadataIncomplete')
-    expect(showSuccess).not.toHaveBeenCalled()
+    applyReview(['grok-4.7'])
+    expect(wrapper.emitted.update).toEqual([[['grok-4', 'grok-4.7']]])
     expect(wrapper.emitted.syncFinished).toHaveLength(1)
     expect(wrapper.emitted.upstreamSynced).toEqual([])
   })
@@ -388,7 +406,8 @@ describe('ModelWhitelistSelector', () => {
     expect(syncUpstreamModels).not.toHaveBeenCalled()
     expect(wrapper.emitted.upstreamSynced).toEqual([[]])
     expect(wrapper.emitted.syncFinished).toEqual([])
-    expect(wrapper.emitted.update).toEqual([[['grok-4.7']]])
+    expect(wrapper.emitted.update).toEqual([])
+    expect(reviewOption('grok-4.7')).toBeInTheDocument()
   })
 
   it('does not mark a creation preview synced when the catalog is only a configured fallback', async () => {
@@ -420,7 +439,8 @@ describe('ModelWhitelistSelector', () => {
       await wrapper.handle.current!.syncUpstreamModels()
     })
     expect(syncUpstreamModels).toHaveBeenCalledWith(46)
-    expect(wrapper.emitted.update).toEqual([[['grok-4.7']]])
+    expect(wrapper.emitted.update).toEqual([])
+    expect(reviewOption('grok-4.7')).toBeInTheDocument()
     expect(wrapper.emitted.syncFinished).toEqual([[]])
   })
 
@@ -452,10 +472,44 @@ describe('ModelWhitelistSelector', () => {
 
     second.resolve({ models: ['b-catalog'], discovery_source: 'upstream' })
     await flushPromises()
-    expect(wrapper.emitted.update).toEqual([[['b-local', 'b-catalog']]])
+    expect(screen.queryByText('a-private-catalog')).toBeNull()
     expect(wrapper.emitted.syncFinished).toEqual([[]])
-    expect(showSuccess).toHaveBeenCalledTimes(1)
     expect(syncButton().disabled).toBe(false)
+    applyReview(['b-catalog'])
+    expect(wrapper.emitted.update).toEqual([[['b-local', 'b-catalog']]])
+  })
+
+  it('pre-checks only existing whitelist models and applies manual additions and removals', async () => {
+    syncUpstreamModels.mockResolvedValue({ models: ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6-astra'], discovery_source: 'upstream' })
+    const wrapper = mountSelector({ accountId: 46, modelValue: ['gpt-6-astra', 'custom-x'] })
+    fireEvent.click(wrapper.findButton('admin.accounts.syncUpstreamModels')!)
+    await flushPromises()
+
+    expect(wrapper.emitted.update).toEqual([])
+    expect(screen.getAllByTestId('sync-upstream-model-option')).toHaveLength(2)
+    expect(reviewOption('gpt-6-astra').getAttribute('aria-checked')).toBe('true')
+    expect(reviewOption('gpt-6.1-sol').getAttribute('aria-checked')).toBe('false')
+
+    applyReview(['gpt-6-astra', 'gpt-6.1-sol'])
+    expect(wrapper.emitted.update).toEqual([[['custom-x', 'gpt-6.1-sol']]])
+    expect(screen.queryByTestId('sync-upstream-models-review')).toBeNull()
+  })
+
+  it('leaves the whitelist untouched when the review is cancelled or unchanged', async () => {
+    syncUpstreamModels.mockResolvedValue({ models: ['gpt-6-astra', 'gpt-6.1-sol'], discovery_source: 'upstream' })
+    const wrapper = mountSelector({ accountId: 46, modelValue: ['gpt-6-astra'] })
+    fireEvent.click(wrapper.findButton('admin.accounts.syncUpstreamModels')!)
+    await flushPromises()
+    fireEvent.click(reviewOption('gpt-6.1-sol'))
+    fireEvent.click(screen.getByText('common.cancel'))
+    expect(wrapper.emitted.update).toEqual([])
+
+    // 对话框关闭动画期间外部内容仍带 aria-hidden，按 testid 取按钮
+    fireEvent.click(wrapper.container.querySelector('[data-testid="sync-upstream-models"]')!)
+    await flushPromises()
+    applyReview()
+    expect(wrapper.emitted.update).toEqual([])
+    expect(showInfo).toHaveBeenCalledWith('admin.accounts.syncUpstreamModelsUnchanged')
   })
 
   it('drops a sync result that settles after unmount', async () => {

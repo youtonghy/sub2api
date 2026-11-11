@@ -598,7 +598,7 @@ export default function EditAccountModal({ show, account, proxies, groups, onClo
     }
   }
 
-  /** 诊断面板的同步按钮：白名单模式交给选择器（会追加模型），映射模式只同步已保存配置 */
+  /** 诊断面板的同步按钮：白名单模式交给选择器（同步后弹窗确认再写入），映射模式只同步已保存配置 */
   const requestGrokCatalogSync = async () => {
     if (!show || account?.platform !== 'grok' || !account.id) return
     if (diagnosticsLoading || grokDiagnosticsSyncingRef.current || grokWhitelistRef.current?.isSyncingUpstream) return

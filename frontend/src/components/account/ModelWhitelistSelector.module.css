@@ -25,3 +25,10 @@
 .dangerText { color: var(--danger); }
 .customRow { display: flex; gap: var(--space-2); }
 .customRow > input { flex: 1 1 auto; }
+.review { display: flex; flex-direction: column; gap: var(--space-2); }
+.reviewToolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.reviewActions { display: flex; gap: var(--space-1); }
+.reviewList { max-height: 22rem; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-control); }
+.reviewList > .optionSelect { width: 100%; }
+@media (hover: hover) and (pointer: fine) { .reviewList > .optionSelect:hover { background: var(--surface-muted); } }
+.reviewTag { margin-left: auto; flex: 0 0 auto; color: var(--text-secondary); font-size: var(--text-xs); }

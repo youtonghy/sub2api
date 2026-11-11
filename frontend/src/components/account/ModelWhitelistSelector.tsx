@@ -4,6 +4,7 @@ import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useS
 import { accountsAPI } from '@/api/admin/accounts'
 import type { SyncUpstreamPreviewParams } from '@/api/admin/accounts'
 import { Button } from '@/components/arc/button/button'
+import BaseDialog from '@/components/common/BaseDialog'
 import ModelIcon from '@/components/common/ModelIcon'
 import { useClipboard } from '@/composables/useClipboard'
 import { allModels, getModelsByPlatform } from '@/composables/useModelWhitelist'
@@ -47,6 +48,123 @@ export interface ModelWhitelistSelectorHandle {
   readonly isSyncingUpstream: boolean
 }
 
+interface UpstreamSyncReview {
+  /** 上游返回的模型（去重、保持上游顺序） */
+  models: string[]
+  /** 默认勾选：白名单中已有的上游模型 */
+  initial: string[]
+}
+
+/** 上游模型二次确认：列出上游模型，管理员勾选后再写入白名单 */
+function UpstreamModelReviewDialog({
+  review,
+  onCancel,
+  onConfirm
+}: {
+  review: UpstreamSyncReview
+  onCancel: () => void
+  onConfirm: (selected: Set<string>) => void
+}) {
+  const { t } = useI18n()
+  const [selected, setSelected] = useState(() => new Set(review.initial))
+  const [search, setSearch] = useState('')
+  const initial = new Set(review.initial)
+  const query = search.toLowerCase().trim()
+  const visible = query ? review.models.filter((model) => model.toLowerCase().includes(query)) : review.models
+
+  const toggle = (model: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(model)) next.delete(model)
+      else next.add(model)
+      return next
+    })
+  }
+  // 全选/全不选只作用于当前搜索结果
+  const setVisible = (checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      for (const model of visible) {
+        if (checked) next.add(model)
+        else next.delete(model)
+      }
+      return next
+    })
+  }
+
+  return (
+    <BaseDialog
+      show
+      width="normal"
+      title={t('admin.accounts.syncUpstreamModelsConfirmTitle')}
+      description={t('admin.accounts.syncUpstreamModelsConfirmHint', {
+        total: review.models.length,
+        selected: review.initial.length
+      })}
+      onClose={onCancel}
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={onCancel}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="button" data-testid="sync-upstream-models-apply" onClick={() => onConfirm(selected)}>
+            {t('admin.accounts.syncUpstreamModelsApply')}
+          </Button>
+        </>
+      }
+    >
+      <div className={own.review}>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          type="text"
+          className={styles.input}
+          placeholder={t('admin.accounts.searchModels')}
+        />
+        <div className={own.reviewToolbar}>
+          <span className={styles.hint}>
+            {t('admin.accounts.syncUpstreamModelsSelectedCount', { selected: selected.size, total: review.models.length })}
+          </span>
+          <div className={own.reviewActions}>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setVisible(true)}>
+              {t('common.selectAll')}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setVisible(false)}>
+              {t('admin.accounts.syncUpstreamModelsDeselectAll')}
+            </Button>
+          </div>
+        </div>
+        <div className={own.reviewList} data-testid="sync-upstream-models-review">
+          {visible.map((model) => {
+            const checked = selected.has(model)
+            return (
+              <button
+                key={model}
+                type="button"
+                role="checkbox"
+                aria-checked={checked}
+                data-testid="sync-upstream-model-option"
+                className={own.optionSelect}
+                onClick={() => toggle(model)}
+              >
+                <span className={own.checkbox} data-checked={checked ? 'true' : undefined}>
+                  {checked ? <Check size={12} strokeWidth={3} aria-hidden="true" /> : null}
+                </span>
+                <ModelIcon model={model} size="18px" />
+                <span className={own.truncate}>{model}</span>
+                {initial.has(model) ? (
+                  <span className={own.reviewTag}>{t('admin.accounts.syncUpstreamModelsExistingTag')}</span>
+                ) : null}
+              </button>
+            )
+          })}
+          {visible.length === 0 ? <div className={own.empty}>{t('admin.accounts.noMatchingModels')}</div> : null}
+        </div>
+      </div>
+    </BaseDialog>
+  )
+}
+
 /** 模型白名单多选：下拉选择、填充相关模型、同步上游模型、自定义模型 */
 export default function ModelWhitelistSelector({
   value,
@@ -72,6 +190,8 @@ export default function ModelWhitelistSelector({
   const [customModel, setCustomModel] = useState('')
   const [isComposing, setIsComposing] = useState(false)
   const [isSyncingUpstream, setIsSyncingUpstreamState] = useState(false)
+  // 上游同步结果的确认窗口数据；为 null 时不显示
+  const [syncReview, setSyncReview] = useState<UpstreamSyncReview | null>(null)
   // 同步请求的世代号：切换账号或卸载后，旧请求的结果不再写回当前草稿
   const upstreamSyncVersion = useRef(0)
   const syncingRef = useRef(false)
@@ -96,6 +216,7 @@ export default function ModelWhitelistSelector({
     previousAccountId.current = accountId
     upstreamSyncVersion.current += 1
     setIsSyncingUpstream(false)
+    setSyncReview(null)
   }, [accountId])
 
   useEffect(() => {
@@ -234,33 +355,20 @@ export default function ModelWhitelistSelector({
         onUpstreamSynced?.()
       }
 
-      const newModels = [...valueRef.current]
-      let addedCount = 0
-      for (const model of upstreamModels) {
-        if (!newModels.includes(model)) {
-          newModels.push(model)
-          addedCount += 1
-        }
-      }
-
-      onChangeRef.current(newModels)
       const warnings = result.warnings ?? []
-      const hasPartialMetadata = warnings.some((warning) => warning.code === 'upstream_model_metadata_partial')
-      const hasIncompleteMetadata = warnings.some((warning) => warning.code === 'upstream_model_metadata_incomplete')
-      if (hasIncompleteMetadata) {
+      if (warnings.some((warning) => warning.code === 'upstream_model_metadata_incomplete')) {
         appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataIncomplete'))
-        return
-      }
-      if (addedCount > 0) {
-        appStore.showSuccess(
-          t('admin.accounts.syncUpstreamModelsSuccess', { count: addedCount, total: upstreamModels.length })
-        )
-      } else {
-        appStore.showInfo(t('admin.accounts.syncUpstreamModelsNoChanges', { count: upstreamModels.length }))
-      }
-      if (hasPartialMetadata) {
+      } else if (warnings.some((warning) => warning.code === 'upstream_model_metadata_partial')) {
         appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataPartial'))
       }
+
+      // 不直接写入白名单：打开确认窗口，默认只勾选白名单里已有的上游模型
+      const uniqueModels = Array.from(new Set(upstreamModels))
+      const current = new Set(valueRef.current)
+      setSyncReview({
+        models: uniqueModels,
+        initial: uniqueModels.filter((model) => current.has(model))
+      })
     } catch (error) {
       if (!isCurrentSync()) return
       const message = extractApiErrorMessage(error, t('admin.accounts.syncUpstreamModelsFailed'))
@@ -284,6 +392,24 @@ export default function ModelWhitelistSelector({
 
   const clearAll = () => {
     onChange([])
+  }
+
+  /** 按确认窗口的勾选结果更新白名单：只增删上游列表内的模型，其他已选模型保持不变 */
+  const applySyncReview = (selected: Set<string>) => {
+    if (!syncReview) return
+    const upstream = new Set(syncReview.models)
+    const current = valueRef.current
+    const kept = current.filter((model) => !upstream.has(model) || selected.has(model))
+    const additions = syncReview.models.filter((model) => selected.has(model) && !current.includes(model))
+    const removed = current.length - kept.length
+    setSyncReview(null)
+    const appStore = useAppStore.getState()
+    if (additions.length === 0 && removed === 0) {
+      appStore.showInfo(t('admin.accounts.syncUpstreamModelsUnchanged'))
+      return
+    }
+    onChangeRef.current([...kept, ...additions])
+    appStore.showSuccess(t('admin.accounts.syncUpstreamModelsApplied', { added: additions.length, removed }))
   }
 
   return (
@@ -402,6 +528,14 @@ export default function ModelWhitelistSelector({
           {t('admin.accounts.clearAllModels')}
         </Button>
       </div>
+
+      {syncReview ? (
+        <UpstreamModelReviewDialog
+          review={syncReview}
+          onCancel={() => setSyncReview(null)}
+          onConfirm={applySyncReview}
+        />
+      ) : null}
 
       {/* Custom Model Input */}
       <div className={styles.field}>
