@@ -26,27 +26,32 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// VERSION 记录当前代码所基于的上游 Wei-Shaw/sub2api 版本，合并上游时随之更新。
+//
 //go:embed VERSION
 var embeddedVersion string
 
 // Build-time variables (can be set by ldflags)
 var (
+	// Version 是本程序自己的版本号，由构建脚本注入打包时间（YYMMDDHHmm，如 2611111054），
+	// 见 scripts/resolve-version.sh；未注入时（如 go run）为 "dev"。
 	Version   = ""
 	Commit    = "unknown"
 	Date      = "unknown"
 	BuildType = "source" // "source" for manual builds, "release" for CI builds (set by ldflags)
+
+	// UpstreamVersion 是所基于的上游版本，固定取自内嵌的 VERSION 文件。
+	UpstreamVersion = ""
 )
 
 func init() {
-	// 如果 Version 已通过 ldflags 注入（例如 -X main.Version=...），则不要覆盖。
-	if strings.TrimSpace(Version) != "" {
-		return
+	UpstreamVersion = strings.TrimSpace(embeddedVersion)
+	if UpstreamVersion == "" {
+		UpstreamVersion = "0.0.0-dev"
 	}
-
-	// 默认从 embedded VERSION 文件读取版本号（编译期打包进二进制）。
-	Version = strings.TrimSpace(embeddedVersion)
-	if Version == "" {
-		Version = "0.0.0-dev"
+	// 如果 Version 已通过 ldflags 注入（例如 -X main.Version=...），则不要覆盖。
+	if strings.TrimSpace(Version) == "" {
+		Version = "dev"
 	}
 }
 
@@ -62,7 +67,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		log.Printf("RetooAi %s (commit: %s, built: %s)\n", Version, Commit, Date)
+		log.Printf("RetooAi %s (upstream: v%s, commit: %s, built: %s)\n", Version, UpstreamVersion, Commit, Date)
 		return
 	}
 
@@ -144,8 +149,9 @@ func runMainServer() {
 	}
 
 	buildInfo := handler.BuildInfo{
-		Version:   Version,
-		BuildType: BuildType,
+		Version:         Version,
+		UpstreamVersion: UpstreamVersion,
+		BuildType:       BuildType,
 	}
 
 	app, err := initializeApplication(buildInfo)

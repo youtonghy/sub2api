@@ -39,7 +39,10 @@ export interface AppState {
   versionLoaded: boolean
   versionLoading: boolean
   currentVersion: string
+  upstreamVersion: string
   latestVersion: string
+  /** 检查上游失败时后端返回的说明，此时 latestVersion 不可信 */
+  versionWarning: string
   hasUpdate: boolean
   buildType: string
   releaseInfo: ReleaseInfo | null
@@ -219,7 +222,9 @@ export const useAppStore = create<AppState>()((set, get) => {
     versionLoaded: false,
     versionLoading: false,
     currentVersion: '',
+    upstreamVersion: '',
     latestVersion: '',
+    versionWarning: '',
     hasUpdate: false,
     buildType: 'source',
     releaseInfo: null,
@@ -276,7 +281,9 @@ export const useAppStore = create<AppState>()((set, get) => {
       if (state.versionLoaded && !force) {
         return {
           current_version: state.currentVersion,
+          upstream_version: state.upstreamVersion,
           latest_version: state.latestVersion,
+          warning: state.versionWarning || undefined,
           has_update: state.hasUpdate,
           build_type: state.buildType,
           release_info: state.releaseInfo || undefined,
@@ -294,7 +301,9 @@ export const useAppStore = create<AppState>()((set, get) => {
         const data = await checkUpdatesAPI(force)
         set({
           currentVersion: data.current_version,
+          upstreamVersion: data.upstream_version || '',
           latestVersion: data.latest_version,
+          versionWarning: data.warning || '',
           hasUpdate: data.has_update,
           buildType: data.build_type || 'source',
           releaseInfo: data.release_info || null,

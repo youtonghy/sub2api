@@ -25,6 +25,9 @@ import (
 var (
 	ErrNoUpdateAvailable         = infraerrors.Conflict("ALREADY_UP_TO_DATE", "no update available; current version is latest")
 	ErrRollbackVersionNotAllowed = infraerrors.BadRequest("ROLLBACK_VERSION_NOT_ALLOWED", "version is not in the allowed rollback list")
+	// ErrOnlineUpdateDisabled: RetooAi 是上游的派生构建，上游发布的二进制会覆盖本地改动，
+	// 因此禁止在线更新/回滚，改为合并上游代码后重新构建。
+	ErrOnlineUpdateDisabled = infraerrors.BadRequest("ONLINE_UPDATE_DISABLED", "online update is disabled for fork builds; merge upstream and rebuild instead")
 )
 
 const (
@@ -61,10 +64,13 @@ type GitHubReleaseClient interface {
 
 // UpdateService handles software updates
 type UpdateService struct {
-	cache          UpdateCache
-	githubClient   GitHubReleaseClient
+	cache        UpdateCache
+	githubClient GitHubReleaseClient
+	// currentVersion 是与上游 release 比较用的语义化版本（派生构建中即所基于的上游版本）。
 	currentVersion string
 	buildType      string // "source" for manual builds, "release" for CI builds
+	// buildVersion 是派生构建自身的版本号（打包时间，如 2611111054）；为空表示非派生构建。
+	buildVersion string
 }
 
 // NewUpdateService creates a new UpdateService
@@ -77,15 +83,31 @@ func NewUpdateService(cache UpdateCache, githubClient GitHubReleaseClient, versi
 	}
 }
 
+// WithForkBuild 把服务标记为派生构建：buildVersion 作为当前程序版本展示，
+// currentVersion 仅作为上游基线参与比较，在线更新与回滚被禁用。
+func (s *UpdateService) WithForkBuild(buildVersion string) *UpdateService {
+	s.buildVersion = strings.TrimSpace(buildVersion)
+	if s.buildVersion == "" {
+		s.buildVersion = s.currentVersion
+	}
+	return s
+}
+
+func (s *UpdateService) isForkBuild() bool {
+	return s.buildVersion != ""
+}
+
 // UpdateInfo contains update information
 type UpdateInfo struct {
-	CurrentVersion string       `json:"current_version"`
-	LatestVersion  string       `json:"latest_version"`
-	HasUpdate      bool         `json:"has_update"`
-	ReleaseInfo    *ReleaseInfo `json:"release_info,omitempty"`
-	Cached         bool         `json:"cached"`
-	Warning        string       `json:"warning,omitempty"`
-	BuildType      string       `json:"build_type"` // "source" or "release"
+	CurrentVersion string `json:"current_version"`
+	// UpstreamVersion 是当前构建所基于的上游版本；HasUpdate 表示上游有比它更新的 release。
+	UpstreamVersion string       `json:"upstream_version"`
+	LatestVersion   string       `json:"latest_version"`
+	HasUpdate       bool         `json:"has_update"`
+	ReleaseInfo     *ReleaseInfo `json:"release_info,omitempty"`
+	Cached          bool         `json:"cached"`
+	Warning         string       `json:"warning,omitempty"`
+	BuildType       string       `json:"build_type"` // "source" or "release"
 }
 
 // ReleaseInfo contains GitHub release details
@@ -146,13 +168,9 @@ func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInf
 			cached.Warning = "Using cached data: " + err.Error()
 			return cached, nil
 		}
-		return &UpdateInfo{
-			CurrentVersion: s.currentVersion,
-			LatestVersion:  s.currentVersion,
-			HasUpdate:      false,
-			Warning:        err.Error(),
-			BuildType:      s.buildType,
-		}, nil
+		info := s.newUpdateInfo(s.currentVersion, nil, false)
+		info.Warning = err.Error()
+		return info, nil
 	}
 
 	// Cache result
@@ -163,6 +181,9 @@ func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInf
 // PerformUpdate downloads and applies the update
 // Uses atomic file replacement pattern for safe in-place updates
 func (s *UpdateService) PerformUpdate(ctx context.Context) error {
+	if s.isForkBuild() {
+		return ErrOnlineUpdateDisabled
+	}
 	info, err := s.CheckUpdate(ctx, true)
 	if err != nil {
 		return err
@@ -281,6 +302,9 @@ func (s *UpdateService) applyReleaseAssets(ctx context.Context, releaseAssets []
 
 // Rollback restores the previous version
 func (s *UpdateService) Rollback() error {
+	if s.isForkBuild() {
+		return ErrOnlineUpdateDisabled
+	}
 	exePath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("failed to get executable path: %w", err)
@@ -307,6 +331,9 @@ func (s *UpdateService) Rollback() error {
 // strictly older than the current version (the current version itself is excluded),
 // newest first. Draft and prerelease entries are skipped.
 func (s *UpdateService) ListRollbackVersions(ctx context.Context) ([]RollbackVersion, error) {
+	if s.isForkBuild() {
+		return nil, ErrOnlineUpdateDisabled
+	}
 	releases, err := s.fetchRollbackCandidates(ctx)
 	if err != nil {
 		return nil, err
@@ -327,6 +354,9 @@ func (s *UpdateService) ListRollbackVersions(ctx context.Context) ([]RollbackVer
 // The target must be one of the versions returned by ListRollbackVersions;
 // anything else (including the current version) is rejected.
 func (s *UpdateService) RollbackToVersion(ctx context.Context, version string) error {
+	if s.isForkBuild() {
+		return ErrOnlineUpdateDisabled
+	}
 	target := strings.TrimPrefix(strings.TrimSpace(version), "v")
 	if target == "" {
 		return ErrRollbackVersionNotAllowed
@@ -416,20 +446,29 @@ func (s *UpdateService) fetchLatestRelease(ctx context.Context) (*UpdateInfo, er
 		}
 	}
 
+	return s.newUpdateInfo(latestVersion, &ReleaseInfo{
+		Name:        release.Name,
+		Body:        release.Body,
+		PublishedAt: release.PublishedAt,
+		HTMLURL:     release.HTMLURL,
+		Assets:      assets,
+	}, false), nil
+}
+
+func (s *UpdateService) newUpdateInfo(latestVersion string, release *ReleaseInfo, cached bool) *UpdateInfo {
+	current := s.currentVersion
+	if s.isForkBuild() {
+		current = s.buildVersion
+	}
 	return &UpdateInfo{
-		CurrentVersion: s.currentVersion,
-		LatestVersion:  latestVersion,
-		HasUpdate:      compareVersions(s.currentVersion, latestVersion) < 0,
-		ReleaseInfo: &ReleaseInfo{
-			Name:        release.Name,
-			Body:        release.Body,
-			PublishedAt: release.PublishedAt,
-			HTMLURL:     release.HTMLURL,
-			Assets:      assets,
-		},
-		Cached:    false,
-		BuildType: s.buildType,
-	}, nil
+		CurrentVersion:  current,
+		UpstreamVersion: s.currentVersion,
+		LatestVersion:   latestVersion,
+		HasUpdate:       compareVersions(s.currentVersion, latestVersion) < 0,
+		ReleaseInfo:     release,
+		Cached:          cached,
+		BuildType:       s.buildType,
+	}
 }
 
 func (s *UpdateService) downloadFile(ctx context.Context, downloadURL, dest string) error {
@@ -612,14 +651,7 @@ func (s *UpdateService) getFromCache(ctx context.Context) (*UpdateInfo, error) {
 		return nil, fmt.Errorf("cache expired")
 	}
 
-	return &UpdateInfo{
-		CurrentVersion: s.currentVersion,
-		LatestVersion:  cached.Latest,
-		HasUpdate:      compareVersions(s.currentVersion, cached.Latest) < 0,
-		ReleaseInfo:    cached.ReleaseInfo,
-		Cached:         true,
-		BuildType:      s.buildType,
-	}, nil
+	return s.newUpdateInfo(cached.Latest, cached.ReleaseInfo, true), nil
 }
 
 func (s *UpdateService) saveToCache(ctx context.Context, info *UpdateInfo) {

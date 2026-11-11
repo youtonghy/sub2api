@@ -29,8 +29,10 @@ func ProvideGrokOAuthService(proxyRepo ProxyRepository, oauthClient GrokOAuthCli
 
 // BuildInfo contains build information
 type BuildInfo struct {
-	Version   string
-	BuildType string
+	Version string
+	// UpstreamVersion 是所基于的上游语义化版本；为空时视为非派生构建。
+	UpstreamVersion string
+	BuildType       string
 }
 
 // ProvidePricingService creates and initializes PricingService
@@ -45,7 +47,11 @@ func ProvidePricingService(cfg *config.Config, remoteClient PricingRemoteClient)
 
 // ProvideUpdateService creates UpdateService with BuildInfo
 func ProvideUpdateService(cache UpdateCache, githubClient GitHubReleaseClient, buildInfo BuildInfo) *UpdateService {
-	return NewUpdateService(cache, githubClient, buildInfo.Version, buildInfo.BuildType)
+	if buildInfo.UpstreamVersion == "" {
+		return NewUpdateService(cache, githubClient, buildInfo.Version, buildInfo.BuildType)
+	}
+	return NewUpdateService(cache, githubClient, buildInfo.UpstreamVersion, buildInfo.BuildType).
+		WithForkBuild(buildInfo.Version)
 }
 
 // ProvideEmailQueueService creates EmailQueueService with default worker count

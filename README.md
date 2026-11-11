@@ -531,6 +531,8 @@ nano config.yaml
 ```
 
 > **Note:** The `-tags embed` flag embeds the frontend into the binary. Without this flag, the binary will not serve the frontend UI.
+>
+> **Versioning:** the program version is the build time (`YYMMDDHHmm`, e.g. `2611111054`, UTC+8 by default, override with `VERSION_TZ`). The upstream version it is based on comes from `cmd/server/VERSION`. The admin version panel compares that against the latest upstream release. Fork builds do not support online update or rollback; merge upstream and rebuild instead.
 
 **Key configuration in `config.yaml`:**
 

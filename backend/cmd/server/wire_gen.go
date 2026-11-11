@@ -386,14 +386,20 @@ func providePrivacyClientFactory() service.PrivacyClientFactory {
 
 func provideServiceBuildInfo(buildInfo handler.BuildInfo) service.BuildInfo {
 	return service.BuildInfo{
-		Version:   buildInfo.Version,
-		BuildType: buildInfo.BuildType,
+		Version:         buildInfo.Version,
+		UpstreamVersion: buildInfo.UpstreamVersion,
+		BuildType:       buildInfo.BuildType,
 	}
 }
 
 func providePluginHostInfo(buildInfo handler.BuildInfo) service.PluginHostInfo {
+	// 插件按语义化版本声明兼容范围，打包时间版本号无法比较，使用所基于的上游版本。
+	hostVersion := buildInfo.UpstreamVersion
+	if hostVersion == "" {
+		hostVersion = buildInfo.Version
+	}
 	return service.PluginHostInfo{
-		Version:   buildInfo.Version,
+		Version:   hostVersion,
 		BuildType: buildInfo.BuildType,
 	}
 }

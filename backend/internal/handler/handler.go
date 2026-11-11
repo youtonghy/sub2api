@@ -74,6 +74,9 @@ type Handlers struct {
 
 // BuildInfo contains build-time information
 type BuildInfo struct {
-	Version   string
-	BuildType string // "source" for manual builds, "release" for CI builds
+	// Version 是本程序的版本号：本地/镜像构建时为打包时间（YYMMDDHHmm，如 2611111054）。
+	Version string
+	// UpstreamVersion 是所基于的上游 Wei-Shaw/sub2api 版本（cmd/server/VERSION）。
+	UpstreamVersion string
+	BuildType       string // "source" for manual builds, "release" for CI builds
 }

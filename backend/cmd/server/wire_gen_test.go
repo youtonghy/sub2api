@@ -12,12 +12,17 @@ import (
 
 func TestProvideServiceBuildInfo(t *testing.T) {
 	in := handler.BuildInfo{
-		Version:   "v-test",
-		BuildType: "release",
+		Version:         "2611111054",
+		UpstreamVersion: "0.2.21",
+		BuildType:       "release",
 	}
 	out := provideServiceBuildInfo(in)
 	require.Equal(t, in.Version, out.Version)
+	require.Equal(t, in.UpstreamVersion, out.UpstreamVersion)
 	require.Equal(t, in.BuildType, out.BuildType)
+
+	// 插件兼容性按语义化版本判断，必须拿到上游版本而不是打包时间
+	require.Equal(t, "0.2.21", providePluginHostInfo(in).Version)
 }
 
 func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {

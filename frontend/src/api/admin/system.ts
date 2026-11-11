@@ -12,7 +12,10 @@ export interface ReleaseInfo {
 }
 
 export interface VersionInfo {
+  /** 本程序版本号（打包时间，如 2611111054） */
   current_version: string
+  /** 所基于的上游版本；has_update 表示上游有比它更新的 release */
+  upstream_version?: string
   latest_version: string
   has_update: boolean
   release_info?: ReleaseInfo

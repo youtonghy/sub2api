@@ -185,3 +185,35 @@ func TestUpdateServiceRollbackToVersionAcceptsVPrefix(t *testing.T) {
 	require.NotErrorIs(t, err, ErrRollbackVersionNotAllowed)
 	require.Contains(t, err.Error(), "no compatible release found")
 }
+
+func TestUpdateServiceForkBuildComparesUpstreamAndBlocksOnlineUpdate(t *testing.T) {
+	cache := &updateServiceCacheStub{}
+	svc := NewUpdateService(
+		cache,
+		&updateServiceGitHubClientStub{
+			release: &GitHubRelease{TagName: "v0.2.21", HTMLURL: "https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.21"},
+		},
+		"0.2.20",
+		"release",
+	).WithForkBuild("2611111054")
+
+	info, err := svc.CheckUpdate(context.Background(), true)
+	require.NoError(t, err)
+	require.Equal(t, "2611111054", info.CurrentVersion)
+	require.Equal(t, "0.2.20", info.UpstreamVersion)
+	require.Equal(t, "0.2.21", info.LatestVersion)
+	require.True(t, info.HasUpdate)
+
+	cached, err := svc.CheckUpdate(context.Background(), false)
+	require.NoError(t, err)
+	require.True(t, cached.Cached)
+	require.Equal(t, "2611111054", cached.CurrentVersion)
+	require.Equal(t, "0.2.20", cached.UpstreamVersion)
+	require.True(t, cached.HasUpdate)
+
+	require.ErrorIs(t, svc.PerformUpdate(context.Background()), ErrOnlineUpdateDisabled)
+	require.ErrorIs(t, svc.Rollback(), ErrOnlineUpdateDisabled)
+	require.ErrorIs(t, svc.RollbackToVersion(context.Background(), "0.2.19"), ErrOnlineUpdateDisabled)
+	_, err = svc.ListRollbackVersions(context.Background())
+	require.ErrorIs(t, err, ErrOnlineUpdateDisabled)
+}

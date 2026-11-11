@@ -1,23 +1,8 @@
 #!/bin/sh
 set -eu
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-BACKEND_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
-REPO_DIR="$(CDPATH= cd -- "$BACKEND_DIR/.." && pwd)"
-VERSION_FILE="$BACKEND_DIR/cmd/server/VERSION"
-
-# Prefer the exact release tag when building from a tagged checkout so
-# source builds from vX.Y.Z don't inherit the previous VERSION file value.
-if command -v git >/dev/null 2>&1; then
-  TAG="$(
-    git -C "$REPO_DIR" describe --tags --exact-match --match 'v[0-9]*' 2>/dev/null || \
-    git -C "$REPO_DIR" describe --tags --exact-match --match '[0-9]*' 2>/dev/null || \
-    true
-  )"
-  if [ -n "$TAG" ]; then
-    printf '%s\n' "${TAG#v}"
-    exit 0
-  fi
-fi
-
-printf '%s\n' "$(tr -d '\r\n' < "$VERSION_FILE")"
+# RetooAi 的程序版本号使用打包时间（YYMMDDHHmm，例如 2611111054 表示 2026-11-11 10:54）。
+# 所基于的上游版本单独记录在 cmd/server/VERSION 中并内嵌进二进制，不由本脚本输出。
+#
+# 时区默认 UTC+8（POSIX 写法 CST-8，不依赖 tzdata），可用 VERSION_TZ 覆盖，例如 VERSION_TZ=UTC。
+TZ="${VERSION_TZ:-CST-8}" date +%y%m%d%H%M

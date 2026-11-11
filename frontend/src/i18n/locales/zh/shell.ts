@@ -3,6 +3,17 @@
  */
 export default {
   shell: {
+    forkVersion: {
+      builtAt: '打包于 {time}',
+      upstreamBase: '基于上游',
+      upstreamLatest: '最新上游',
+      upToDate: '已基于最新上游版本',
+      behind: '上游有新版本 {version}',
+      syncHint: '合并上游代码并重新构建即可同步，本程序不支持在线更新。',
+      viewChangelog: '查看更新日志',
+      viewDiff: '查看上游改动',
+      checkFailed: '无法获取上游最新版本',
+    },
     expandSidebar: '展开侧边栏',
     collapseSidebar: '收起侧边栏',
     openNavigation: '打开导航',

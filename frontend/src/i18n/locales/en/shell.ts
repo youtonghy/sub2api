@@ -3,6 +3,17 @@
  */
 export default {
   shell: {
+    forkVersion: {
+      builtAt: 'Built {time}',
+      upstreamBase: 'Based on upstream',
+      upstreamLatest: 'Latest upstream',
+      upToDate: 'Based on the latest upstream release',
+      behind: 'Upstream {version} is available',
+      syncHint: 'Merge upstream and rebuild to sync. Online update is not supported for this build.',
+      viewChangelog: 'View changelog',
+      viewDiff: 'View upstream changes',
+      checkFailed: 'Could not check the latest upstream release',
+    },
     expandSidebar: 'Expand sidebar',
     collapseSidebar: 'Collapse sidebar',
     openNavigation: 'Open navigation',
