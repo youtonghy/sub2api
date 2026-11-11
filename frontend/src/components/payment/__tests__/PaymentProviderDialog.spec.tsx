@@ -61,8 +61,15 @@ vi.mock('@/components/account/AccountFormLayout', async (importOriginal) => {
   }
 })
 
-// Vue 版 Select / ToggleSwitch 桩：不渲染内容
-vi.mock('@/components/common/Select', () => ({ default: () => <div /> }))
+// Vue 版 Select / ToggleSwitch 桩：不渲染内容；Select 记录最近一次渲染的 props 供用例模拟选择
+type SelectStubProps = { value: unknown; options: Array<{ value: string }>; onChange: (value: unknown) => void }
+const selectProps = vi.hoisted(() => ({ current: [] as SelectStubProps[] }))
+vi.mock('@/components/common/Select', () => ({
+  default: (props: SelectStubProps) => {
+    selectProps.current.push(props)
+    return <div />
+  }
+}))
 vi.mock('@/components/payment/ToggleSwitch', () => ({ default: () => <div /> }))
 
 function providerFactory(overrides: Partial<ProviderInstance> = {}): ProviderInstance {
@@ -158,6 +165,32 @@ describe('PaymentProviderDialog callback URLs', () => {
     expect(payload?.config.notifyUrl).toBe(expectedNotify + '/api/v1/payment/webhook/easypay')
     expect(payload?.config.returnUrl).toBe(expectedReturn + '/payment/result')
     unmount()
+  })
+})
+
+describe('PaymentProviderDialog EasyPay refund protocol', () => {
+  it.each([undefined, '1', '0'])('loads and saves the refund success code %s', (storedCode) => {
+    const provider = providerFactory({
+      provider_key: 'easypay', name: 'EasyPay', supported_types: ['alipay'],
+      config: {
+        pid: 'pid-1', apiBase: 'https://pay.example.com',
+        ...(storedCode === undefined ? {} : { refundSuccessCode: storedCode })
+      }
+    })
+    const { ref, onSave, unmount } = mountDialog({ editing: provider })
+    act(() => ref.current!.loadProvider(provider))
+
+    const refundSelector = () =>
+      [...selectProps.current].reverse().find((props) => props.options.some((option) => option.value === '0'))
+    expect(refundSelector(), 'refund success code selector').toBeDefined()
+    expect(refundSelector()!.value).toBe(storedCode ?? '1')
+    const selectedCode = storedCode === '0' ? '1' : '0'
+    act(() => refundSelector()!.onChange(selectedCode))
+    submit()
+
+    expect(onSave.mock.calls[0]?.[0]?.config.refundSuccessCode).toBe(selectedCode)
+    unmount()
+    selectProps.current = []
   })
 })
 

@@ -120,6 +120,7 @@ export function makeDataTableStub(options: DataTableStubOptions = {}) {
   return function DataTableStub(props: {
     columns: Column[]
     data: any[]
+    loading?: boolean
     cells?: Record<string, (context: DataTableCellContext) => ReactNode>
     headers?: Record<string, (context: DataTableHeaderContext) => ReactNode>
     onSort?: (key: string, order: 'asc' | 'desc') => void
@@ -150,20 +151,22 @@ export function makeDataTableStub(options: DataTableStubOptions = {}) {
               </div>
             ))}
         {options.sortButton && <button type="button" data-test="sort-priority" onClick={() => props.onSort?.('priority', 'desc')} />}
-        {props.data.map((row, index) => (
-          <div key={row.id ?? index} {...(options.rowAttrs?.(row) ?? {})}>
-            {(options.cells ?? []).map((cell) => {
-              const [key, testId] = Array.isArray(cell) ? cell : [cell, undefined]
-              return testId ? (
-                <div key={key} data-test={testId}>
-                  {renderCell(key, row, index)}
-                </div>
-              ) : (
-                <span key={key}>{renderCell(key, row, index)}</span>
-              )
-            })}
-          </div>
-        ))}
+        {/* 与真实 DataTable 一致：加载态下不渲染数据行 */}
+        {!props.loading &&
+          props.data.map((row, index) => (
+            <div key={row.id ?? index} {...(options.rowAttrs?.(row) ?? {})}>
+              {(options.cells ?? []).map((cell) => {
+                const [key, testId] = Array.isArray(cell) ? cell : [cell, undefined]
+                return testId ? (
+                  <div key={key} data-test={testId}>
+                    {renderCell(key, row, index)}
+                  </div>
+                ) : (
+                  <span key={key}>{renderCell(key, row, index)}</span>
+                )
+              })}
+            </div>
+          ))}
       </div>
     )
   }

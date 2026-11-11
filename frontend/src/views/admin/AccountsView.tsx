@@ -2966,13 +2966,19 @@ export default function AccountsView() {
           onToggleSchedulable={(value) => void handleBulkToggleSchedulable(value)}
         />
       )}
-      <div ref={accountTableRef} className={styles.tableArea}>
+      {/* 刷新列表时保留现有行（只读、标记忙碌），只有没有数据时才显示表格加载态 */}
+      <div
+        ref={accountTableRef}
+        className={styles.tableArea}
+        aria-busy={loading}
+        inert={accountView === 'list' && loading && accounts.length > 0}
+      >
         {accountView === 'list' ? (
           <DataTable<AccountListItem>
             ref={dataTableRef}
             columns={cols}
             data={accounts}
-            loading={loading}
+            loading={loading && accounts.length === 0}
             rowKey="id"
             serverSideSort
             onSort={handleSort}

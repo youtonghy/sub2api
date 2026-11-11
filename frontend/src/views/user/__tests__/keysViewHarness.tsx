@@ -111,6 +111,7 @@ export const dataTableModule = () => ({
   default: function DataTableStub(props: {
     columns: Column[]
     data: any[]
+    loading?: boolean
     cells?: Record<string, (context: DataTableCellContext) => ReactNode>
     onSort?: (key: string, order: 'asc' | 'desc') => void
     empty?: ReactNode
@@ -134,6 +135,7 @@ export const dataTableModule = () => ({
             {cell('name', row, index)}
             {cell('actions', row, index)}
             <div data-test="current-concurrency">{cell('current_concurrency', row, index)}</div>
+            <div data-test="usage">{cell('usage', row, index)}</div>
             {hasColumn('last_used_ip') && <div data-test="last-used-ip">{cell('last_used_ip', row, index)}</div>}
           </div>
         ))}

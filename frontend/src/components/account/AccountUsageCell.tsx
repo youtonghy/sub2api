@@ -1034,14 +1034,16 @@ export default function AccountUsageCell({
     <RefreshCw className={[styles.actionIcon, spinning ? styles.spin : ''].join(' ')} aria-hidden="true" />
   )
 
+  // Anthropic / OpenAI 的主动查询按钮：列表刷新（loading）期间同样置灰并转圈，保留已有数据行
+  const activeQueryBusy = activeQueryLoading || loading
   const activeQueryButton = (
     <button
       type="button"
       className={styles.action}
-      disabled={activeQueryLoading}
+      disabled={activeQueryBusy}
       onClick={() => void loadActiveUsage()}
     >
-      {refreshIcon(activeQueryLoading)}
+      {refreshIcon(activeQueryBusy)}
       {t('admin.accounts.usageWindow.activeQuery')}
     </button>
   )
@@ -1082,7 +1084,8 @@ export default function AccountUsageCell({
 
   const renderAnthropic = () => (
     <>
-      {loading ? (
+      {/* 刷新期间已有数据时保留原有行（同一组节点），只在首次加载时显示骨架 */}
+      {loading && !usageInfo ? (
         // OAuth: 3 rows, Setup Token: 1 row
         <div className={styles.stackLoose}>
           <SkeletonBarRow />
@@ -1349,6 +1352,26 @@ export default function AccountUsageCell({
       ) : (
         dash
       )}
+
+      {/*
+        Query the upstream now, bypassing the server's usage cache (force=true), like the Claude
+        and OpenAI cells: an account upgraded or reset upstream otherwise shows old figures for
+        the cache TTL. Shown in every state, including errors, where a retry matters most.
+      */}
+      {!loading ? (
+        <div className={local.followUp}>
+          <button
+            type="button"
+            className={styles.action}
+            data-testid="antigravity-active-query"
+            disabled={activeQueryLoading}
+            onClick={() => void loadActiveUsage()}
+          >
+            {refreshIcon(activeQueryLoading)}
+            {t('admin.accounts.usageWindow.activeQuery')}
+          </button>
+        </div>
+      ) : null}
     </>
   )
 
@@ -1571,7 +1594,11 @@ export default function AccountUsageCell({
       // Other accounts: no usage window
       content = dash
     }
-    return <div ref={setRootEl}>{content}</div>
+    return (
+      <div ref={setRootEl} aria-busy={loading || activeQueryLoading}>
+        {content}
+      </div>
+    )
   }
 
   // Non-OAuth/Setup-Token accounts

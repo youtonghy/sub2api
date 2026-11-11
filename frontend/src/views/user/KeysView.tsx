@@ -283,6 +283,7 @@ export default function KeysView() {
   const [submitting, setSubmitting] = useState(false)
   const [now, setNow] = useState(() => new Date())
   const [usageStats, setUsageStats] = useState<Record<string, BatchApiKeyUsageStats>>({})
+  const [usageLoading, setUsageLoading] = useState(false)
   const [userGroupRates, setUserGroupRates] = useState<Record<number, number>>({})
   const [pagination, setPaginationState] = useState(() => ({
     page: 1,
@@ -442,6 +443,7 @@ export default function KeysView() {
     const { signal } = controller
     const q = live.current
     setLoading(true)
+    setUsageLoading(false)
     try {
       // Build filters
       const filters: {
@@ -465,18 +467,13 @@ export default function KeysView() {
       handleSelectionChange(live.current.selectedIds)
       setPaginationState((current) => ({ ...current, total: response.total, pages: response.pages }))
 
-      // Load usage stats for all API keys in the list
+      // 用量统计要聚合 30 天的 usage_logs，可能比列表慢很多：不阻塞表格渲染，单独加载
+      setUsageLoading(response.items.length > 0)
       if (response.items.length > 0) {
-        const keyIds = response.items.map((k) => k.id)
-        try {
-          const usageResponse = await usageAPI.getDashboardApiKeysUsage(keyIds, { signal })
-          if (signal.aborted) return
-          setUsageStats(usageResponse.stats)
-        } catch (e) {
-          if (!isAbortError(e)) {
-            console.error('Failed to load usage stats:', e)
-          }
-        }
+        void loadUsageStats(
+          response.items.map((k) => k.id),
+          signal
+        )
       }
     } catch (error) {
       if (isAbortError(error)) {
@@ -486,6 +483,22 @@ export default function KeysView() {
     } finally {
       if (abortController.current === controller) {
         setLoading(false)
+      }
+    }
+  }
+
+  const loadUsageStats = async (keyIds: number[], signal: AbortSignal) => {
+    try {
+      const usageResponse = await usageAPI.getDashboardApiKeysUsage(keyIds, { signal })
+      if (signal.aborted) return
+      setUsageStats(usageResponse.stats)
+    } catch (e) {
+      if (!isAbortError(e)) {
+        console.error('Failed to load usage stats:', e)
+      }
+    } finally {
+      if (!signal.aborted) {
+        setUsageLoading(false)
       }
     }
   }
@@ -1076,11 +1089,19 @@ export default function KeysView() {
       <div className={styles.usageCell}>
         <div className={styles.inline}>
           <span className={styles.muted}>{t('keys.today')}:</span>
-          <span className={styles.strong}>${(usageStats[row.id]?.today_actual_cost ?? 0).toFixed(4)}</span>
+          {usageLoading && !usageStats[row.id] ? (
+            <span className={styles.usagePending} data-test="usage-pending" aria-hidden="true" />
+          ) : (
+            <span className={styles.strong}>${(usageStats[row.id]?.today_actual_cost ?? 0).toFixed(4)}</span>
+          )}
         </div>
         <div className={styles.inline}>
           <span className={styles.muted}>{t('keys.total')}:</span>
-          <span className={styles.strong}>${(usageStats[row.id]?.total_actual_cost ?? 0).toFixed(4)}</span>
+          {usageLoading && !usageStats[row.id] ? (
+            <span className={styles.usagePending} aria-hidden="true" />
+          ) : (
+            <span className={styles.strong}>${(usageStats[row.id]?.total_actual_cost ?? 0).toFixed(4)}</span>
+          )}
         </div>
         {/* Quota progress (if quota is set) */}
         {row.quota > 0 && (

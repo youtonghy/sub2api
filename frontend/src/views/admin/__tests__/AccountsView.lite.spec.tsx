@@ -165,6 +165,39 @@ describe('admin AccountsView lite account list', () => {
     )
   })
 
+  it('keeps existing rows mounted and busy while a manual list refresh is pending', async () => {
+    const { container } = await mountView()
+    const row = container.querySelector('[data-account-name="compact row"]')
+    expect(row).toBeTruthy()
+    let finish: (value: unknown) => void = () => {}
+    listAccounts.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    await act(async () => {
+      fireEvent.click(container.querySelector('button[aria-label="common.refresh"]')!)
+    })
+    await flushPromises()
+    expect(captured.DataTable.loading).toBe(false)
+    expect(container.querySelector('[data-account-name="compact row"]')).toBe(row)
+    expect(container.querySelector('[aria-busy="true"]')?.hasAttribute('inert')).toBe(true)
+    await act(async () => {
+      finish({ items: [{ ...listRow, name: 'updated row' }], total: 1, page: 1, page_size: 20, pages: 1 })
+    })
+    await flushPromises()
+    expect(container.querySelector('[data-account-name="updated row"]')).toBe(row)
+    expect(container.querySelector('[aria-busy="true"]')).toBeNull()
+  })
+
+  it('still shows initial loading when no rows are available', async () => {
+    let finish: (value: unknown) => void = () => {}
+    listAccounts.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    await mountView()
+    expect(captured.DataTable.loading).toBe(true)
+    await act(async () => {
+      finish({ items: [listRow], total: 1, page: 1, page_size: 20, pages: 1 })
+    })
+    await flushPromises()
+    expect(captured.DataTable.loading).toBe(false)
+  })
+
   it('maps group_ids through the group catalog for the table cell', async () => {
     const { container } = await mountView()
 
