@@ -30,6 +30,7 @@ import Skeleton from '@/components/common/Skeleton'
 import { useI18n } from '@/i18n/useI18n'
 import { useAppStore } from '@/stores/app'
 import type { AccountListItem, AccountPlatform, AdminGroup } from '@/types'
+import { fetchAllAccountsByPriority } from '@/utils/accountPriorityFetch'
 import { computeDropPriority } from '@/utils/accountPriorityOrder'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import styles from './AccountSortOrderModal.module.css'
@@ -40,28 +41,7 @@ export interface AccountSortOrderModalProps {
   onSaved?: () => void
 }
 
-// 一次分页请求尽量取全量：拖动排序必须看到同一条全局顺序，不能只排当前页。
-const PAGE_SIZE = 1000
-// 防御性上限，避免异常 total 把弹窗拖死（1000 × 10 = 1 万个账号）。
-const MAX_PAGES = 10
-
 type PriorityUpdate = { id: number; priority: number }
-
-const fetchAllAccounts = async () => {
-  const collected: AccountListItem[] = []
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const response = await adminAPI.accounts.list(page, PAGE_SIZE, {
-      lite: '1',
-      sort_by: 'priority',
-      sort_order: 'asc'
-    })
-    collected.push(...response.items)
-    const total = response.total ?? collected.length
-    if (!response.items.length || collected.length >= total) break
-  }
-  // 服务端已按 priority 排序，这里再用 id 兜底保证同一优先级内的顺序稳定。
-  return collected.sort((a, b) => a.priority - b.priority || a.id - b.id)
-}
 
 // 与打开弹窗时的原始优先级对比，只提交真正变了的行。
 const computePlannedUpdates = (
@@ -138,7 +118,7 @@ export default function AccountSortOrderModal({ show, onClose, onSaved }: Accoun
     let cancelled = false
     setLoading(true)
     setLoadError('')
-    Promise.all([fetchAllAccounts(), adminAPI.groups.getAll().catch(() => [] as AdminGroup[])])
+    Promise.all([fetchAllAccountsByPriority(), adminAPI.groups.getAll().catch(() => [] as AdminGroup[])])
       .then(([accounts, allGroups]) => {
         if (cancelled) return
         const initial = new Map(accounts.map((account) => [account.id, account.priority]))

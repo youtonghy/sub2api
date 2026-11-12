@@ -111,6 +111,24 @@ describe('usePriorityDrag', () => {
     expect(onDrop).not.toHaveBeenCalled()
   })
 
+  it('maps the drop slot by row id when only part of the rows is rendered (virtual scroll)', () => {
+    // 完整数据有 5 行，但 DOM 里只渲染了 id 1..3（对应数据下标 2..4）
+    const allRows: Row[] = [
+      { id: 8, priority: 1 },
+      { id: 9, priority: 2 },
+      ...rows
+    ]
+    const drag = createPriorityDrag<Row>({ getRows: () => allRows, getContainer: () => container, onDrop })
+    drag.start(mouseDown(10), rows[0])
+    mouseMove(180)
+    mouseUp()
+
+    const result = onDrop.mock.calls[0][0]
+    expect(result.order.map((row: Row) => row.id)).toEqual([8, 9, 2, 1, 3])
+    expect(result.previous?.id).toBe(2)
+    expect(result.next?.id).toBe(3)
+  })
+
   it('bails out when the gesture is mostly horizontal', () => {
     const drag = setup()
     drag.start(mouseDown(10), rows[0])

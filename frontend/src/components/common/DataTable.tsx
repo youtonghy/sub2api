@@ -52,6 +52,8 @@ export interface DataTableHandle<T = any> {
   sortedData: T[]
   resolveRowKey: (row: T, index: number) => RowKey
   tableWrapperEl: HTMLDivElement | null
+  /** 由外部切换排序指示并持久化（不触发 onSort，调用方自行重新加载数据） */
+  setSort: (key: string, order: SortOrder) => void
 }
 
 export interface DataTableProps<T = any> {
@@ -441,7 +443,11 @@ export default function DataTable<T = any>({
       shouldVirtualize,
       sortedData,
       resolveRowKey,
-      tableWrapperEl: tableWrapperRef.current
+      tableWrapperEl: tableWrapperRef.current,
+      setSort: (key: string, order: SortOrder) => {
+        setSort({ key, order })
+        writePersistedSortState({ key, order })
+      }
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rowVirtualizer, shouldVirtualize, sortedData, rowKey]

@@ -194,22 +194,31 @@ export function createPriorityDrag<T extends PriorityDragRow>(options: UsePriori
 
   function onPointerUp() {
     const wasDragging = dragActive
-    const targetIndex = dropIndex
     const moved = dragging
+    // 落点用行 id 表达，而不是 DOM 下标：虚拟滚动下 DOM 里只有可见行，
+    // 下标和完整数据对不上。
+    const beforeId = rowElements[dropIndex]?.dataset.rowId ?? null
+    const afterId = rowElements[dropIndex - 1]?.dataset.rowId ?? null
     const rows = options.getRows()
-    const sourceIndex = moved ? rows.findIndex((row) => row.id === moved.id) : -1
 
     cleanup()
 
-    if (!wasDragging || !moved || sourceIndex < 0) return
+    if (!wasDragging || !moved) return
+    const movedKey = String(moved.id)
+    if (!rows.some((row) => row.id === moved.id)) return
+    // 落在自己的上沿或下沿：位置没变。
+    if (beforeId === movedKey || afterId === movedKey) return
 
-    // dropIndex 是"插入到第几个之前"，删掉自己之后要修正下标。
-    let insertIndex = targetIndex
-    if (insertIndex > sourceIndex) insertIndex -= 1
-    if (insertIndex === sourceIndex) return
+    const order = rows.filter((row) => row.id !== moved.id)
+    let insertIndex = -1
+    if (beforeId != null) {
+      insertIndex = order.findIndex((row) => String(row.id) === beforeId)
+    } else if (afterId != null) {
+      const anchor = order.findIndex((row) => String(row.id) === afterId)
+      insertIndex = anchor < 0 ? -1 : anchor + 1
+    }
+    if (insertIndex < 0) return
 
-    const order = [...rows]
-    order.splice(sourceIndex, 1)
     order.splice(insertIndex, 0, moved)
     const previous = insertIndex > 0 ? order[insertIndex - 1] : null
     const next = insertIndex < order.length - 1 ? order[insertIndex + 1] : null

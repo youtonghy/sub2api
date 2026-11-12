@@ -106,7 +106,8 @@ import type {
   WindowStats
 } from '@/types'
 import { fetchAllAccountIds } from '@/utils/accountSelection'
-import { computeDropPriority } from '@/utils/accountPriorityOrder'
+import { fetchAllAccountsByPriority } from '@/utils/accountPriorityFetch'
+import { computeDropPriority, planPriorityMove } from '@/utils/accountPriorityOrder'
 import { buildGrokUsageRefreshKey, buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
@@ -1175,46 +1176,68 @@ export default function AccountsView() {
     return ranks
   }, [accounts])
 
-  // 拖动落点 → 新的优先级。只写被拖动的这一个账号：取新前后邻居优先级的中点，
-  // 邻居之间没有空位时才退回整页按位置重编号。
+  // 拖动落点 → 新的优先级。
+  // 列表按优先级升序、且落点前后都有邻居并留有空位时，只写被拖动的账号（取中点）。
+  // 其它情况（邻居间没有空位、落在页首/页尾、当前按别的列排序）都基于全量调度顺序规划：
+  // 只看当前页重编号会和其它页、被筛掉的账号撞号。
   const reorderAccountPriority = async (
     moved: AccountListItem,
     previous: AccountListItem | null,
     next: AccountListItem | null
   ) => {
     const rows = accountsRef.current
-    const taken = new Set(rows.filter((row) => row.id !== moved.id).map((row) => row.priority))
-    const target = computeDropPriority({
-      lowerBound: previous?.priority ?? null,
-      upperBound: next?.priority ?? null,
-      taken
-    })
-    const changes = target != null ? [{ id: moved.id, priority: target }] : rows.map((row, index) => ({ id: row.id, priority: index + 1 }))
-    const before = new Map(rows.map((row) => [row.id, row.priority]))
-    const effective = changes.filter((change) => before.get(change.id) !== change.priority)
-    if (effective.length === 0) return
-
-    // 先把本地顺序改掉，失败再整体回滚，避免出现"拖完又跳回去"的闪烁。
-    const optimistic = new Map(rows.map((row) => [row.id, row.priority]))
-    effective.forEach((change) => optimistic.set(change.id, change.priority))
-    setAccounts(
-      rows
-        .map((row) => ({ ...row, priority: optimistic.get(row.id) ?? row.priority }))
-        .sort((left, right) => left.priority - right.priority || left.id - right.id)
-    )
+    const sortState = sortStateRef.current
+    const sortedByPriority = sortState.sort_by === 'priority' && sortState.sort_order === 'asc'
 
     try {
-      await adminAPI.accounts.updateSortOrder(effective)
-      useAppStore.getState().showSuccess(t('admin.accounts.sortOrder.updated'))
+      let changes: Array<{ id: number; priority: number }> | null = null
+      if (sortedByPriority && previous && next) {
+        const target = computeDropPriority({
+          lowerBound: previous.priority,
+          upperBound: next.priority,
+          taken: new Set(rows.filter((row) => row.id !== moved.id).map((row) => row.priority))
+        })
+        if (target != null) changes = target === moved.priority ? [] : [{ id: moved.id, priority: target }]
+      }
+      if (changes == null) {
+        changes = planPriorityMove({
+          ordered: await fetchAllAccountsByPriority(),
+          movedId: moved.id,
+          previousId: previous?.id ?? null,
+          nextId: next?.id ?? null
+        })
+      }
+      if (changes == null) {
+        // 全量列表里找不到这些账号：当前页已过期，重新加载后再拖。
+        useAppStore.getState().showError(t('admin.accounts.sortOrder.updateFailed'))
+        reloadQuietly()
+        return
+      }
+
+      if (changes.length > 0) {
+        // 已按优先级排序时先把本地顺序改掉，失败再整体回滚，避免"拖完又跳回去"的闪烁。
+        if (sortedByPriority) {
+          const nextPriority = new Map(changes.map((change) => [change.id, change.priority]))
+          setAccounts(
+            rows
+              .map((row) => ({ ...row, priority: nextPriority.get(row.id) ?? row.priority }))
+              .sort((left, right) => left.priority - right.priority || left.id - right.id)
+          )
+        }
+        await adminAPI.accounts.updateSortOrder(changes)
+        useAppStore.getState().showSuccess(t('admin.accounts.sortOrder.updated'))
+      }
+
       // 顺序就是优先级本身：拖完把排序切回"优先级升序"，
       // 让列表顺序、位次列、真实的调度顺序三者保持一致。
-      const sortState = sortStateRef.current
-      if (sortState.sort_by !== 'priority' || sortState.sort_order !== 'asc') {
+      if (!sortedByPriority) {
         sortStateRef.current = { sort_by: 'priority', sort_order: 'asc' }
-        void reload()
+        setParamsLocal({ sort_by: 'priority', sort_order: 'asc' })
+        dataTableRef.current?.setSort('priority', 'asc')
+        await reload()
       }
     } catch (error) {
-      setAccounts(rows)
+      if (sortedByPriority) setAccounts(rows)
       useAppStore.getState().showError(extractApiErrorMessage(error, t('admin.accounts.sortOrder.updateFailed')))
     }
   }
