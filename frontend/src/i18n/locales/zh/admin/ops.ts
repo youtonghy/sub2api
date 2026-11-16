@@ -45,7 +45,7 @@ export default {
         samplingThereafter: '后续采样间隔',
         retentionDays: '运维日志保留天数',
         requestRetentionDays: '请求日志保留天数',
-        requestRetentionDaysHint: '请求使用明细每 6 小时滚动清理一次，保存后在下次清理生效。永久保留会持续占用存储空间。',
+        requestRetentionDaysHint: '请求使用明细和隐私过滤记录每 6 小时滚动清理一次，保存后在下次清理生效。永久保留会持续占用存储空间。',
         retentionDaysInvalid: '运维日志须保留 1–3650 天；请求日志须保留 1–3650 天或选择永久保留。',
         retentionDaysOption: '{days} 天',
         retentionDaysCustom: '自定义天数',

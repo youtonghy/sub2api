@@ -7,6 +7,7 @@ import {
   ArrowLeftRight,
   ChartColumn,
   CreditCard,
+  EyeOff,
   Fingerprint,
   Folder,
   Gift,
@@ -127,6 +128,7 @@ export function useAppNavigation(): AppNavigation {
   const flagSubscription = flag(FeatureFlags.subscription)
   const flagAffiliate = flag(FeatureFlags.affiliate)
   const flagRiskControl = flag(FeatureFlags.riskControl)
+  const flagPrivacyFilter = flag(FeatureFlags.privacyFilter)
   const flagPluginManagement = flag(FeatureFlags.pluginManagement)
   const flagMCP = flag(FeatureFlags.mcp)
 
@@ -150,7 +152,7 @@ export function useAppNavigation(): AppNavigation {
     .sort((a, b) => a.sort_order - b.sort_order)
 
   // 用户自己的导航项（用户端主菜单与管理员的「我的账户」共享）。
-  // 顺序：密钥 → 用量 → 可用渠道 → 渠道状态 → 订阅/支付 → 兑换/资料。
+  // 顺序：密钥 → 用量 → 隐私过滤记录 → 可用渠道 → 渠道状态 → 订阅/支付 → 兑换/资料。
   function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     const items: NavItem[] = []
     if (withDashboard) {
@@ -160,6 +162,7 @@ export function useAppNavigation(): AppNavigation {
       { path: '/keys', label: t('nav.apiKeys'), icon: KeyRound },
       { path: '/batch-image', label: t('nav.batchImage'), icon: Images, hideInSimpleMode: true, featureFlag: () => canUseBatchImage },
       { path: '/usage', label: t('nav.usage'), icon: ChartColumn, hideInSimpleMode: true },
+      { path: '/privacy-filter', label: t('nav.privacyFilter'), icon: EyeOff, hideInSimpleMode: true, featureFlag: flagPrivacyFilter },
       { path: '/available-channels', label: t('nav.availableChannels'), icon: Network, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
       { path: '/monitor', label: t('nav.channelStatus'), icon: Signal, featureFlag: flagChannelMonitor },
       { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCard, hideInSimpleMode: true, featureFlag: flagSubscription },
@@ -212,6 +215,7 @@ export function useAppNavigation(): AppNavigation {
           { path: '/admin/prompt-audit', label: t('nav.promptAudit'), icon: ShieldCheck },
         ],
       },
+      { path: '/admin/privacy-filter', label: t('nav.privacyFilter'), icon: EyeOff },
       { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: Ticket, hideInSimpleMode: true },
       { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: Gift, hideInSimpleMode: true },
       {

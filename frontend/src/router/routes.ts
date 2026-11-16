@@ -173,6 +173,13 @@ export const appRoutes: AppRouteDef[] = [
     view: () => import('@/views/user/UsageView'),
   },
   {
+    path: '/privacy-filter',
+    name: 'PrivacyFilter',
+    layout: 'app',
+    meta: { requiresAuth: true, requiresAdmin: false, title: 'Privacy Filter', titleKey: 'privacyFilter.title', descriptionKey: 'privacyFilter.userDescription' },
+    view: () => import('@/features/privacy-filter/UserPrivacyFilterView'),
+  },
+  {
     path: '/redeem',
     name: 'Redeem',
     layout: 'app',
@@ -409,6 +416,13 @@ export const appRoutes: AppRouteDef[] = [
     layout: 'app',
     meta: { requiresAuth: true, requiresAdmin: true, title: 'Prompt Audit', titleKey: 'admin.promptAudit.title', descriptionKey: 'admin.promptAudit.description', requiresRiskControl: true },
     view: () => import('@/features/prompt-audit/PromptAuditView'),
+  },
+  {
+    path: '/admin/privacy-filter',
+    name: 'AdminPrivacyFilter',
+    layout: 'app',
+    meta: { requiresAuth: true, requiresAdmin: true, title: 'Privacy Filter', titleKey: 'privacyFilter.title', descriptionKey: 'privacyFilter.adminDescription' },
+    view: () => import('@/features/privacy-filter/AdminPrivacyFilterView'),
   },
   {
     path: '/admin/usage',

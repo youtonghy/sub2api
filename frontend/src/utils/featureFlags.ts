@@ -134,6 +134,12 @@ export const FeatureFlags = {
     mode: 'opt-in',
     label: 'Affiliate',
   }),
+  // Read-only: derived from the privacy filter config (mode on and at least one group).
+  privacyFilter: defineFlag({
+    key: 'privacy_filter_enabled',
+    mode: 'opt-in',
+    label: 'Privacy Filter',
+  }),
   // Read-only: enabled by the deployment's MCP_PUBLIC_URL, not an admin toggle.
   mcp: defineFlag({
     key: 'mcp_enabled',

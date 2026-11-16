@@ -6,9 +6,6 @@ import RiskControlView from '../RiskControlView'
 
 const {
   getConfig,
-  getPrivacyFilterConfig,
-  updatePrivacyFilterConfig,
-  getPrivacyFilterStatus,
   updateConfig,
   getStatus,
   listLogs,
@@ -19,9 +16,6 @@ const {
   showSuccess
 } = vi.hoisted(() => ({
   getConfig: vi.fn(),
-  getPrivacyFilterConfig: vi.fn(),
-  updatePrivacyFilterConfig: vi.fn(),
-  getPrivacyFilterStatus: vi.fn(),
   updateConfig: vi.fn(),
   getStatus: vi.fn(),
   listLogs: vi.fn(),
@@ -36,9 +30,6 @@ vi.mock('@/api/admin', () => ({
   adminAPI: {
     riskControl: {
       getConfig,
-      getPrivacyFilterConfig,
-      updatePrivacyFilterConfig,
-      getPrivacyFilterStatus,
       updateConfig,
       getStatus,
       listLogs,
@@ -217,18 +208,6 @@ describe('admin RiskControlView', () => {
     testAPIKeys.mockReset()
 
     getConfig.mockResolvedValue(baseConfig())
-    getPrivacyFilterConfig.mockResolvedValue({ mode: 'off', group_ids: [], categories: ['private_key', 'credential'] })
-    getPrivacyFilterStatus.mockResolvedValue({
-      scanned_requests: 0,
-      hit_requests: 0,
-      redacted_requests: 0,
-      failed_requests: 0,
-      fields: 0,
-      restored_tokens: 0,
-      unresolved_tokens: 0,
-      category_counts: {},
-      started_at: '2026-11-09T00:00:00Z'
-    })
     getStatus.mockResolvedValue(runtimeStatus())
     listLogs.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 20, pages: 1 })
     getGroups.mockResolvedValue([])

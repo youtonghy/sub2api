@@ -1,5 +1,6 @@
 import adminAccessKeys from './adminAccessKeys'
 import mcp from './mcp'
+import privacyFilter from './privacyFilter'
 import landing from './landing'
 import common from './common'
 import dashboard from './dashboard'
@@ -20,6 +21,7 @@ import insightsUi from './insightsUi'
 export default {
   adminAccessKeys,
   mcp,
+  privacyFilter,
   ...landing,
   ...common,
   ...dashboard,

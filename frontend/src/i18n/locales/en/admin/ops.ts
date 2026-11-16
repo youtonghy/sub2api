@@ -45,7 +45,7 @@ export default {
         samplingThereafter: 'Sampling thereafter',
         retentionDays: 'Operations log retention days',
         requestRetentionDays: 'Request log retention days',
-        requestRetentionDaysHint: 'Request usage records are pruned every 6 hours. Changes apply on the next cleanup. Keeping records forever uses increasing storage.',
+        requestRetentionDaysHint: 'Request usage records and privacy filter records are pruned every 6 hours. Changes apply on the next cleanup. Keeping records forever uses increasing storage.',
         retentionDaysInvalid: 'Keep operations logs for 1–3650 days; keep request logs for 1–3650 days or choose Forever.',
         retentionDaysOption: '{days} days',
         retentionDaysCustom: 'Custom days',

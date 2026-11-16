@@ -64,6 +64,7 @@ describe('User UI request marker', () => {
     '/usage',
     '/usage/stats',
     '/usage/dashboard/snapshot-v2',
+    '/privacy-filter/events',
     '/announcements',
     '/announcements/3/read',
     '/redeem',

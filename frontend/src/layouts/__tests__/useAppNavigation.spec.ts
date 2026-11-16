@@ -63,3 +63,45 @@ describe('useAppNavigation MCP entry', () => {
     expect(mcpEntries()).toEqual([])
   })
 })
+
+describe('useAppNavigation privacy filter entries', () => {
+  beforeEach(() => {
+    useAuthStore.setState(useAuthStore.getInitialState(), true)
+    useAppStore.setState(useAppStore.getInitialState(), true)
+  })
+
+  function arrangePrivacy(isAdmin: boolean, privacyFilterEnabled: boolean | undefined) {
+    useAuthStore.setState({ isAdmin, isSimpleMode: false })
+    useAppStore.setState({
+      backendModeEnabled: false,
+      cachedPublicSettings: {
+        risk_control_enabled: true,
+        ...(privacyFilterEnabled === undefined ? {} : { privacy_filter_enabled: privacyFilterEnabled })
+      } as PublicSettings
+    })
+    useAdminSettingsStore.setState({ customMenuItems: [], fetch: vi.fn() } as never)
+    const { result } = renderHook(() => useAppNavigation())
+    return Object.fromEntries(
+      result.current.sections.map((section) => [
+        section.id,
+        section.items.flatMap((entry) => [entry.id, ...(entry.children ?? []).map((child) => child.id)])
+      ])
+    )
+  }
+
+  it('gives admins a top-level page outside the security audit group, even with the filter off', () => {
+    const ids = arrangePrivacy(true, false)
+    expect(ids.admin).toContain('/admin/privacy-filter')
+    expect(ids.admin.indexOf('/admin/privacy-filter')).toBe(ids.admin.indexOf('/admin/prompt-audit') + 1)
+    expect(ids.personal).not.toContain('/privacy-filter')
+  })
+
+  it('shows the user records page right after usage only while the filter is active', () => {
+    const ids = arrangePrivacy(false, true)
+    expect(ids.user.indexOf('/privacy-filter')).toBe(ids.user.indexOf('/usage') + 1)
+    expect(arrangePrivacy(true, true).personal).toContain('/privacy-filter')
+
+    expect(arrangePrivacy(false, false).user).not.toContain('/privacy-filter')
+    expect(arrangePrivacy(false, undefined).user).not.toContain('/privacy-filter')
+  })
+})
