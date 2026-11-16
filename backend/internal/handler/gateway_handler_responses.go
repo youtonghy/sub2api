@@ -122,7 +122,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 
-	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolOpenAIResponses, body)
+	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolOpenAIResponses, reqModel, body)
 	if filterErr != nil {
 		h.responsesErrorResponse(c, http.StatusInternalServerError, "api_error", privacyFilterClientMessage)
 		return

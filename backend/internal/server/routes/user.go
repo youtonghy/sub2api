@@ -119,6 +119,13 @@ func RegisterUserRoutes(
 			usage.POST("/dashboard/api-keys-usage", h.Usage.DashboardAPIKeysUsage)
 		}
 
+		// 隐私过滤记录（仅本人）
+		privacyFilter := authenticated.Group("/privacy-filter")
+		privacyFilter.Use(panelRateLimiter.Heavy())
+		{
+			privacyFilter.GET("/events", h.PrivacyFilter.ListEvents)
+		}
+
 		// 公告（用户可见）
 		announcements := authenticated.Group("/announcements")
 		{

@@ -79,7 +79,7 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 	reqLog = reqLog.With(zap.String("model", reqModel))
 	setOpsRequestContext(c, reqModel, false)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeSync))
-	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.PrivacyFilterProtocolEmbeddings, body)
+	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.PrivacyFilterProtocolEmbeddings, reqModel, body)
 	if filterErr != nil {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", privacyFilterClientMessage)
 		return

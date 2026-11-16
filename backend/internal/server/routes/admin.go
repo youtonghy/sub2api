@@ -124,6 +124,9 @@ func RegisterAdminRoutes(
 		// 风控中心
 		registerContentModerationRoutes(admin, h)
 
+		// 隐私过滤
+		registerPrivacyFilterRoutes(admin, h)
+
 		// 独立提示词输入审计
 		registerPromptAuditRoutes(admin, h)
 
@@ -180,9 +183,16 @@ func registerContentModerationRoutes(admin *gin.RouterGroup, h *handler.Handlers
 		risk.POST("/users/:user_id/unban", h.Admin.ContentModeration.UnbanUser)
 		risk.DELETE("/hashes", h.Admin.ContentModeration.DeleteFlaggedHash)
 		risk.DELETE("/hashes/all", h.Admin.ContentModeration.ClearFlaggedHashes)
-		risk.GET("/privacy-filter/config", h.Admin.PrivacyFilter.GetConfig)
-		risk.PUT("/privacy-filter/config", h.Admin.PrivacyFilter.UpdateConfig)
-		risk.GET("/privacy-filter/status", h.Admin.PrivacyFilter.GetStatus)
+	}
+}
+
+func registerPrivacyFilterRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	privacy := admin.Group("/privacy-filter")
+	{
+		privacy.GET("/config", h.Admin.PrivacyFilter.GetConfig)
+		privacy.PUT("/config", h.Admin.PrivacyFilter.UpdateConfig)
+		privacy.GET("/status", h.Admin.PrivacyFilter.GetStatus)
+		privacy.GET("/events", h.Admin.PrivacyFilter.ListEvents)
 	}
 }
 

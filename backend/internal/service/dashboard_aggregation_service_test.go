@@ -18,6 +18,9 @@ type dashboardAggregationRepoTestStub struct {
 	cleanupDedupCutoff    time.Time
 	cleanupAggregateCalls int
 	cleanupDedupCalls     int
+	cleanupPrivacyCalls   int
+	cleanupPrivacyCutoff  time.Time
+	cleanupPrivacyErr     error
 	ensurePartitionCalls  int
 	lastStart             time.Time
 	lastEnd               time.Time
@@ -88,6 +91,12 @@ func (s *dashboardAggregationRepoTestStub) CleanupUsageBillingDedup(ctx context.
 	s.cleanupDedupCalls++
 	s.cleanupDedupCutoff = cutoff
 	return s.cleanupDedupErr
+}
+
+func (s *dashboardAggregationRepoTestStub) CleanupPrivacyFilterEvents(ctx context.Context, cutoff time.Time) error {
+	s.cleanupPrivacyCalls++
+	s.cleanupPrivacyCutoff = cutoff
+	return s.cleanupPrivacyErr
 }
 
 func (s *dashboardAggregationRepoTestStub) EnsureUsageLogsPartitions(ctx context.Context, now time.Time) error {
@@ -254,6 +263,67 @@ func TestDashboardAggregationService_CleanupDedupFailure_DoesNotRecord(t *testin
 
 	require.Nil(t, svc.lastRetentionCleanup.Load())
 	require.Equal(t, 1, repo.cleanupDedupCalls)
+}
+
+func TestDashboardAggregationService_CleanupPrivacyFilterEvents_SharesUsageRetention(t *testing.T) {
+	repo := &dashboardAggregationRepoTestStub{}
+	svc := &DashboardAggregationService{
+		repo: repo,
+		cfg: config.DashboardAggregationConfig{
+			Enabled: true,
+			Retention: config.DashboardAggregationRetentionConfig{
+				UsageLogsDays: 7,
+				HourlyDays:    1,
+				DailyDays:     1,
+			},
+		},
+	}
+
+	now := time.Now().UTC()
+	svc.maybeCleanupRetention(context.Background(), now)
+
+	require.Equal(t, 1, repo.cleanupPrivacyCalls)
+	require.Equal(t, repo.cleanupUsageCutoff, repo.cleanupPrivacyCutoff)
+	require.NotNil(t, svc.lastRetentionCleanup.Load())
+}
+
+func TestDashboardAggregationService_CleanupPrivacyFilterEvents_SkippedWhenKeptForever(t *testing.T) {
+	repo := &dashboardAggregationRepoTestStub{}
+	svc := &DashboardAggregationService{
+		repo: repo,
+		cfg: config.DashboardAggregationConfig{
+			Enabled: true,
+			Retention: config.DashboardAggregationRetentionConfig{
+				UsageLogsDays: 0,
+				HourlyDays:    1,
+				DailyDays:     1,
+			},
+		},
+	}
+
+	svc.maybeCleanupRetention(context.Background(), time.Now().UTC())
+
+	require.Equal(t, 0, repo.cleanupPrivacyCalls)
+}
+
+func TestDashboardAggregationService_CleanupPrivacyFilterEventsFailure_DoesNotRecord(t *testing.T) {
+	repo := &dashboardAggregationRepoTestStub{cleanupPrivacyErr: errors.New("privacy cleanup failed")}
+	svc := &DashboardAggregationService{
+		repo: repo,
+		cfg: config.DashboardAggregationConfig{
+			Enabled: true,
+			Retention: config.DashboardAggregationRetentionConfig{
+				UsageLogsDays: 1,
+				HourlyDays:    1,
+				DailyDays:     1,
+			},
+		},
+	}
+
+	svc.maybeCleanupRetention(context.Background(), time.Now().UTC())
+
+	require.Nil(t, svc.lastRetentionCleanup.Load())
+	require.Equal(t, 1, repo.cleanupPrivacyCalls)
 }
 
 func TestDashboardAggregationService_PartitionFailure_DoesNotAggregate(t *testing.T) {

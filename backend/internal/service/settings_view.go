@@ -426,6 +426,9 @@ type PublicSettings struct {
 
 	// 允许终端用户在用量页查看自己的失败请求
 	AllowUserViewErrorRequests bool `json:"allow_user_view_error_requests"`
+
+	// 隐私过滤对至少一个分组生效时为 true，用户侧据此显示过滤记录入口
+	PrivacyFilterEnabled bool `json:"privacy_filter_enabled"`
 }
 
 type LoginAgreementDocument struct {

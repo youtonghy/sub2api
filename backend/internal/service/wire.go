@@ -603,6 +603,14 @@ func ProvideOpsSystemLogSink(opsRepo OpsRepository) *OpsSystemLogSink {
 	return sink
 }
 
+// ProvidePrivacyFilterService creates the privacy filter and starts the
+// background writer for its records. Stop is called from cmd/server's cleanup.
+func ProvidePrivacyFilterService(settingRepo SettingRepository, cfg *config.Config, eventRepo PrivacyFilterEventRepository) *PrivacyFilterService {
+	svc := NewPrivacyFilterService(settingRepo, cfg)
+	svc.AttachEventStore(eventRepo)
+	return svc
+}
+
 // ProvideAuditLogService 创建操作审计日志服务并启动异步写入与保留期清理协程。
 // 停止逻辑挂在 cmd/server 的 provideCleanup。
 func ProvideAuditLogService(repo AuditLogRepository, settingService *SettingService) *AuditLogService {
@@ -987,7 +995,7 @@ var ProviderSet = wire.NewSet(
 	NewModelPricingResolver,
 	NewModelPlazaService,
 	NewContentModerationService,
-	NewPrivacyFilterService,
+	ProvidePrivacyFilterService,
 	NewAffiliateService,
 	ProvidePaymentConfigService,
 	ProvidePaymentService,

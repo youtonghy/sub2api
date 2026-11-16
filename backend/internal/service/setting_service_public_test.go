@@ -182,6 +182,27 @@ func TestSettingService_GetPublicSettings_ExposesAllowUserViewErrorRequests(t *t
 	require.True(t, settings.AllowUserViewErrorRequests)
 }
 
+func TestSettingService_GetPublicSettings_PrivacyFilterEnabled(t *testing.T) {
+	cases := map[string]bool{
+		"":                                   false,
+		"not json":                           false,
+		`{"mode":"off","group_ids":[1]}`:     false,
+		`{"mode":"redact","group_ids":[]}`:   false,
+		`{"mode":"observe","group_ids":[1]}`: true,
+		`{"mode":"redact","group_ids":[1],"categories":[]}`: false,
+	}
+	for raw, want := range cases {
+		values := map[string]string{}
+		if raw != "" {
+			values[SettingKeyPrivacyFilterConfig] = raw
+		}
+		svc := NewSettingService(&settingPublicRepoStub{values: values}, &config.Config{})
+		settings, err := svc.GetPublicSettings(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, want, settings.PrivacyFilterEnabled, raw)
+	}
+}
+
 func TestSettingService_GetPublicSettings_ExposesWeChatOAuthModeCapabilities(t *testing.T) {
 	svc := NewSettingService(&settingPublicRepoStub{
 		values: map[string]string{

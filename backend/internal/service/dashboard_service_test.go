@@ -128,6 +128,10 @@ func (s *dashboardAggregationRepoStub) CleanupUsageBillingDedup(ctx context.Cont
 	return nil
 }
 
+func (s *dashboardAggregationRepoStub) CleanupPrivacyFilterEvents(ctx context.Context, cutoff time.Time) error {
+	return nil
+}
+
 func (s *dashboardAggregationRepoStub) EnsureUsageLogsPartitions(ctx context.Context, now time.Time) error {
 	return nil
 }

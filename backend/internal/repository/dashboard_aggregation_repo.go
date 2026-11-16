@@ -22,6 +22,8 @@ type dashboardAggregationRepository struct {
 const usageLogsCleanupBatchSize = 10000
 const usageBillingDedupCleanupBatchSize = 10000
 
+const privacyFilterEventsCleanupBatchSize = 5000
+
 // NewDashboardAggregationRepository 创建仪表盘预聚合仓储。
 func NewDashboardAggregationRepository(sqlDB *sql.DB) service.DashboardAggregationRepository {
 	if sqlDB == nil {
@@ -344,6 +346,33 @@ func cleanupUsageLogsBatchWithRollupInvalidation(ctx context.Context, db *sql.DB
 		return 0, err
 	}
 	return affected, nil
+}
+
+// CleanupPrivacyFilterEvents deletes expired privacy filter records in batches.
+func (r *dashboardAggregationRepository) CleanupPrivacyFilterEvents(ctx context.Context, cutoff time.Time) error {
+	for {
+		res, err := r.sql.ExecContext(ctx, `
+			WITH victims AS (
+				SELECT id
+				FROM privacy_filter_events
+				WHERE created_at < $1
+				ORDER BY id
+				LIMIT $2
+			)
+			DELETE FROM privacy_filter_events
+			WHERE id IN (SELECT id FROM victims)
+		`, cutoff.UTC(), privacyFilterEventsCleanupBatchSize)
+		if err != nil {
+			return err
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if affected < privacyFilterEventsCleanupBatchSize {
+			return nil
+		}
+	}
 }
 
 func (r *dashboardAggregationRepository) CleanupUsageBillingDedup(ctx context.Context, cutoff time.Time) error {

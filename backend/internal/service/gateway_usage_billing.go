@@ -226,18 +226,29 @@ func resolveUsageBillingRequestID(ctx context.Context, upstreamRequestID string)
 			return requestID
 		}
 	}
-	if ctx != nil {
-		if clientRequestID, _ := ctx.Value(ctxkey.ClientRequestID).(string); strings.TrimSpace(clientRequestID) != "" {
-			return "client:" + strings.TrimSpace(clientRequestID)
-		}
-		if requestID, _ := ctx.Value(ctxkey.RequestID).(string); strings.TrimSpace(requestID) != "" {
-			return "local:" + strings.TrimSpace(requestID)
-		}
+	if requestID := ContextUsageRequestID(ctx); requestID != "" {
+		return requestID
 	}
 	if requestID := strings.TrimSpace(upstreamRequestID); requestID != "" {
 		return requestID
 	}
 	return "generated:" + generateRequestID()
+}
+
+// ContextUsageRequestID returns the request ID usage_logs stores for a request
+// carrying ctx ("client:" or "local:" prefixed), or "" when ctx has neither ID.
+// Other records use it so they can be matched against usage_logs.request_id.
+func ContextUsageRequestID(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	if clientRequestID, _ := ctx.Value(ctxkey.ClientRequestID).(string); strings.TrimSpace(clientRequestID) != "" {
+		return "client:" + strings.TrimSpace(clientRequestID)
+	}
+	if requestID, _ := ctx.Value(ctxkey.RequestID).(string); strings.TrimSpace(requestID) != "" {
+		return "local:" + strings.TrimSpace(requestID)
+	}
+	return ""
 }
 
 func isForcedUsageBillingRequestID(requestID string) bool {

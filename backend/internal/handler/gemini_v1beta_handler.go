@@ -399,7 +399,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		return
 	}
 
-	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolGemini, body)
+	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolGemini, reqModel, body)
 	if filterErr != nil {
 		googleError(c, http.StatusInternalServerError, privacyFilterClientMessage)
 		return

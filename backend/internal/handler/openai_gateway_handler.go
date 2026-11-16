@@ -559,7 +559,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	setOpsRequestContext(c, reqModel, reqStream)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
 
-	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolOpenAIResponses, body)
+	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolOpenAIResponses, reqModel, body)
 	if filterErr != nil {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", privacyFilterClientMessage)
 		return
@@ -1268,7 +1268,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	setOpsRequestContext(c, reqModel, reqStream)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
 
-	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolAnthropicMessages, body)
+	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolAnthropicMessages, reqModel, body)
 	if filterErr != nil {
 		h.anthropicErrorResponse(c, http.StatusInternalServerError, "api_error", privacyFilterClientMessage)
 		return
@@ -2651,7 +2651,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	setOpsEndpointContext(c, "", int16(service.RequestTypeWSV2))
 
 	// One vault per connection: later turns may refer to values from earlier ones.
-	filteredFirstMessage, wsPrivacyVault, filterErr := runPrivacyFilterWithVault(c, reqLog, h.privacyFilterService, apiKey, service.ContentModerationProtocolOpenAIResponses, firstMessage, nil)
+	filteredFirstMessage, wsPrivacyVault, filterErr := runPrivacyFilterWithVault(c, reqLog, h.privacyFilterService, apiKey, service.ContentModerationProtocolOpenAIResponses, reqModel, firstMessage, nil)
 	if filterErr != nil {
 		closeOpenAIClientWS(wsConn, coderws.StatusInternalError, privacyFilterClientMessage)
 		return
@@ -3061,7 +3061,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			ReasoningEffortMappings:     reasoningEffortMappings,
 			TurnStarted:                 recordTurnStart,
 			RewriteClientPayload: func(payload []byte) ([]byte, error) {
-				filtered, vault, err := runPrivacyFilterWithVault(c, reqLog, h.privacyFilterService, apiKey, service.ContentModerationProtocolOpenAIResponses, payload, wsPrivacyVault)
+				filtered, vault, err := runPrivacyFilterWithVault(c, reqLog, h.privacyFilterService, apiKey, service.ContentModerationProtocolOpenAIResponses, openAIWSPayloadModel(payload, reqModel), payload, wsPrivacyVault)
 				if err != nil {
 					return nil, service.NewOpenAIWSClientCloseError(coderws.StatusInternalError, privacyFilterClientMessage, nil)
 				}

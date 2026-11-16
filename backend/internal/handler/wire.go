@@ -209,6 +209,7 @@ func ProvideHandlers(
 	modelPlazaHandler *ModelPlazaHandler,
 	asyncImageHandler *AsyncImageHandler,
 	batchImageHandler *BatchImageHandler,
+	privacyFilterHandler *PrivacyFilterHandler,
 	_ *service.IdempotencyCoordinator,
 	_ *service.IdempotencyCleanupService,
 	_ *service.OpenAIQuotaAutoResetService,
@@ -236,6 +237,7 @@ func ProvideHandlers(
 		ModelPlaza:       modelPlazaHandler,
 		AsyncImage:       asyncImageHandler,
 		BatchImage:       batchImageHandler,
+		PrivacyFilter:    privacyFilterHandler,
 	}
 }
 
@@ -247,6 +249,7 @@ var ProviderSet = wire.NewSet(
 	NewMCPOAuthHandler,
 	NewAPIKeyHandler,
 	NewUsageHandler,
+	NewPrivacyFilterHandler,
 	NewRedeemHandler,
 	NewSubscriptionHandler,
 	NewAnnouncementHandler,

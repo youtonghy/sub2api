@@ -49,6 +49,9 @@ type DashboardAggregationRepository interface {
 	CleanupAggregates(ctx context.Context, hourlyCutoff, dailyCutoff time.Time) error
 	CleanupUsageLogs(ctx context.Context, cutoff time.Time) error
 	CleanupUsageBillingDedup(ctx context.Context, cutoff time.Time) error
+	// CleanupPrivacyFilterEvents shares the usage_logs retention window, so the
+	// privacy filter records of a request expire together with its usage log.
+	CleanupPrivacyFilterEvents(ctx context.Context, cutoff time.Time) error
 	EnsureUsageLogsPartitions(ctx context.Context, now time.Time) error
 }
 
@@ -381,7 +384,7 @@ func (s *DashboardAggregationService) maybeCleanupRetention(ctx context.Context,
 	dedupDays = max(dedupDays, usageDays)
 	dedupCutoff := now.AddDate(0, 0, -dedupDays)
 
-	var aggErr, usageErr, dedupErr error
+	var aggErr, usageErr, dedupErr, privacyErr error
 	if s.cfg.Enabled {
 		aggErr = s.repo.CleanupAggregates(ctx, hourlyCutoff, dailyCutoff)
 	}
@@ -400,7 +403,13 @@ func (s *DashboardAggregationService) maybeCleanupRetention(ctx context.Context,
 	if dedupErr != nil {
 		logger.LegacyPrintf("service.dashboard_aggregation", "[DashboardAggregation] usage_billing_dedup 保留清理失败: %v", dedupErr)
 	}
-	if aggErr == nil && usageErr == nil && dedupErr == nil {
+	if usageDays > 0 {
+		privacyErr = s.repo.CleanupPrivacyFilterEvents(ctx, usageCutoff)
+	}
+	if privacyErr != nil {
+		logger.LegacyPrintf("service.dashboard_aggregation", "[DashboardAggregation] privacy_filter_events 保留清理失败: %v", privacyErr)
+	}
+	if aggErr == nil && usageErr == nil && dedupErr == nil && privacyErr == nil {
 		s.lastRetentionCleanup.Store(now)
 	}
 }

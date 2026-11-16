@@ -17,6 +17,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 )
 
@@ -107,7 +108,7 @@ func (h *GatewayHandler) GeminiCachedContentsCreate(c *gin.Context) {
 		return
 	}
 	// 解析前脱敏：req 持有的 contents 才是实际写入上游缓存的内容。
-	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolGemini, body)
+	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolGemini, gjson.GetBytes(body, "model").String(), body)
 	if filterErr != nil {
 		googleError(c, http.StatusInternalServerError, privacyFilterClientMessage)
 		return

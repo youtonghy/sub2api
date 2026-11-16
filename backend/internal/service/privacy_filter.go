@@ -86,6 +86,9 @@ type PrivacyFilterStatus struct {
 	UnresolvedTokens int64            `json:"unresolved_tokens"`
 	CategoryCounts   map[string]int64 `json:"category_counts"`
 	StartedAt        time.Time        `json:"started_at"`
+	// DroppedEvents and FailedEventWrites count records that were not stored.
+	DroppedEvents     int64 `json:"dropped_events"`
+	FailedEventWrites int64 `json:"failed_event_writes"`
 }
 
 type privacyFilterSnapshot struct {
@@ -119,6 +122,9 @@ type PrivacyFilterService struct {
 	restoredTokens, unresolvedTokens       atomic.Int64
 	categoryCounts                         map[privacyfilter.Category]*atomic.Int64
 	startedAt                              time.Time
+
+	eventRepo PrivacyFilterEventRepository
+	events    *privacyFilterEventWriter
 }
 
 // NewPrivacyFilterService creates the service. Rules are compiled on first use,
@@ -170,6 +176,19 @@ func parsePrivacyFilterConfig(raw string) (PrivacyFilterConfig, error) {
 		config.GroupIDs = []int64{}
 	}
 	return config, nil
+}
+
+// privacyFilterConfigActive reports whether a stored configuration filters any
+// request, which decides whether users are shown the records page.
+func privacyFilterConfigActive(raw string) bool {
+	if raw == "" {
+		return false
+	}
+	config, err := parsePrivacyFilterConfig(raw)
+	if err != nil {
+		return false
+	}
+	return config.Mode != PrivacyFilterModeOff && len(config.GroupIDs) > 0 && len(config.Categories) > 0
 }
 
 func validatePrivacyFilterConfig(config PrivacyFilterConfig) error {
@@ -250,6 +269,7 @@ func (s *PrivacyFilterService) GetStatus() PrivacyFilterStatus {
 	for category, counter := range s.categoryCounts {
 		counts[string(category)] = counter.Load()
 	}
+	dropped, failedWrites := s.eventCounters()
 	return PrivacyFilterStatus{
 		ScannedRequests:  s.scanned.Load(),
 		HitRequests:      s.hit.Load(),
@@ -260,6 +280,9 @@ func (s *PrivacyFilterService) GetStatus() PrivacyFilterStatus {
 		UnresolvedTokens: s.unresolvedTokens.Load(),
 		CategoryCounts:   counts,
 		StartedAt:        s.startedAt,
+
+		DroppedEvents:     dropped,
+		FailedEventWrites: failedWrites,
 	}
 }
 

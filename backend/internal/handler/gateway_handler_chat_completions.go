@@ -118,7 +118,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		return
 	}
 
-	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolOpenAIChat, body)
+	filteredBody, filterErr := h.applyPrivacyFilter(c, reqLog, apiKey, service.ContentModerationProtocolOpenAIChat, reqModel, body)
 	if filterErr != nil {
 		h.chatCompletionsErrorResponse(c, http.StatusInternalServerError, "api_error", privacyFilterClientMessage)
 		return
