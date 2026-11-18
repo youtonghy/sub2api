@@ -2370,7 +2370,8 @@ func TestAdminService_CreateGroup_NormalizesForceOpenAIUltrafastByPlatform(t *te
 	}{
 		{name: "openai", platform: PlatformOpenAI, want: true},
 		{name: "composite", platform: PlatformComposite, want: true},
-		{name: "anthropic", platform: PlatformAnthropic, want: false},
+		// 全平台分组：与 Fast 一致，Ultra Fast 开关处处可开，运行时仅对解析到 OpenAI 的请求生效。
+		{name: "anthropic", platform: PlatformAnthropic, want: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &groupRepoStubForAdmin{}
@@ -2403,8 +2404,8 @@ func TestAdminService_CreateGroup_AllowsForcingFastAndUltrafastTogether(t *testi
 	require.True(t, repo.created.ForceOpenAIUltrafast)
 }
 
-// 不支持该能力的平台两个开关都会被清零。
-func TestAdminService_CreateGroup_UnsupportedPlatformIgnoresBothForcedTiers(t *testing.T) {
+// 全平台分组：创建请求里的具体平台值被忽略，两个强制档位开关都保留。
+func TestAdminService_CreateGroup_UniversalGroupKeepsBothForcedTiers(t *testing.T) {
 	repo := &groupRepoStubForAdmin{}
 	svc := &adminServiceImpl{groupRepo: repo}
 
@@ -2414,8 +2415,9 @@ func TestAdminService_CreateGroup_UnsupportedPlatformIgnoresBothForcedTiers(t *t
 
 	require.NoError(t, err)
 	require.NotNil(t, group)
-	require.False(t, repo.created.ForceOpenAIFast)
-	require.False(t, repo.created.ForceOpenAIUltrafast)
+	require.Equal(t, PlatformComposite, repo.created.Platform)
+	require.True(t, repo.created.ForceOpenAIFast)
+	require.True(t, repo.created.ForceOpenAIUltrafast)
 }
 
 func TestAdminService_UpdateGroup_ForceOpenAIUltrafast(t *testing.T) {
@@ -2473,27 +2475,18 @@ func TestAdminService_UpdateGroup_ForceOpenAIUltrafast(t *testing.T) {
 		require.True(t, repo.updated.ForceOpenAIUltrafast)
 	})
 
-	t.Run("platform change clears both", func(t *testing.T) {
-		existing := &Group{ID: 1, Name: "g", Platform: PlatformOpenAI, Status: StatusActive, ForceOpenAIFast: true, ForceOpenAIUltrafast: true}
+	// 全平台分组：更新请求里的具体平台值被忽略，强制档位开关不被清空。
+	t.Run("platform value in update keeps both", func(t *testing.T) {
+		existing := &Group{ID: 1, Name: "g", Platform: PlatformComposite, Status: StatusActive, ForceOpenAIFast: true, ForceOpenAIUltrafast: true}
 		repo := &groupRepoStubForAdmin{getByID: existing}
 		svc := &adminServiceImpl{groupRepo: repo}
 
 		_, err := svc.UpdateGroup(context.Background(), existing.ID, &UpdateGroupInput{Platform: PlatformAnthropic})
 
 		require.NoError(t, err)
-		require.False(t, repo.updated.ForceOpenAIFast)
-		require.False(t, repo.updated.ForceOpenAIUltrafast)
-	})
-
-	t.Run("platform change clears ultrafast", func(t *testing.T) {
-		existing := &Group{ID: 1, Name: "g", Platform: PlatformOpenAI, Status: StatusActive, ForceOpenAIUltrafast: true}
-		repo := &groupRepoStubForAdmin{getByID: existing}
-		svc := &adminServiceImpl{groupRepo: repo}
-
-		_, err := svc.UpdateGroup(context.Background(), existing.ID, &UpdateGroupInput{Platform: PlatformAnthropic})
-
-		require.NoError(t, err)
-		require.False(t, repo.updated.ForceOpenAIUltrafast)
+		require.Equal(t, PlatformComposite, repo.updated.Platform)
+		require.True(t, repo.updated.ForceOpenAIFast)
+		require.True(t, repo.updated.ForceOpenAIUltrafast)
 	})
 
 	t.Run("unrelated update preserves ultrafast", func(t *testing.T) {

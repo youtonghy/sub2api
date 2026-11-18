@@ -971,12 +971,12 @@ func TestResolveAccountStatsCost_UpstreamPriceFactorScalesModelFilePricingOnly(t
 	tokens := UsageTokens{InputTokens: 100, OutputTokens: 50}
 
 	modelFile := newTestChannelServiceForStats(t, &Channel{ID: 1, Status: StatusActive}, 10, "anthropic")
-	result := resolveAccountStatsCost(context.Background(), modelFile, bs, 1, 10, "claude-sonnet-4", tokens, 1, 999.0, "", time.Time{}, true, 1.1)
+	result := resolveAccountStatsCost(context.Background(), modelFile, bs, 1, "", 10, "claude-sonnet-4", tokens, 1, 999.0, "", time.Time{}, true, 1.1)
 	require.NotNil(t, result)
 	require.InDelta(t, 0.22, *result, 1e-12)
 
 	applyPricing := newTestChannelServiceForStats(t, &Channel{ID: 1, Status: StatusActive, ApplyPricingToAccountStats: true}, 10, "anthropic")
-	result = resolveAccountStatsCost(context.Background(), applyPricing, bs, 1, 10, "claude-sonnet-4", tokens, 1, 0.75, "", time.Time{}, true, 1.1)
+	result = resolveAccountStatsCost(context.Background(), applyPricing, bs, 1, "", 10, "claude-sonnet-4", tokens, 1, 0.75, "", time.Time{}, true, 1.1)
 	require.NotNil(t, result)
 	require.InDelta(t, 0.75, *result, 1e-12)
 }
