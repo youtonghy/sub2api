@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -9,6 +10,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 )
+
+// compositeUnresolvedModelMessage 返回 composite 分组无法为模型解析目标平台时的
+// 客户端错误信息，并把模型名记入 ops 上下文，便于排查是哪个模型未配置。
+func compositeUnresolvedModelMessage(c *gin.Context, model string) string {
+	model = strings.TrimSpace(model)
+	if c != nil {
+		c.Set(opsModelKey, model)
+	}
+	return fmt.Sprintf("Model %q is not supported by composite groups: no explicit route, single-platform account mapping or recognizable model name matched", model)
+}
 
 func ensureCompositeTargetPlatform(c *gin.Context, apiKey *service.APIKey, model string) {
 	if c == nil || c.Request == nil || apiKey == nil || apiKey.Group == nil || !service.GroupNeedsPlatformResolution(apiKey.Group) {

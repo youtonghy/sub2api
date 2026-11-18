@@ -223,7 +223,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		return
 	}
 	if !compositeTargetPlatformResolved(c, apiKey, reqModel) {
-		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by composite groups")
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", compositeUnresolvedModelMessage(c, reqModel))
 		return
 	}
 	if rejectSystemOneOnlyPlatform(c, apiKey, h.errorResponse) {
@@ -2206,7 +2206,7 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 		return
 	}
 	if !compositeTargetPlatformResolved(c, apiKey, parsedReq.Model) {
-		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by composite groups")
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", compositeUnresolvedModelMessage(c, parsedReq.Model))
 		return
 	}
 	if rejectSystemOneOnlyPlatform(c, apiKey, h.errorResponse) {

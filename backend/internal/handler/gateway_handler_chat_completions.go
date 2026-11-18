@@ -79,7 +79,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 	bindRequestedReasoningEffort(c, body, reqModel)
 	ensureCompositeTargetPlatform(c, apiKey, reqModel)
 	if !compositeTargetPlatformResolved(c, apiKey, reqModel) {
-		h.chatCompletionsErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by composite groups")
+		h.chatCompletionsErrorResponse(c, http.StatusBadRequest, "invalid_request_error", compositeUnresolvedModelMessage(c, reqModel))
 		return
 	}
 	if rejectSystemOneOnlyPlatform(c, apiKey, h.chatCompletionsErrorResponse) {
