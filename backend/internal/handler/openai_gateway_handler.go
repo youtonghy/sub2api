@@ -1236,6 +1236,11 @@ func (h *OpenAIGatewayHandler) messagesAttempt(c *gin.Context) {
 
 	// 检查分组是否允许 /v1/messages 调度
 	if !allowOpenAICompatibleMessagesDispatch(c, apiKey) {
+		// 跨平台回退：当前平台不允许 /v1/messages 分发（如 composite 分组未开启
+		// 分发而首选平台是 openai），视同该平台不可用，改试下一个平台。
+		if requestCompositePlatformFallback(c, 0) {
+			return
+		}
 		h.anthropicErrorResponse(c, http.StatusForbidden, "permission_error",
 			"This group does not allow /v1/messages dispatch")
 		return

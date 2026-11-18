@@ -197,6 +197,7 @@ func newCompositeFallbackResponsesRouter(t *testing.T, upstream *strictFailoverU
 		c.Next()
 	})
 	router.POST("/openai/v1/responses", handler.Responses)
+	router.POST("/v1/messages", handler.Messages)
 	return router, billingCache.Stop
 }
 
@@ -276,4 +277,38 @@ func TestCompositeCrossPlatformFallback_Responses_PreviousResponseIDStaysOnPrefe
 
 	require.Empty(t, upstream.accountHits())
 	require.NotEqual(t, http.StatusOK, recorder.Code)
+}
+
+// Scenario: composite 分组未开启 /v1/messages 分发时，首选平台 openai 不能服务
+// Messages 请求 → 改由豁免分发开关的回退平台（opencode_go）完成，而不是 403。
+func TestCompositeCrossPlatformFallback_Messages_DispatchGateFallsBackToNextPlatform(t *testing.T) {
+	upstream := &strictFailoverUpstream{}
+	router, cleanup := newCompositeFallbackResponsesRouter(t, upstream, compositeFallbackAccounts(), []string{service.PlatformOpenCodeGo})
+	defer cleanup()
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/messages",
+		bytes.NewBufferString(`{"model":"qwen4-max","max_tokens":16,"stream":true,"messages":[{"role":"user","content":"hello"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, req)
+
+	require.Equal(t, []int64{41}, upstream.accountHits(), recorder.Body.String())
+	require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
+	require.Contains(t, recorder.Body.String(), "from fallback platform")
+}
+
+// Scenario: 没有回退序列时分发开关拒绝保持原样
+func TestCompositeCrossPlatformFallback_Messages_DispatchGateWithoutFallbackStays403(t *testing.T) {
+	upstream := &strictFailoverUpstream{}
+	router, cleanup := newCompositeFallbackResponsesRouter(t, upstream, compositeFallbackAccounts(), nil)
+	defer cleanup()
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/messages",
+		bytes.NewBufferString(`{"model":"qwen4-max","max_tokens":16,"messages":[{"role":"user","content":"hello"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, req)
+
+	require.Empty(t, upstream.accountHits())
+	require.Equal(t, http.StatusForbidden, recorder.Code, recorder.Body.String())
 }
