@@ -1018,6 +1018,7 @@ export default function UsageView() {
             showSourceToggle={false}
             showMetricToggle
             enableBreakdown={false}
+            showAccountCost={false}
             title={t('usage.endpointDistribution')}
             startDate={startDate}
             endDate={endDate}

@@ -66,7 +66,7 @@
 .block { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
 
 .priceGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: var(--space-2); }
-.multiplierGrid { display: grid; max-width: 28rem; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); margin-top: var(--space-3); }
+.multiplierGrid { display: grid; max-width: 48rem; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); margin-top: var(--space-3); }
 .singlePrice { width: 12rem; }
 
 .reasoning {
@@ -85,6 +85,7 @@
 }
 
 @media (min-width: 64rem) {
+  .multiplierGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .reasoningGrid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 }
 

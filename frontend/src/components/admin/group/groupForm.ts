@@ -118,6 +118,7 @@ export interface GroupFormState {
   monthly_limit_usd: FormNumber
   long_context_pricing_enabled: boolean
   force_openai_fast: boolean
+  force_openai_ultrafast: boolean
   free_openai_fast: boolean
   model_pricing: PricingFormEntry[]
   // 图片生成计费配置
@@ -200,6 +201,7 @@ export function createGroupFormDefaults(mode: GroupFormMode): GroupFormState {
     monthly_limit_usd: null,
     long_context_pricing_enabled: true,
     force_openai_fast: false,
+    force_openai_ultrafast: false,
     free_openai_fast: false,
     model_pricing: [],
     allow_image_generation: false,
@@ -341,6 +343,7 @@ export function groupFormFromGroup(group: AdminGroup): GroupFormState {
     monthly_limit_usd: group.monthly_limit_usd,
     long_context_pricing_enabled: group.long_context_pricing_enabled ?? true,
     force_openai_fast: group.force_openai_fast ?? false,
+    force_openai_ultrafast: group.force_openai_ultrafast ?? false,
     free_openai_fast: group.free_openai_fast ?? false,
     model_pricing: groupPricingFromAPI(group.model_pricing),
     allow_image_generation: group.allow_image_generation ?? false,
@@ -713,6 +716,7 @@ export function buildCreateGroupPayload(form: GroupFormState, ctx: GroupPayloadC
   const requestData: PayloadRecord = {
     ...createGroupForm,
     force_openai_fast: normalizeGroupOpenAIFast(form.platform, form.force_openai_fast),
+    force_openai_ultrafast: normalizeGroupOpenAIFast(form.platform, form.force_openai_ultrafast),
     free_openai_fast: normalizeGroupOpenAIFast(form.platform, form.free_openai_fast),
     model_pricing: groupPricingToAPI(form.model_pricing, form.platform),
     daily_limit_usd: normalizeOptionalLimit(form.daily_limit_usd),
@@ -753,6 +757,7 @@ export function buildUpdateGroupPayload(
   const payload: PayloadRecord = {
     ...form,
     force_openai_fast: normalizeGroupOpenAIFast(form.platform, form.force_openai_fast),
+    force_openai_ultrafast: normalizeGroupOpenAIFast(form.platform, form.force_openai_ultrafast),
     free_openai_fast: normalizeGroupOpenAIFast(form.platform, form.free_openai_fast),
     model_pricing: groupPricingToAPI(form.model_pricing, form.platform),
     daily_limit_usd: normalizeOptionalLimit(form.daily_limit_usd),

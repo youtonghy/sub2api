@@ -194,6 +194,8 @@ const createInitialState = (show: boolean) => ({
   interceptWarmupRequests: false,
   autoPauseOnExpired: true,
   openaiPassthroughEnabled: false,
+  // 自动透传时仍按账号模型白名单/映射来源名筛选候选账号
+  openaiPassthroughModelFilterEnabled: false,
   // OpenAI Codex namespace 工具摊平兼容开关（仅 OAuth），缺省关闭即原样保留
   openaiFlattenNamespacesEnabled: false,
   openAILongContextBillingEnabled: false,
@@ -357,7 +359,7 @@ export const openaiResponsesWebSocketV2Mode = (s: CreateAccountState): OpenAIWSM
     : s.openaiOAuthResponsesWebSocketV2Mode
 
 export const isOpenAIModelRestrictionDisabled = (s: CreateAccountState) =>
-  s.form.platform === 'openai' && s.openaiPassthroughEnabled
+  s.form.platform === 'openai' && s.openaiPassthroughEnabled && !s.openaiPassthroughModelFilterEnabled
 
 // API Key 认证只对 Gemini 平台开放，Anthropic 平台的 Vertex 账号始终使用 Service Account JSON。
 export const vertexUsesApiKey = (s: CreateAccountState) => s.form.platform === 'gemini' && s.vertexAuthMode === 'apikey'
@@ -792,6 +794,7 @@ export function createCreateAccountController(deps: CreateAccountControllerDeps)
       if (newPlatform !== 'openai') {
         set({
           openaiPassthroughEnabled: false,
+          openaiPassthroughModelFilterEnabled: false,
           openaiFlattenNamespacesEnabled: false,
           openAIEndpointCapabilities: ['chat_completions', 'embeddings'],
           openaiOAuthResponsesWebSocketV2Mode: OPENAI_WS_MODE_OFF,
@@ -1231,6 +1234,7 @@ export function createCreateAccountController(deps: CreateAccountControllerDeps)
       interceptWarmupRequests: false,
       autoPauseOnExpired: true,
       openaiPassthroughEnabled: false,
+      openaiPassthroughModelFilterEnabled: false,
       openaiFlattenNamespacesEnabled: false,
       openAILongContextBillingEnabled: false,
       openAILongContextBillingTouched: false,
@@ -1320,6 +1324,11 @@ export function createCreateAccountController(deps: CreateAccountControllerDeps)
     } else {
       delete extra.openai_passthrough
       delete extra.openai_oauth_passthrough
+    }
+    if (s.openaiPassthroughEnabled && s.openaiPassthroughModelFilterEnabled) {
+      extra.openai_passthrough_model_filter = true
+    } else {
+      delete extra.openai_passthrough_model_filter
     }
     // 缺省即保留 namespace，不写空值，避免 extra 里堆积默认项
     if (s.form.type === 'oauth' && s.openaiFlattenNamespacesEnabled) {

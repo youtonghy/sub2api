@@ -14,7 +14,7 @@ import { useI18n } from '@/i18n/useI18n'
 import type { Account, AccountUsageInfo, GeminiCredentials, WindowStats } from '@/types'
 import { supportsAccountQuota } from '@/utils/accountQuota'
 import { buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
-import { formatCompactNumber } from '@/utils/format'
+import { formatCompactNumber, formatDateTime } from '@/utils/format'
 import { isOfficialGeminiBaseUrl } from '@/utils/geminiExplicitCache'
 import { enqueueUsageRequest } from '@/utils/usageLoadQueue'
 import AccountQuotaInfo from './AccountQuotaInfo'
@@ -310,11 +310,17 @@ export default function AccountUsageCell({
   const hasOpenAIUsageFallback =
     account.platform === 'openai' && account.type === 'oauth' && (!!usageInfo?.five_hour || !!usageInfo?.seven_day)
 
+  // 至少有一个窗口拿到过真实利用率（而非上游未返回的占位）时，说明当前显示的是有效观测
+  const hasOpenAIQuotaObservation = [usageInfo?.five_hour, usageInfo?.seven_day].some(
+    (window) => window && !window.utilization_unknown
+  )
+
   const openAISevenDayEstimatedTotalCost = (() => {
     const sevenDay = usageInfo?.seven_day
     const utilization = sevenDay?.utilization
     const currentCost = sevenDay?.window_stats?.cost
     if (
+      sevenDay?.utilization_unknown ||
       typeof utilization !== 'number' ||
       typeof currentCost !== 'number' ||
       !Number.isFinite(utilization) ||
@@ -842,13 +848,27 @@ export default function AccountUsageCell({
     })
   }
 
+  // 行被复用到另一个账号（翻页/排序）时，用它丢弃过期的主动查询结果
+  const currentAccountID = useRef(account.id)
+  useEffect(() => {
+    currentAccountID.current = account.id
+  }, [account.id])
+
   const loadActiveUsage = async () => {
+    const accountID = account.id
     setActiveQueryLoading(true)
+    setError(null)
     try {
-      const result = await adminAPI.accounts.getUsage(account.id, 'active', true)
-      if (!disposed.current) setUsageInfo(result)
+      const result = await adminAPI.accounts.getUsage(accountID, 'active', true)
+      if (!disposed.current && currentAccountID.current === accountID) {
+        setUsageInfo(result)
+        _usageCache.set(accountID, { data: result, ts: Date.now() })
+      }
     } catch (e: unknown) {
-      console.error('Failed to load active usage:', e)
+      if (!disposed.current && currentAccountID.current === accountID) {
+        setError(t('common.error'))
+        console.error('Failed to load active usage:', e)
+      }
     } finally {
       if (!disposed.current) setActiveQueryLoading(false)
     }
@@ -1171,13 +1191,32 @@ export default function AccountUsageCell({
     </>
   )
 
-  const renderOpenAI = () =>
+  const openAIQuotaRefreshAlert =
+    error || usageInfo?.error || usageInfo?.error_code ? (
+      <div role="alert" className={styles.warningTiny}>
+        {t(
+          hasOpenAIQuotaObservation
+            ? 'admin.accounts.usageWindow.quotaRefreshFailedCached'
+            : 'admin.accounts.usageWindow.quotaRefreshFailedUnknown'
+        )}
+      </div>
+    ) : null
+
+  const renderOpenAI = () => (
+    <>
+      {openAIQuotaRefreshAlert}
+      {renderOpenAIUsage()}
+    </>
+  )
+
+  const renderOpenAIUsage = () =>
     hasOpenAIUsageFallback ? (
       <div className={styles.stack}>
         {usageInfo?.five_hour ? (
           <UsageProgressBar
             label="5h"
             utilization={usageInfo.five_hour.utilization}
+            utilizationUnknown={usageInfo.five_hour.utilization_unknown}
             resetsAt={usageInfo.five_hour.resets_at}
             windowStats={usageInfo.five_hour.window_stats}
             showNowWhenIdle
@@ -1188,12 +1227,23 @@ export default function AccountUsageCell({
           <UsageProgressBar
             label="7d"
             utilization={usageInfo.seven_day.utilization}
+            utilizationUnknown={usageInfo.seven_day.utilization_unknown}
             resetsAt={usageInfo.seven_day.resets_at}
             windowStats={usageInfo.seven_day.window_stats}
             estimatedTotalCost={openAISevenDayEstimatedTotalCost}
             showNowWhenIdle
             color="emerald"
           />
+        ) : null}
+        {hasOpenAIQuotaObservation ? (
+          <div className={styles.mutedLine}>
+            {t('admin.accounts.usageWindow.quotaObservedAt')}{' '}
+            {usageInfo?.updated_at ? (
+              <time dateTime={usageInfo.updated_at}>{formatDateTime(usageInfo.updated_at)}</time>
+            ) : (
+              <span>{t('admin.accounts.usageWindow.quotaObservationUnknown')}</span>
+            )}
+          </div>
         ) : null}
         {/*
           Upstream codex /wham/usage quota query + reset. The local active-sampling
@@ -1540,7 +1590,7 @@ export default function AccountUsageCell({
         ) : null}
         {/* Vertex 设置了配额上限：显示配额进度条 */}
         {isGeminiVertex ? quotaBars : null}
-        {loading ? (
+        {loading && !usageInfo ? (
           <div className={styles.stack}>
             <SkeletonBarRow />
           </div>

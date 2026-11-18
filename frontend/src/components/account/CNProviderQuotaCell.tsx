@@ -80,16 +80,25 @@ const claimAutoProbe = (accountID: number): boolean => {
   return true
 }
 
-/** 切换账号 id 时整体重建（Vue 版 watch(account.id) 清空结果） */
+/** 切换账号 id 或平台时整体重建（Vue 版 watch([id, platform]) 清空探测结果） */
 export default function CNProviderQuotaCell(props: CNProviderQuotaCellProps) {
   if (!cnQuotaCellVisible(props.account)) return null
-  return <CNProviderQuotaCellInner key={props.account.id} {...props} />
+  return <CNProviderQuotaCellInner key={`${props.account.id}:${props.account.platform}`} {...props} />
 }
 
 function CNProviderQuotaCellInner({ account }: CNProviderQuotaCellProps) {
   const { t } = useI18n()
-  // 挂载时：先用持久化快照渲染
-  const [data, setData] = useState<CNProviderQuotaProbeResult | null>(() => snapshotData(account))
+  // 持久化快照随列表刷新更新；手动探测结果优先显示，直到快照数值或版本真正变化。
+  // 列表刷新即使快照未变也会替换 account.extra，因此按内容比较而不是按引用。
+  const snapshot = snapshotData(account)
+  const snapshotKey = JSON.stringify([snapshot, readExtraString(account, `${account.platform}_usage_updated_at`)])
+  const [probeData, setProbeData] = useState<CNProviderQuotaProbeResult | null>(null)
+  const [prevSnapshotKey, setPrevSnapshotKey] = useState(snapshotKey)
+  if (prevSnapshotKey !== snapshotKey) {
+    setPrevSnapshotKey(snapshotKey)
+    setProbeData(null)
+  }
+  const data = probeData ?? snapshot
   const [loading, setLoadingState] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const loadingRef = useRef(false)
@@ -120,7 +129,7 @@ function CNProviderQuotaCellInner({ account }: CNProviderQuotaCellProps) {
       if (disposed.current) return
       // 失败时保留已渲染的快照条形图（仅显示错误行），成功才覆盖。
       if (result.success) {
-        setData(result)
+        setProbeData(result)
       } else {
         setError(result.error || t('common.error'))
       }

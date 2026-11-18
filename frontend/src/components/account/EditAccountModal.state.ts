@@ -221,6 +221,8 @@ export interface EditState {
   customBaseUrl: string
   // OpenAI 自动透传开关（OAuth/API Key）
   openaiPassthroughEnabled: boolean
+  // 自动透传时仍按账号模型白名单/映射来源名筛选候选账号
+  openaiPassthroughModelFilterEnabled: boolean
   // OpenAI Codex namespace 工具摊平兼容开关（仅 OAuth），缺省关闭即原样保留
   openaiFlattenNamespacesEnabled: boolean
   openAILongContextBillingEnabled: boolean
@@ -349,6 +351,7 @@ export function createInitialEditState(): EditState {
     customBaseUrlEnabled: false,
     customBaseUrl: '',
     openaiPassthroughEnabled: false,
+    openaiPassthroughModelFilterEnabled: false,
     openaiFlattenNamespacesEnabled: false,
     openAILongContextBillingEnabled: false,
     editPlanType: '',
@@ -903,6 +906,7 @@ export function syncEditStateFromAccount(prev: EditState, newAccount: Account): 
 
   // Load OpenAI passthrough toggle (OpenAI OAuth/SetupToken/API Key)
   s.openaiPassthroughEnabled = false
+  s.openaiPassthroughModelFilterEnabled = false
   s.openaiFlattenNamespacesEnabled = false
   s.openAILongContextBillingEnabled = false
   s.editPlanType = ''
@@ -924,6 +928,7 @@ export function syncEditStateFromAccount(prev: EditState, newAccount: Account): 
     (newAccount.type === 'oauth' || newAccount.type === 'setup-token' || newAccount.type === 'apikey')
   ) {
     s.openaiPassthroughEnabled = extra?.openai_passthrough === true || extra?.openai_oauth_passthrough === true
+    s.openaiPassthroughModelFilterEnabled = extra?.openai_passthrough_model_filter === true
     s.openaiFlattenNamespacesEnabled = newAccount.type === 'oauth' && extra?.openai_responses_flatten_namespaces === true
     const longContextBillingValue = extra?.openai_long_context_billing_enabled
     s.openAILongContextBillingEnabled = longContextBillingValue === true
@@ -1508,7 +1513,7 @@ export function buildEditUpdatePayload(s: EditState, account: Account, deps: Bui
   if (account.type === 'apikey') {
     const currentCredentials = accountCredentials
     const newBaseUrl = s.editBaseUrl.trim() || defaultBaseUrlOf(s, account)
-    const shouldApplyModelMapping = !(account.platform === 'openai' && s.openaiPassthroughEnabled)
+    const shouldApplyModelMapping = !isOpenAIModelRestrictionDisabledFor(account.platform, s)
 
     // Always update credentials for apikey type to handle model mapping changes
     const newCredentials: Record<string, unknown> = {
@@ -1756,7 +1761,7 @@ export function buildEditUpdatePayload(s: EditState, account: Account, deps: Bui
       : (updatePayload.credentials as Record<string, unknown>) || accountCredentials
     const newCredentials: Record<string, unknown> = { ...currentCredentials }
     if (account.platform === 'openai') {
-      const shouldApplyModelMapping = !s.openaiPassthroughEnabled
+      const shouldApplyModelMapping = !isOpenAIModelRestrictionDisabledFor(account.platform, s)
       if (shouldApplyModelMapping) {
         applyModelRestriction(newCredentials)
       } else if (!newCredentials.model_mapping) {
@@ -1995,6 +2000,11 @@ export function buildEditUpdatePayload(s: EditState, account: Account, deps: Bui
       delete newExtra.openai_passthrough
       delete newExtra.openai_oauth_passthrough
     }
+    if (s.openaiPassthroughEnabled && s.openaiPassthroughModelFilterEnabled) {
+      newExtra.openai_passthrough_model_filter = true
+    } else {
+      delete newExtra.openai_passthrough_model_filter
+    }
     // 缺省即保留 namespace，不写空值，避免 extra 里堆积默认项
     if (account.type === 'oauth' && s.openaiFlattenNamespacesEnabled) {
       newExtra.openai_responses_flatten_namespaces = true
@@ -2179,4 +2189,15 @@ export function buildEditUpdatePayload(s: EditState, account: Account, deps: Bui
   }
 
   return { ok: true, payload: updatePayload }
+}
+
+/**
+ * OpenAI 自动透传默认忽略模型白名单/映射；开启「透传时按账号模型筛选」后，
+ * 白名单/映射仍保存并用于筛选候选账号。
+ */
+export function isOpenAIModelRestrictionDisabledFor(
+  platform: string | undefined,
+  s: Pick<EditState, 'openaiPassthroughEnabled' | 'openaiPassthroughModelFilterEnabled'>
+): boolean {
+  return platform === 'openai' && s.openaiPassthroughEnabled && !s.openaiPassthroughModelFilterEnabled
 }

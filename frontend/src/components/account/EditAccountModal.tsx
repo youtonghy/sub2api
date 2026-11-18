@@ -84,6 +84,7 @@ import {
   isGenericMultiProtocolAccount,
   isGrokDiagnosticsDirty,
   isGrokOAuthAccount,
+  isOpenAIModelRestrictionDisabledFor,
   isSparkShadowAccount,
   isVertexAPIKeyMode,
   modeFromGrokMediaExtra,
@@ -223,7 +224,7 @@ export default function EditAccountModal({ show, account, proxies, groups, onClo
   const antigravityPresetMappings = getPresetMappingsByPlatform('antigravity')
   const bedrockPresets = getPresetMappingsByPlatform('bedrock')
   const openAITextGenerationCapabilityEnabled = s.openAIEndpointCapabilities.includes('chat_completions')
-  const isOpenAIModelRestrictionDisabled = account?.platform === 'openai' && s.openaiPassthroughEnabled
+  const isOpenAIModelRestrictionDisabled = isOpenAIModelRestrictionDisabledFor(account?.platform, s)
   const accountExtra = account?.extra as Record<string, unknown> | undefined
 
   // Platform-specific hint for Base URL
@@ -2041,7 +2042,18 @@ export default function EditAccountModal({ show, account, proxies, groups, onClo
                   description={t('admin.accounts.openai.oauthPassthroughDesc')}
                   checked={s.openaiPassthroughEnabled}
                   onChange={(value) => update({ openaiPassthroughEnabled: value })}
-                />
+                  testId="edit-openai-passthrough-toggle"
+                >
+                  {s.openaiPassthroughEnabled ? (
+                    <SwitchRow
+                      label={t('admin.accounts.openai.passthroughModelFilter')}
+                      description={t('admin.accounts.openai.passthroughModelFilterDesc')}
+                      checked={s.openaiPassthroughModelFilterEnabled}
+                      onChange={(value) => update({ openaiPassthroughModelFilterEnabled: value })}
+                      testId="edit-openai-passthrough-model-filter"
+                    />
+                  ) : null}
+                </SwitchRow>
               </FormSection>
             ) : null}
 

@@ -130,4 +130,27 @@ describe('groupForm', () => {
     expect(next.allow_batch_image_generation).toBe(false)
     expect(next.image_count_billing).toBe(false)
   })
+
+  it('round-trips the forced OpenAI Ultra Fast tier independently of Fast', () => {
+    const form = groupFormFromGroup({
+      id: 1,
+      name: 'g',
+      platform: 'composite',
+      force_openai_fast: false,
+      force_openai_ultrafast: true
+    } as unknown as AdminGroup)
+    expect(form.force_openai_ultrafast).toBe(true)
+    expect(form.force_openai_fast).toBe(false)
+
+    const update = buildUpdateGroupPayload(form, {
+      ...ctx(),
+      codexManifest: { enabled: false, account_ids: [], fallback_to_scheduler: true }
+    })
+    expect(update.force_openai_ultrafast).toBe(true)
+    expect(update.force_openai_fast).toBe(false)
+
+    const created = buildCreateGroupPayload({ ...createGroupFormDefaults('create'), name: 'n', force_openai_ultrafast: true }, ctx())
+    expect(created.force_openai_ultrafast).toBe(true)
+    expect(createGroupFormDefaults('create').force_openai_ultrafast).toBe(false)
+  })
 })

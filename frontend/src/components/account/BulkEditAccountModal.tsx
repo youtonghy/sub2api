@@ -131,6 +131,8 @@ interface BulkEditState {
   status: 'active' | 'inactive'
   groupIds: number[]
   openaiPassthroughEnabled: boolean
+  // 自动透传时仍按账号模型白名单/映射来源名筛选候选账号
+  openaiPassthroughModelFilterEnabled: boolean
   // Codex namespace 工具摊平兼容开关（仅 OAuth），缺省关闭即原样保留
   openaiFlattenNamespacesEnabled: boolean
   openAILongContextBillingEnabled: boolean
@@ -195,6 +197,7 @@ const createInitialState = (): BulkEditState => ({
   status: 'active',
   groupIds: [],
   openaiPassthroughEnabled: false,
+  openaiPassthroughModelFilterEnabled: false,
   openaiFlattenNamespacesEnabled: false,
   openAILongContextBillingEnabled: false,
   openAIImageSizeTiers: [...OPENAI_IMAGE_SIZE_TIERS],
@@ -434,7 +437,10 @@ export default function BulkEditAccountModal({
     { value: 'disabled', label: t('common.disabled') }
   ]
   const isOpenAIModelRestrictionDisabled =
-    allOpenAIPassthroughCapable && form.enableOpenAIPassthrough && form.openaiPassthroughEnabled
+    allOpenAIPassthroughCapable &&
+    form.enableOpenAIPassthrough &&
+    form.openaiPassthroughEnabled &&
+    !form.openaiPassthroughModelFilterEnabled
 
   const openAIWSModeOptions = [
     { value: OPENAI_WS_MODE_OFF, label: t('admin.accounts.openai.wsModeOff') },
@@ -638,6 +644,7 @@ export default function BulkEditAccountModal({
     if (form.enableOpenAIPassthrough) {
       const extra = ensureExtra()
       extra.openai_passthrough = form.openaiPassthroughEnabled
+      extra.openai_passthrough_model_filter = form.openaiPassthroughEnabled && form.openaiPassthroughModelFilterEnabled
       if (!form.openaiPassthroughEnabled) {
         extra.openai_oauth_passthrough = false
       }
@@ -1082,6 +1089,16 @@ export default function BulkEditAccountModal({
                   onCheckedChange={(v) => update({ openaiPassthroughEnabled: v })}
                   aria-label={t('admin.accounts.openai.oauthPassthrough')}
                 />
+                {form.openaiPassthroughEnabled ? (
+                  <Checkbox
+                    label={t('admin.accounts.openai.passthroughModelFilter')}
+                    description={t('admin.accounts.openai.passthroughModelFilterDesc')}
+                    checked={form.openaiPassthroughModelFilterEnabled}
+                    disabled={!form.enableOpenAIPassthrough}
+                    onCheckedChange={(next) => update({ openaiPassthroughModelFilterEnabled: next === true })}
+                    data-testid="bulk-openai-passthrough-model-filter"
+                  />
+                ) : null}
               </FieldBody>
             </BulkField>
           ) : null}

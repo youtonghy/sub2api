@@ -326,6 +326,8 @@ export default function PricingEntryCard({
                 <div className={styles.multiplierGrid}>
                   {priceField(t('admin.channels.form.fastMultiplier'), 'fast_multiplier', '0.000001', 'admin.channels.form.multiplierPlaceholder')}
                   {priceField(t('admin.channels.form.flexMultiplier'), 'flex_multiplier', '0.000001', 'admin.channels.form.multiplierPlaceholder')}
+                  {platform === 'openai' &&
+                    priceField(t('admin.channels.form.ultrafastMultiplier'), 'ultrafast_multiplier', '0.000001', 'admin.channels.form.multiplierPlaceholder')}
                 </div>
               )}
 

@@ -119,6 +119,13 @@ export function GroupOpenAIFastSection({ ctl }: { ctl: GroupFormController }) {
         onChange={(force_openai_fast) => update({ force_openai_fast })}
       />
       <SwitchRow
+        label={t('admin.groups.openaiFast.forceUltrafast')}
+        description={t('admin.groups.openaiFast.ultrafastHint')}
+        data-testid={`${mode}-force-openai-ultrafast`}
+        checked={form.force_openai_ultrafast}
+        onChange={(force_openai_ultrafast) => update({ force_openai_ultrafast })}
+      />
+      <SwitchRow
         label={t('admin.groups.openaiFast.free')}
         description={t('admin.groups.openaiFast.freeHint')}
         data-testid={`${mode}-free-openai-fast`}

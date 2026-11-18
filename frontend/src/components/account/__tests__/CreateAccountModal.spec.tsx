@@ -290,6 +290,25 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     expect(createAccountMock.mock.calls[0]?.[0]?.extra?.openai_image_size_tiers).toEqual(['4K'])
   })
 
+  it('can create a passthrough account with model filtering enabled', async () => {
+    createAccountMock.mockReset().mockResolvedValue({ id: 43, platform: 'openai', type: 'apikey' })
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'OpenAI')
+    await selectButtonByText(wrapper, 'API Key')
+    await setValue(textInput(wrapper), 'filtered passthrough')
+    await setValue(passwordInput(wrapper), 'synthetic-key')
+    await clickToggle('create-openai-passthrough-toggle')
+    await clickToggle('create-openai-passthrough-model-filter')
+    await click(screen.getByTestId('model-whitelist-selector'))
+    await submit(wrapper)
+    await flushPromises()
+
+    const payload = createAccountMock.mock.calls[0]?.[0]
+    expect(payload.extra.openai_passthrough).toBe(true)
+    expect(payload.extra.openai_passthrough_model_filter).toBe(true)
+    expect(payload.credentials.model_mapping).toEqual({ 'public-glm': 'public-glm' })
+  })
+
   it('sets month and year expiry presets without submitting the account form', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-01-31T12:34:00'))

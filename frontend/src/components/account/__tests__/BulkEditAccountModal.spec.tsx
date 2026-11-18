@@ -320,7 +320,8 @@ describe('BulkEditAccountModal', () => {
     expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledTimes(1)
     expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], {
       extra: {
-        openai_passthrough: true
+        openai_passthrough: true,
+        openai_passthrough_model_filter: false
       }
     })
   })
@@ -914,6 +915,7 @@ describe('BulkEditAccountModal', () => {
     expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], {
       extra: {
         openai_passthrough: false,
+        openai_passthrough_model_filter: false,
         openai_oauth_passthrough: false
       }
     })
@@ -933,10 +935,31 @@ describe('BulkEditAccountModal', () => {
     expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledTimes(1)
     expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], {
       extra: {
-        openai_passthrough: true
+        openai_passthrough: true,
+        openai_passthrough_model_filter: false
       }
     })
     expect(document.body.textContent).toContain('admin.accounts.openai.modelRestrictionDisabledByPassthrough')
+  })
+
+  it('开启透传时按账号模型筛选后仍提交模型限制', async () => {
+    mountModal({
+      selectedPlatforms: ['openai'],
+      selectedTypes: ['apikey']
+    })
+
+    enable('bulk-edit-openai-passthrough-enabled')
+    fireEvent.click(byId('bulk-edit-openai-passthrough-toggle'))
+    setChecked(screen.getByTestId('bulk-openai-passthrough-model-filter'), true)
+    enable('bulk-edit-model-restriction-enabled')
+    await submit()
+
+    expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledTimes(1)
+    expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], {
+      extra: { openai_passthrough: true, openai_passthrough_model_filter: true },
+      credentials: { model_mapping: {} }
+    })
+    expect(document.body.textContent).not.toContain('admin.accounts.openai.modelRestrictionDisabledByPassthrough')
   })
 
   it('filtered-results 模式下应提交 filters 而不是 account_ids', async () => {

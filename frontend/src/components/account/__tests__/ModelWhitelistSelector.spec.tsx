@@ -220,6 +220,31 @@ describe('ModelWhitelistSelector', () => {
     expect(wrapper.emitted.update).toEqual([[['gpt-latest']]])
   })
 
+  it.each(['claude-*', '*', 'gpt-*-mini'])('rejects wildcard whitelist entry %s without clearing the input', (model) => {
+    const wrapper = mountSelector({ modelValue: ['gpt-5'] })
+    const input = screen.getByPlaceholderText<HTMLInputElement>('admin.accounts.enterCustomModelName')
+    fireEvent.change(input, { target: { value: model } })
+    fireEvent.click(wrapper.findButton('admin.accounts.addModel')!)
+
+    expect(wrapper.emitted.update).toHaveLength(0)
+    expect(showInfo).toHaveBeenCalledWith('admin.accounts.modelWildcardNotSupported')
+    expect(input.value).toBe(model)
+  })
+
+  it('rejects wildcard entries submitted with Enter and accepts a corrected exact model', () => {
+    const wrapper = mountSelector()
+    const input = screen.getByPlaceholderText<HTMLInputElement>('admin.accounts.enterCustomModelName')
+    fireEvent.change(input, { target: { value: ' claude-* ' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(wrapper.emitted.update).toHaveLength(0)
+    expect(showInfo).toHaveBeenCalledWith('admin.accounts.modelWildcardNotSupported')
+
+    fireEvent.change(input, { target: { value: ' claude-sonnet-4-5 ' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(wrapper.emitted.update).toEqual([[['claude-sonnet-4-5']]])
+    expect(input.value).toBe('')
+  })
+
   it('still allows custom models without a mapping prop', () => {
     const wrapper = mountSelector()
     fireEvent.change(screen.getByPlaceholderText('admin.accounts.enterCustomModelName'), { target: { value: 'custom-model' } })

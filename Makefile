@@ -11,6 +11,7 @@ FRONTEND_CRITICAL_VITEST := \
 	src/components/account/__tests__/OpenAIQuotaResetCell.spark_shadow.spec.tsx \
 	src/constants/__tests__/platforms.spec.ts \
 	src/components/account/__tests__/credentialsBuilder.platformCatalog.spec.ts \
+	src/components/account/__tests__/CNProviderQuotaCell.spec.tsx \
 	src/components/account/__tests__/CreateAccountModal.spec.tsx \
 	src/components/account/__tests__/EditAccountModal.spec.tsx \
 	src/components/account/__tests__/credentialsBuilder.spec.ts \

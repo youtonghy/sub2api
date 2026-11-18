@@ -120,4 +120,80 @@ describe('CNProviderQuotaCell', () => {
     await flushPromises()
     expect(queryQuota).toHaveBeenCalledWith(account.id)
   })
+
+  describe('snapshot and manual probe precedence', () => {
+    const percents = (container: HTMLElement) =>
+      Array.from(container.querySelectorAll('[data-testid="usage-bar-percent"]')).map((el) => el.textContent)
+    const withExtra = (extra: Record<string, unknown>, id = account.id) =>
+      ({ ...account, id, extra: { ...(account.extra as Record<string, unknown>), ...extra } }) as unknown as Account
+    const probe = async (container: HTMLElement) => {
+      await act(async () => {
+        fireEvent.click(container.querySelector('[data-test="cn-provider-quota-probe"]')!)
+      })
+      await flushPromises()
+    }
+
+    it('renders replacement quota values and windows for the same account without probing', async () => {
+      const view = render(<CNProviderQuotaCell account={account} />)
+      view.rerender(
+        <CNProviderQuotaCell
+          account={withExtra({
+            zhipu_5h_used_percent: 52,
+            zhipu_weekly_used_percent: null,
+            zhipu_monthly_used_percent: 81,
+            zhipu_monthly_reset_at: '2026-12-01T00:00:00Z'
+          })}
+        />
+      )
+      expect(percents(view.container)).toEqual(['52%', '81%'])
+      expect(view.container.textContent).toContain('admin.accounts.cnProviders.windowMonthly')
+      expect(queryQuota).not.toHaveBeenCalled()
+    })
+
+    it('removes bars when a refreshed snapshot clears all quota windows', async () => {
+      const view = render(<CNProviderQuotaCell account={account} />)
+      view.rerender(<CNProviderQuotaCell account={withExtra({ zhipu_5h_used_percent: null, zhipu_weekly_used_percent: null })} />)
+      expect(percents(view.container)).toEqual([])
+      expect(queryQuota).not.toHaveBeenCalled()
+    })
+
+    it('keeps a manual result through unrelated refreshes, then adopts a changed snapshot', async () => {
+      queryQuota.mockResolvedValue({ success: true, tiers: [{ window: '5h', used_percent: 44 }] })
+      const view = render(<CNProviderQuotaCell account={account} />)
+      await probe(view.container)
+      view.rerender(<CNProviderQuotaCell account={withExtra({ unrelated_field: true })} />)
+      expect(percents(view.container)).toEqual(['44%'])
+      view.rerender(<CNProviderQuotaCell account={withExtra({ zhipu_5h_used_percent: 66 })} />)
+      expect(percents(view.container)).toEqual(['66%', '27%'])
+      expect(queryQuota).toHaveBeenCalledTimes(1)
+    })
+
+    it('adopts a new snapshot version even if its quota values equal the old snapshot', async () => {
+      queryQuota.mockResolvedValue({ success: true, tiers: [{ window: '5h', used_percent: 44 }] })
+      const view = render(<CNProviderQuotaCell account={account} />)
+      await probe(view.container)
+      expect(percents(view.container)).toEqual(['44%'])
+      view.rerender(
+        <CNProviderQuotaCell account={withExtra({ zhipu_usage_updated_at: new Date(Date.now() + 1000).toISOString() })} />
+      )
+      expect(percents(view.container)).toEqual(['0%', '27%'])
+    })
+
+    it('keeps the new account snapshot when the previous account probe finishes late', async () => {
+      let resolveProbe!: (value: unknown) => void
+      queryQuota.mockReturnValue(new Promise((resolve) => (resolveProbe = resolve)))
+      const view = render(<CNProviderQuotaCell account={account} />)
+      await act(async () => {
+        fireEvent.click(view.container.querySelector('[data-test="cn-provider-quota-probe"]')!)
+      })
+      view.rerender(<CNProviderQuotaCell account={withExtra({ zhipu_5h_used_percent: 91 }, 8)} />)
+      expect(percents(view.container)[0]).toBe('91%')
+      await act(async () => {
+        resolveProbe({ success: true, tiers: [{ window: '5h', used_percent: 44 }] })
+      })
+      await flushPromises()
+      expect(percents(view.container)[0]).toBe('91%')
+      expect(view.container.querySelector('[data-test="cn-provider-quota-probe"]')?.hasAttribute('disabled')).toBe(false)
+    })
+  })
 })

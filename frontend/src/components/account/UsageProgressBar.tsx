@@ -17,6 +17,8 @@ export interface UsageProgressBarProps {
   label: string
   /** Percentage (0-100+) */
   utilization: number
+  /** 上游未返回利用率时为 true：不画进度、百分比显示为「—」、不显示重置时间 */
+  utilizationUnknown?: boolean
   resetsAt?: string | null
   color: UsageProgressBarColor
   windowStats?: WindowStats | null
@@ -74,6 +76,7 @@ function useResetClock(resetsAt: string | null | undefined): Date {
 export default function UsageProgressBar({
   label,
   utilization,
+  utilizationUnknown = false,
   resetsAt,
   color,
   windowStats,
@@ -92,13 +95,17 @@ export default function UsageProgressBar({
   const level = usageBarLevel(utilization, remainingCapacity)
 
   // Bar width (capped at 100%)
-  const barWidth = `${Math.min(Math.max(utilization, 0), 100)}%`
+  const barWidth = utilizationUnknown ? '0%' : `${Math.min(Math.max(utilization, 0), 100)}%`
 
   // Display percentage (cap at 999% for readability)
   const percent = Math.round(remainingCapacity ? Math.min(Math.max(utilization, 0), 100) : utilization)
-  const displayPercent = percent > 999 ? '>999%' : `${percent}%`
+  const displayPercent = utilizationUnknown ? '—' : percent > 999 ? '>999%' : `${percent}%`
 
-  const shouldShowResetTime = resetsAt ? true : Boolean(showNowWhenIdle && utilization <= 0)
+  const shouldShowResetTime = utilizationUnknown
+    ? false
+    : resetsAt
+      ? true
+      : Boolean(showNowWhenIdle && utilization <= 0)
 
   const formatResetTime = (() => {
     if (!resetsAt) {
@@ -169,7 +176,7 @@ export default function UsageProgressBar({
           aria-label={label}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-valuenow={Math.min(Math.max(utilization, 0), 100)}
+          aria-valuenow={utilizationUnknown ? undefined : Math.min(Math.max(utilization, 0), 100)}
           aria-valuetext={displayPercent}
         >
           <div className={styles.fill} data-level={level} data-testid="usage-bar-fill" style={{ width: barWidth }} />

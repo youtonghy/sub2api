@@ -243,6 +243,7 @@ export function useGroupForm({ mode, isSimpleMode }: UseGroupFormOptions) {
       video_model_prices: createVideoModelPricesForm(),
       long_context_pricing_enabled: true,
       force_openai_fast: false,
+      force_openai_ultrafast: false,
       free_openai_fast: false,
       model_pricing: [],
       web_search_price_per_call: null,

@@ -289,6 +289,10 @@ export default function ModelWhitelistSelector({
     const model = customModel.trim()
     if (!model) return
     const appStore = useAppStore.getState()
+    if (model.includes('*')) {
+      appStore.showInfo(t('admin.accounts.modelWildcardNotSupported'))
+      return
+    }
     if (value.includes(model)) {
       appStore.showInfo(t('admin.accounts.modelExists'))
       return

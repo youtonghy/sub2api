@@ -41,6 +41,8 @@ export interface EndpointDistributionChartProps {
   showMetricToggle?: boolean
   showSourceToggle?: boolean
   enableBreakdown?: boolean
+  /** 是否显示账号成本列（用户侧用量页隐藏） */
+  showAccountCost?: boolean
   startDate?: string
   endDate?: string
   /** 用户明细请求附带的额外筛选条件 */
@@ -61,6 +63,7 @@ export default function EndpointDistributionChart({
   showMetricToggle = false,
   showSourceToggle = false,
   enableBreakdown = true,
+  showAccountCost = true,
   startDate,
   endDate,
   filters
@@ -150,6 +153,7 @@ export default function EndpointDistributionChart({
                   <th scope="col">{t('admin.dashboard.requests')}</th>
                   <th scope="col">{t('admin.dashboard.tokens')}</th>
                   <th scope="col">{t('admin.dashboard.actual')}</th>
+                  {showAccountCost && <th scope="col">{t('admin.dashboard.accountCost')}</th>}
                   <th scope="col">{t('admin.dashboard.standard')}</th>
                 </tr>
               </thead>
@@ -187,12 +191,17 @@ export default function EndpointDistributionChart({
                         <td>{formatNumber(item.requests)}</td>
                         <td>{formatTokens(item.total_tokens)}</td>
                         <td className={styles.actual}>${formatCost(item.actual_cost)}</td>
+                        {showAccountCost && <td className={styles.accountCost}>${formatCost(item.account_cost ?? 0)}</td>}
                         <td className={styles.standard}>${formatCost(item.cost)}</td>
                       </tr>
                       {expanded && (
                         <tr>
-                          <td colSpan={5} className={styles.expandCell}>
-                            <UserBreakdownSubTable items={breakdown.items} loading={breakdown.loading} />
+                          <td colSpan={showAccountCost ? 6 : 5} className={styles.expandCell}>
+                            <UserBreakdownSubTable
+                              items={breakdown.items}
+                              loading={breakdown.loading}
+                              showAccountCost={showAccountCost}
+                            />
                           </td>
                         </tr>
                       )}

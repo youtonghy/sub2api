@@ -2302,7 +2302,18 @@ export default function CreateAccountModal({ show, proxies, groups, onClose, onC
             description={t('admin.accounts.openai.oauthPassthroughDesc')}
             checked={s.openaiPassthroughEnabled}
             onChange={(value) => set({ openaiPassthroughEnabled: value })}
-          />
+            data-testid="create-openai-passthrough-toggle"
+          >
+            {s.openaiPassthroughEnabled ? (
+              <ToggleRow
+                label={t('admin.accounts.openai.passthroughModelFilter')}
+                description={t('admin.accounts.openai.passthroughModelFilterDesc')}
+                checked={s.openaiPassthroughModelFilterEnabled}
+                onChange={(value) => set({ openaiPassthroughModelFilterEnabled: value })}
+                data-testid="create-openai-passthrough-model-filter"
+              />
+            ) : null}
+          </ToggleRow>
         </FormSection>
       ) : null}
 
