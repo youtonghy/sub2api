@@ -46,7 +46,34 @@ func WithCompositeRouteDecision(ctx context.Context, decision CompositeRouteDeci
 	if source := strings.TrimSpace(decision.Source); source != "" {
 		ctx = context.WithValue(ctx, ctxkey.CompositeRouteSource, source)
 	}
+	if len(decision.FallbackPlatforms) > 0 {
+		ctx = context.WithValue(ctx, ctxkey.CompositeFallbackPlatforms, append([]string(nil), decision.FallbackPlatforms...))
+	}
 	return ctx
+}
+
+// CompositeFallbackPlatformsFromContext 返回首选平台之后待尝试的平台（副本）。
+func CompositeFallbackPlatformsFromContext(ctx context.Context) []string {
+	if ctx == nil {
+		return nil
+	}
+	platforms, _ := ctx.Value(ctxkey.CompositeFallbackPlatforms).([]string)
+	if len(platforms) == 0 {
+		return nil
+	}
+	return append([]string(nil), platforms...)
+}
+
+// WithCompositeFallbackPlatform 把请求切换到跨平台回退序列中的下一个平台：
+// 覆盖已解析平台（下游计费、渠道定价、调度过滤均据此读取），并清空剩余序列，
+// 回退状态由 handler 自行跟踪。
+func WithCompositeFallbackPlatform(ctx context.Context, platform string) context.Context {
+	platform = strings.TrimSpace(platform)
+	if ctx == nil || platform == "" {
+		return ctx
+	}
+	ctx = context.WithValue(ctx, ctxkey.ResolvedTargetPlatform, platform)
+	return context.WithValue(ctx, ctxkey.CompositeFallbackPlatforms, []string(nil))
 }
 
 func ResolvedUpstreamModelFromContext(ctx context.Context) (string, bool) {

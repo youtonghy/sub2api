@@ -200,6 +200,8 @@ type SystemSettings struct {
 	StrictPriorityFallback        bool `json:"strict_priority_fallback"`
 	StrictPriorityRetryCount      int  `json:"strict_priority_retry_count"`
 	StrictPriorityCooldownMinutes int  `json:"strict_priority_cooldown_minutes"`
+	// composite 分组跨平台优先级回退
+	CompositeCrossPlatformFallback bool `json:"composite_cross_platform_fallback"`
 
 	// Backend Mode
 	BackendModeEnabled bool `json:"backend_mode_enabled"`

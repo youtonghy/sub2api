@@ -562,6 +562,7 @@ export function prepareSettingsSave(
     strict_priority_fallback: f.strict_priority_fallback,
     strict_priority_retry_count: f.strict_priority_retry_count,
     strict_priority_cooldown_minutes: f.strict_priority_cooldown_minutes,
+    composite_cross_platform_fallback: f.composite_cross_platform_fallback,
     openai_ttft_mode:
       f.openai_ttft_mode === 'visible' ? 'visible' : 'semantic',
     enable_fingerprint_unification: f.enable_fingerprint_unification,

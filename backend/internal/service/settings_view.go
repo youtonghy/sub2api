@@ -235,6 +235,8 @@ type SystemSettings struct {
 	StrictPriorityFallback        bool
 	StrictPriorityRetryCount      int
 	StrictPriorityCooldownMinutes int
+	// composite 分组跨平台优先级回退（仅 OpenAI 网关族平台之间）
+	CompositeCrossPlatformFallback bool
 
 	// Backend 模式：禁用用户注册和自助服务，仅管理员可登录
 	BackendModeEnabled bool

@@ -332,6 +332,7 @@ const baseSettingsResponse = {
   max_claude_code_version: '',
   allow_ungrouped_key_scheduling: false,
   strict_priority_fallback: true,
+  composite_cross_platform_fallback: false,
   openai_ttft_mode: 'semantic',
   enable_fingerprint_unification: true,
   enable_metadata_passthrough: false,
@@ -631,6 +632,19 @@ describe('admin SettingsView payment visible method controls', () => {
     await submit()
 
     expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({ strict_priority_fallback: false }))
+  })
+
+  it('loads and saves the composite cross-platform fallback switch', async () => {
+    await mountView()
+    await openTab('gateway')
+
+    const toggle = byTestId('composite-cross-platform-fallback-toggle')
+    expect(isOn(toggle)).toBe(false)
+
+    await setSwitch(toggle, true)
+    await submit()
+
+    expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({ composite_cross_platform_fallback: true }))
   })
 
   it('renders panel rate limit card and saves settings', async () => {

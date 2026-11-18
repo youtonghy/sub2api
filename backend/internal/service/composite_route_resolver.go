@@ -36,6 +36,7 @@ func (d CompositeRouteDecision) AmbiguousMessage() string {
 type CompositeRouteResolver struct {
 	repo                   CompositeModelRouteRepository
 	modelOwnershipResolver CompositeModelOwnershipResolver
+	crossPlatformFallback  func(context.Context) bool
 }
 
 func NewCompositeRouteResolver(repo CompositeModelRouteRepository) *CompositeRouteResolver {
@@ -46,6 +47,33 @@ func (r *CompositeRouteResolver) SetModelOwnershipResolver(resolver CompositeMod
 	if r != nil {
 		r.modelOwnershipResolver = resolver
 	}
+}
+
+// SetCrossPlatformFallbackEnabled 注入「跨平台优先级回退」开关的读取函数。
+// 未注入时视为关闭，歧义模型保持原有的不解析行为。
+func (r *CompositeRouteResolver) SetCrossPlatformFallbackEnabled(enabled func(context.Context) bool) {
+	if r != nil {
+		r.crossPlatformFallback = enabled
+	}
+}
+
+func (r *CompositeRouteResolver) crossPlatformFallbackEnabled(ctx context.Context) bool {
+	return r != nil && r.crossPlatformFallback != nil && r.crossPlatformFallback(ctx)
+}
+
+// compositeCrossPlatformFallbackEligible 限定可跨平台回退的平台序列：全部属于
+// OpenAI 网关族（共用同一组 handler 与调度器，切平台无需换协议管线），且不含
+// grok（其会话种子、传输方式与媒体通道与其他成员不同）。Gemini 原生端点不参与。
+func compositeCrossPlatformFallbackEligible(platforms []string, endpoint string) bool {
+	if len(platforms) < 2 || endpoint == CompositeRouteEndpointGemini {
+		return false
+	}
+	for _, platform := range platforms {
+		if !isConcreteRequestPlatform(platform) || !domain.UsesOpenAIGateway(platform) || platform == domain.PlatformGrok {
+			return false
+		}
+	}
+	return true
 }
 
 // ListExactPublicModels returns enabled, concrete route IDs suitable for a model catalog.
@@ -144,6 +172,21 @@ func (r *CompositeRouteResolver) Resolve(ctx context.Context, groupID int64, mod
 			// OpenAI 网关族时，OpenAI 网关 OAuth 声明方才会被误送进 Anthropic 管线。
 			if guessed, ok := DetectModelPlatform(model); ok && ownership.OpenAIGatewayOAuthClaimed && domain.UsesOpenAIGateway(guessed) {
 				decision.Reason = CompositeRouteReasonOAuthAmbiguous
+				return decision, nil
+			}
+			// 跨平台优先级回退：首选平台为最高优先级认领账号所在平台，其余平台
+			// 在首选平台选号耗尽后由 OpenAI 网关 handler 依次尝试。
+			if compositeCrossPlatformFallbackEligible(ownership.Platforms, endpoint) && r.crossPlatformFallbackEnabled(ctx) {
+				return CompositeRouteDecision{
+					Matched:           true,
+					Source:            CompositeRouteSourceAccount,
+					GroupID:           groupID,
+					PublicModel:       model,
+					TargetPlatform:    ownership.Platforms[0],
+					UpstreamModel:     model,
+					Endpoint:          endpoint,
+					FallbackPlatforms: append([]string(nil), ownership.Platforms[1:]...),
+				}, nil
 			}
 			return decision, nil
 		} else if ownership.Matched {

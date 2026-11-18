@@ -319,6 +319,13 @@ export function SchedulingSection() {
         </Field>
       </div>
       <ToggleRow
+        label={t('admin.settings.scheduling.compositeCrossPlatformFallback')}
+        description={t('admin.settings.scheduling.compositeCrossPlatformFallbackHint')}
+        checked={form.composite_cross_platform_fallback}
+        onChange={(value) => updateForm({ composite_cross_platform_fallback: value })}
+        switchTestId="composite-cross-platform-fallback-toggle"
+      />
+      <ToggleRow
         label={t('admin.settings.scheduling.allowUngroupedKey')}
         description={t('admin.settings.scheduling.allowUngroupedKeyHint')}
         checked={form.allow_ungrouped_key_scheduling}

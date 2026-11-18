@@ -466,6 +466,7 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyStrictPriorityFallback] = strconv.FormatBool(settings.StrictPriorityFallback)
 	updates[SettingKeyStrictPriorityRetryCount] = strconv.Itoa(settings.StrictPriorityRetryCount)
 	updates[SettingKeyStrictPriorityCooldownMinutes] = strconv.Itoa(settings.StrictPriorityCooldownMinutes)
+	updates[SettingKeyCompositeCrossPlatformFallback] = strconv.FormatBool(settings.CompositeCrossPlatformFallback)
 
 	// Backend Mode
 	updates[SettingKeyBackendModeEnabled] = strconv.FormatBool(settings.BackendModeEnabled)
@@ -809,6 +810,7 @@ func (s *SettingService) refreshCachedSettings(settings *SystemSettings) {
 		s.cfg.Gateway.Scheduling.StrictPriorityRetryCount = settings.StrictPriorityRetryCount
 		s.cfg.Gateway.Scheduling.StrictPriorityCooldownMinutes = settings.StrictPriorityCooldownMinutes
 	}
+	s.storeCompositeCrossPlatformFallback(settings.CompositeCrossPlatformFallback)
 	// codex_cli_only 加固策略缓存：设置更新后强制下次重载（涉及 4 个键 + JSON 解析，直接置过期）。
 	s.codexRestrictionPolicySF.Forget("codex_restriction_policy")
 	s.codexRestrictionPolicyCache.Store(&cachedCodexRestrictionPolicy{expiresAt: 0})

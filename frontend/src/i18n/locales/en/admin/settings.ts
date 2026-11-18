@@ -492,6 +492,8 @@ export default {
         strictPriorityRetryCountHint: 'Retries the failed provider before switching; 0 falls back to the next priority immediately.',
         strictPriorityCooldownMinutes: 'Failed provider cooldown (minutes)',
         strictPriorityCooldownMinutesHint: 'Temporarily removes the failed provider after switching; 0 keeps the default 20s short cooldown (Anthropic 5xx only).',
+        compositeCrossPlatformFallback: 'Cross-Platform Priority Fallback (composite groups)',
+        compositeCrossPlatformFallbackHint: 'When one model is mapped by accounts on several OpenAI-compatible platforms (excluding Grok), start with the platform of the highest-priority account and move to the next platform once it has no usable account or all of its accounts fail. When off, such models are rejected. Explicit model routes take precedence.',
         allowUngroupedKey: 'Allow Ungrouped Key Scheduling',
         allowUngroupedKeyHint: 'When disabled, API Keys not assigned to any group cannot make requests (403 Forbidden). Keep disabled to ensure all Keys belong to a specific group.',
         accountSchedulingThresholdsTitle: 'Platform Account Auto-Pause Thresholds',

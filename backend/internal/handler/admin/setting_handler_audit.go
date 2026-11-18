@@ -431,6 +431,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.StrictPriorityFallback != after.StrictPriorityFallback {
 		changed = append(changed, "strict_priority_fallback")
 	}
+	if before.CompositeCrossPlatformFallback != after.CompositeCrossPlatformFallback {
+		changed = append(changed, "composite_cross_platform_fallback")
+	}
 	if before.StrictPriorityRetryCount != after.StrictPriorityRetryCount {
 		changed = append(changed, "strict_priority_retry_count")
 	}

@@ -485,6 +485,8 @@ export default {
         strictPriorityRetryCountHint: '严格优先级下在失败 provider 上重试的次数，0 表示立即回退到下一个优先级账号。',
         strictPriorityCooldownMinutes: '失败 provider 冷却（分钟）',
         strictPriorityCooldownMinutesHint: '切换后暂时移出调度池；0 表示沿用默认 20 秒短冷却（仅 Anthropic 5xx）。',
+        compositeCrossPlatformFallback: '跨平台优先级回退（全平台分组）',
+        compositeCrossPlatformFallbackHint: '同一模型被多个 OpenAI 兼容平台（不含 Grok）的账号精确映射时，按账号优先级先用最高优先级账号所在平台，该平台无可用账号或全部失败后自动改用下一个平台；关闭时此类模型会被拒绝。显式模型路由优先。',
         allowUngroupedKey: '允许未分组 Key 调度',
         allowUngroupedKeyHint: '关闭后，未分配到任何分组的 API Key 将无法发起请求（返回 403）。建议保持关闭以确保所有 Key 都归属明确的分组。',
         accountSchedulingThresholdsTitle: '平台账号自动停调阈值',

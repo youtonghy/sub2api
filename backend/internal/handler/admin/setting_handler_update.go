@@ -241,6 +241,8 @@ type UpdateSettingsRequest struct {
 	StrictPriorityFallback        bool `json:"strict_priority_fallback"`
 	StrictPriorityRetryCount      int  `json:"strict_priority_retry_count"`
 	StrictPriorityCooldownMinutes int  `json:"strict_priority_cooldown_minutes"`
+	// 省略时保留原值
+	CompositeCrossPlatformFallback *bool `json:"composite_cross_platform_fallback"`
 
 	// Backend Mode
 	BackendModeEnabled bool `json:"backend_mode_enabled"`
@@ -1689,7 +1691,13 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		StrictPriorityFallback:                 req.StrictPriorityFallback,
 		StrictPriorityRetryCount:               req.StrictPriorityRetryCount,
 		StrictPriorityCooldownMinutes:          req.StrictPriorityCooldownMinutes,
-		BackendModeEnabled:                     req.BackendModeEnabled,
+		CompositeCrossPlatformFallback: func() bool {
+			if req.CompositeCrossPlatformFallback != nil {
+				return *req.CompositeCrossPlatformFallback
+			}
+			return previousSettings.CompositeCrossPlatformFallback
+		}(),
+		BackendModeEnabled: req.BackendModeEnabled,
 		AllowUserViewErrorRequests: func() bool {
 			if req.AllowUserViewErrorRequests != nil {
 				return *req.AllowUserViewErrorRequests
@@ -2366,6 +2374,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		StrictPriorityFallback:                                 updatedSettings.StrictPriorityFallback,
 		StrictPriorityRetryCount:                               updatedSettings.StrictPriorityRetryCount,
 		StrictPriorityCooldownMinutes:                          updatedSettings.StrictPriorityCooldownMinutes,
+		CompositeCrossPlatformFallback:                         updatedSettings.CompositeCrossPlatformFallback,
 		BackendModeEnabled:                                     updatedSettings.BackendModeEnabled,
 		EnableFingerprintUnification:                           updatedSettings.EnableFingerprintUnification,
 		EnableMetadataPassthrough:                              updatedSettings.EnableMetadataPassthrough,

@@ -630,6 +630,7 @@ export interface SystemSettings {
   strict_priority_fallback: boolean;
   strict_priority_retry_count: number;
   strict_priority_cooldown_minutes: number;
+  composite_cross_platform_fallback: boolean;
 
   // Gateway forwarding behavior
   openai_ttft_mode: string;
@@ -964,6 +965,7 @@ export interface UpdateSettingsRequest {
   strict_priority_fallback?: boolean;
   strict_priority_retry_count?: number;
   strict_priority_cooldown_minutes?: number;
+  composite_cross_platform_fallback?: boolean;
   openai_ttft_mode?: string;
   enable_fingerprint_unification?: boolean;
   enable_metadata_passthrough?: boolean;

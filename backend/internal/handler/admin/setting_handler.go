@@ -291,6 +291,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		StrictPriorityFallback:                                 settings.StrictPriorityFallback,
 		StrictPriorityRetryCount:                               settings.StrictPriorityRetryCount,
 		StrictPriorityCooldownMinutes:                          settings.StrictPriorityCooldownMinutes,
+		CompositeCrossPlatformFallback:                         settings.CompositeCrossPlatformFallback,
 		BackendModeEnabled:                                     settings.BackendModeEnabled,
 		OpenAITTFTMode:                                         settings.OpenAITTFTMode,
 		EnableFingerprintUnification:                           settings.EnableFingerprintUnification,

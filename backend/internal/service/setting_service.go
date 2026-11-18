@@ -135,6 +135,9 @@ type SettingService struct {
 	claudeCodeVersionSF         singleflight.Group
 	codexRestrictionPolicyCache atomic.Value // *cachedCodexRestrictionPolicy
 	codexRestrictionPolicySF    singleflight.Group
+	// composite 跨平台优先级回退开关的热路径缓存（*cachedCompositeCrossPlatformFallback）
+	compositeCrossPlatformFallbackCache atomic.Value
+	compositeCrossPlatformFallbackSF    singleflight.Group
 
 	cyberSessionBlockRuntimeMu    sync.Mutex
 	cyberSessionBlockRuntimeCache atomic.Value // *cachedCyberSessionBlockRuntime

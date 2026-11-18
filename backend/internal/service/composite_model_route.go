@@ -37,6 +37,9 @@ type CompositeModelOwnership struct {
 	// handler：Anthropic / Gemini / Antigravity 的 OAuth 在那里有原生或兼容
 	// 转发，API Key 上游可能兼容多种格式，唯独这类凭据只能走 OpenAI 网关。
 	OpenAIGatewayOAuthClaimed bool
+	// Platforms 是认领该模型的全部平台，按认领账号的「组内优先级 → 账号全局
+	// 优先级」排序后取首次出现顺序。歧义时据此决定跨平台回退的尝试顺序。
+	Platforms []string
 }
 
 type CompositeModelOwnershipResolver func(context.Context, int64, string) (CompositeModelOwnership, error)
@@ -78,6 +81,9 @@ type CompositeRouteDecision struct {
 	Endpoint       string               `json:"endpoint"`
 	Route          *CompositeModelRoute `json:"route,omitempty"`
 	Reason         string               `json:"reason,omitempty"`
+	// FallbackPlatforms 是 TargetPlatform 选号耗尽后依次尝试的平台，仅在
+	// 跨平台回退开启且多个 OpenAI 网关族平台认领同一模型时非空。
+	FallbackPlatforms []string `json:"fallback_platforms,omitempty"`
 }
 
 type CompositeRouteInput struct {

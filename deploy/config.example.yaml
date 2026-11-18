@@ -609,6 +609,18 @@ gateway:
     strict_priority_retry_count: 0
     # Temporarily remove a failed account for this many minutes in strict mode.
     strict_priority_cooldown_minutes: 0
+    # Composite groups: when one model is mapped (exact model_mapping key) by
+    # accounts of several OpenAI-gateway platforms (openai, opencode_go, kimi,
+    # zhipu, deepseek, minimax, command_code, cline; not grok), try the platforms
+    # in claiming-account priority order (group priority, then account priority)
+    # instead of rejecting the request. Explicit composite routes still win.
+    # Initial value only: the admin setting "composite_cross_platform_fallback"
+    # overrides it once saved and takes effect without restart.
+    # composite 分组跨平台优先级回退：同一模型被多个 OpenAI 网关族平台（不含 grok）
+    # 的账号精确映射时，按认领账号优先级依次尝试各平台，首选平台选号耗尽后改用下一个
+    # 平台，而非报错。显式路由优先。账号切换总次数仍受 gateway.max_account_switches 约束。
+    # 此处仅为初始值；管理端保存设置后以设置为准，无需重启。
+    cross_platform_fallback: false
     # Prefer the account whose session window resets soonest (use-it-or-lose-it).
     # 负载感知选择时优先用尽「会话窗口最早重置」的账号；false 保持
     # 原有「优先级 → 负载率 → LRU」行为（默认）。

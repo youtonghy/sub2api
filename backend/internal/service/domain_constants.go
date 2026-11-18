@@ -643,6 +643,8 @@ const (
 	SettingKeyStrictPriorityFallback        = "strict_priority_fallback"
 	SettingKeyStrictPriorityRetryCount      = "strict_priority_retry_count"
 	SettingKeyStrictPriorityCooldownMinutes = "strict_priority_cooldown_minutes"
+	// SettingKeyCompositeCrossPlatformFallback composite 分组跨平台优先级回退开关。
+	SettingKeyCompositeCrossPlatformFallback = "composite_cross_platform_fallback"
 	// SettingKeyOpenAILowUpstreamRatePriorityEnabled 旧调度是否按上游 token 倍率优先。
 	SettingKeyOpenAILowUpstreamRatePriorityEnabled = "openai_low_upstream_rate_priority_enabled"
 	// SettingKeyOpenAIOAuthSchedulingRateMultiplier OAuth 账号参与成本调度时使用的参考倍率。

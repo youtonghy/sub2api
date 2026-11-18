@@ -341,6 +341,7 @@ export function createDefaultSettingsForm(localText: LocalText): SettingsForm {
     strict_priority_fallback: false,
     strict_priority_retry_count: 0,
     strict_priority_cooldown_minutes: 0,
+    composite_cross_platform_fallback: false,
     openai_low_upstream_rate_priority_enabled: false,
     openai_oauth_scheduling_rate_multiplier: 1,
     openai_advanced_scheduler_enabled: false,

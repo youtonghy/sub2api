@@ -240,6 +240,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyStrictPriorityFallback:                             strconv.FormatBool(s != nil && s.cfg != nil && s.cfg.Gateway.Scheduling.StrictPriorityFallback),
 		SettingKeyStrictPriorityRetryCount:                           strconv.Itoa(strictPriorityRetryCountFromConfig(s)),
 		SettingKeyStrictPriorityCooldownMinutes:                      strconv.Itoa(strictPriorityCooldownMinutesFromConfig(s)),
+		SettingKeyCompositeCrossPlatformFallback:                     strconv.FormatBool(compositeCrossPlatformFallbackFromConfig(s)),
 		SettingKeyOpenAILowUpstreamRatePriorityEnabled:               "false",
 		SettingKeyOpenAIOAuthSchedulingRateMultiplier:                "1",
 		SettingKeyEnableAnthropicCacheTTL1hInjection:                 "false",
@@ -873,6 +874,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	result.StrictPriorityCooldownMinutes = parseBoundedNonNegativeSetting(
 		settings[SettingKeyStrictPriorityCooldownMinutes], strictPriorityCooldownMinutesFromConfig(s), 1440,
 	)
+	result.CompositeCrossPlatformFallback = parseCompositeCrossPlatformFallback(settings[SettingKeyCompositeCrossPlatformFallback], compositeCrossPlatformFallbackFromConfig(s))
 
 	// Gateway forwarding behavior (defaults: fingerprint=true, metadata_passthrough=false,
 	// cch_signing=false, claude_oauth_system_prompt_injection=true)

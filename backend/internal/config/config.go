@@ -1597,6 +1597,11 @@ type GatewaySchedulingConfig struct {
 	// 默认 false，保持原有粘性/负载/加权调度；需要时显式开启。
 	StrictPriorityFallback bool `mapstructure:"strict_priority_fallback"`
 
+	// CrossPlatformFallback 开启后，composite 分组中同一模型被多个 OpenAI 网关族平台
+	// 的账号认领时，按认领账号优先级确定平台顺序，首选平台选号耗尽后依次改用下一个
+	// 平台，而不是拒绝请求。默认 false。运行时以管理端设置为准，此处为未保存设置时的初始值。
+	CrossPlatformFallback bool `mapstructure:"cross_platform_fallback"`
+
 	// PreferSoonestReset 开启后，负载感知选择会优先选用「会话窗口最早重置」的账号
 	// （use-it-or-lose-it：先用尽即将重置的账号，保留重置时间还很久的账号）。
 	// 默认 false，保持原有「优先级 → 负载率 → LRU」行为不变。
@@ -2673,6 +2678,7 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.fallback_max_waiting", 100)
 	viper.SetDefault("gateway.scheduling.fallback_selection_mode", "last_used")
 	viper.SetDefault("gateway.scheduling.strict_priority_fallback", false)
+	viper.SetDefault("gateway.scheduling.cross_platform_fallback", false)
 	viper.SetDefault("gateway.scheduling.strict_priority_retry_count", 0)
 	viper.SetDefault("gateway.scheduling.strict_priority_cooldown_minutes", 0)
 	viper.SetDefault("gateway.scheduling.prefer_soonest_reset", false)

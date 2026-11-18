@@ -42,11 +42,11 @@ func TestResolveCompositeModelOwnershipKeepsProviderAccountsIsolated(t *testing.
 
 	deepSeekOwnership, err := svc.resolveCompositeModelOwnership(context.Background(), groupID, "reasoning-alias")
 	require.NoError(t, err)
-	require.Equal(t, CompositeModelOwnership{TargetPlatform: PlatformDeepseek, Matched: true}, deepSeekOwnership)
+	require.Equal(t, CompositeModelOwnership{TargetPlatform: PlatformDeepseek, Matched: true, Platforms: []string{PlatformDeepseek}}, deepSeekOwnership)
 
 	openAIOwnership, err := svc.resolveCompositeModelOwnership(context.Background(), groupID, "gpt-public")
 	require.NoError(t, err)
-	require.Equal(t, CompositeModelOwnership{TargetPlatform: PlatformOpenAI, Matched: true}, openAIOwnership)
+	require.Equal(t, CompositeModelOwnership{TargetPlatform: PlatformOpenAI, Matched: true, Platforms: []string{PlatformOpenAI}}, openAIOwnership)
 }
 
 // Scenario: 通配符和空映射不声明所有权
@@ -80,7 +80,7 @@ func TestResolveCompositeModelOwnershipRequiresNonEmptyExactMappings(t *testing.
 
 	ownership, err := svc.resolveCompositeModelOwnership(context.Background(), groupID, "grok-public")
 	require.NoError(t, err)
-	require.Equal(t, CompositeModelOwnership{TargetPlatform: PlatformGrok, Matched: true}, ownership)
+	require.Equal(t, CompositeModelOwnership{TargetPlatform: PlatformGrok, Matched: true, Platforms: []string{PlatformGrok}}, ownership)
 }
 
 func TestResolveCompositeModelOwnershipAllowsSamePlatformAndRejectsCrossPlatformAliases(t *testing.T) {
@@ -96,11 +96,11 @@ func TestResolveCompositeModelOwnershipAllowsSamePlatformAndRejectsCrossPlatform
 
 	samePlatform, err := svc.resolveCompositeModelOwnership(context.Background(), groupID, "shared-openai")
 	require.NoError(t, err)
-	require.Equal(t, CompositeModelOwnership{TargetPlatform: PlatformOpenAI, Matched: true}, samePlatform)
+	require.Equal(t, CompositeModelOwnership{TargetPlatform: PlatformOpenAI, Matched: true, Platforms: []string{PlatformOpenAI}}, samePlatform)
 
 	ambiguous, err := svc.resolveCompositeModelOwnership(context.Background(), groupID, "ambiguous")
 	require.NoError(t, err)
-	require.Equal(t, CompositeModelOwnership{Ambiguous: true}, ambiguous)
+	require.Equal(t, CompositeModelOwnership{Ambiguous: true, Platforms: []string{PlatformOpenAI, PlatformDeepseek}}, ambiguous)
 }
 
 // Scenario: 只有 OpenAI 网关族的 OAuth 声明方会被标记（API Key 上游可能兼容多协议，
@@ -121,15 +121,15 @@ func TestResolveCompositeModelOwnershipFlagsOpenAIGatewayOAuthClaimants(t *testi
 
 	withOAuth, err := svc.resolveCompositeModelOwnership(context.Background(), groupID, "gpt-6-astra")
 	require.NoError(t, err)
-	require.Equal(t, CompositeModelOwnership{Ambiguous: true, OpenAIGatewayOAuthClaimed: true}, withOAuth)
+	require.Equal(t, CompositeModelOwnership{Ambiguous: true, OpenAIGatewayOAuthClaimed: true, Platforms: []string{PlatformOpenAI, PlatformDeepseek}}, withOAuth)
 
 	apiKeyOnly, err := svc.resolveCompositeModelOwnership(context.Background(), groupID, "apikey-only")
 	require.NoError(t, err)
-	require.Equal(t, CompositeModelOwnership{Ambiguous: true}, apiKeyOnly)
+	require.Equal(t, CompositeModelOwnership{Ambiguous: true, Platforms: []string{PlatformDeepseek, PlatformOpenAI}}, apiKeyOnly)
 
 	anthropicFamily, err := svc.resolveCompositeModelOwnership(context.Background(), groupID, "claude-opus-4-8")
 	require.NoError(t, err)
-	require.Equal(t, CompositeModelOwnership{Ambiguous: true}, anthropicFamily)
+	require.Equal(t, CompositeModelOwnership{Ambiguous: true, Platforms: []string{PlatformAntigravity, PlatformAnthropic}}, anthropicFamily)
 }
 
 func TestNewGatewayServiceWiresCompositeModelOwnershipResolver(t *testing.T) {

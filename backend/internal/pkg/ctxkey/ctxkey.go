@@ -20,6 +20,10 @@ const (
 	// CompositeRouteSource 标识 composite 解析结果来自显式路由还是内置模型探测。
 	CompositeRouteSource Key = "ctx_composite_route_source"
 
+	// CompositeFallbackPlatforms 是 composite 分组跨平台优先级回退时，首选平台
+	// 选号耗尽后依次尝试的平台列表（[]string）。
+	CompositeFallbackPlatforms Key = "ctx_composite_fallback_platforms"
+
 	// RequestID 为服务端生成/透传的请求 ID。
 	RequestID Key = "ctx_request_id"
 

@@ -947,6 +947,9 @@ func NewGatewayService(
 	}
 	if compositeResolver != nil {
 		compositeResolver.SetModelOwnershipResolver(svc.resolveCompositeModelOwnership)
+		if settingService != nil {
+			compositeResolver.SetCrossPlatformFallbackEnabled(settingService.IsCompositeCrossPlatformFallbackEnabled)
+		}
 	}
 	svc.userGroupRateResolver = newUserGroupRateResolver(
 		userGroupRateRepo,
@@ -1592,22 +1595,25 @@ func (s *GatewayService) resolveCompositeModelOwnership(ctx context.Context, gro
 		return CompositeModelOwnership{}, err
 	}
 
-	platforms := make(map[string]struct{})
+	// 仓储按「组内优先级 → 账号全局优先级」返回账号，平台按首次出现顺序
+	// 记录即为跨平台回退的尝试顺序。
+	seen := make(map[string]struct{})
 	ownership := CompositeModelOwnership{}
 	for _, account := range accounts {
 		if explicitModelMappingClaims(account, model) {
-			platforms[account.Platform] = struct{}{}
+			if _, ok := seen[account.Platform]; !ok {
+				seen[account.Platform] = struct{}{}
+				ownership.Platforms = append(ownership.Platforms, account.Platform)
+			}
 			ownership.OpenAIGatewayOAuthClaimed = ownership.OpenAIGatewayOAuthClaimed ||
 				(account.IsOAuth() && domain.UsesOpenAIGateway(account.Platform))
 		}
 	}
 
-	if len(platforms) == 1 {
-		for platform := range platforms {
-			ownership.TargetPlatform = platform
-		}
+	if len(ownership.Platforms) == 1 {
+		ownership.TargetPlatform = ownership.Platforms[0]
 		ownership.Matched = true
-	} else if len(platforms) > 1 {
+	} else if len(ownership.Platforms) > 1 {
 		ownership.Ambiguous = true
 	}
 
