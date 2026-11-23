@@ -1,8 +1,17 @@
+import { fireEvent } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import PlazaModelPricingTable, { type PlazaModelPricingTableProps } from '../PlazaModelPricingTable'
 import type { PlazaModel } from '@/api/modelPlaza'
 import { mountElement } from './domWrapper'
+
+const { copyToClipboard } = vi.hoisted(() => ({
+  copyToClipboard: vi.fn().mockResolvedValue(true)
+}))
+
+vi.mock('@/composables/useClipboard', () => ({
+  useClipboard: () => ({ copied: false, copyToClipboard })
+}))
 
 vi.mock('@/i18n/useI18n', () => ({
   useI18n: () => ({ t: (key: string) => key, te: () => false, locale: 'en', setLocale: vi.fn() })
@@ -57,6 +66,29 @@ function mountTable(
 }
 
 describe('PlazaModelPricingTable', () => {
+  it('copies the exact model ID from the clicked pricing row', () => {
+    const model = tokenModel({
+      name: 'provider/Model-v2',
+      time_pricing: {
+        timezone: 'Asia/Shanghai',
+        periods: [{ start_time: '09:00', end_time: '12:00', multiplier: 0.5 }]
+      }
+    })
+    const wrapper = mountTable([tokenModel(), model], 1)
+    const buttons = Array.from(document.querySelectorAll('tbody tr'))
+      .filter((row) => row.textContent?.includes(model.name))
+      .map((row) => row.querySelector('button[aria-label="modelPlaza.table.copyModelId"]'))
+    expect(buttons).toHaveLength(2)
+
+    for (const button of buttons) {
+      expect(button).not.toBeNull()
+      fireEvent.click(button!)
+    }
+
+    expect(copyToClipboard.mock.calls).toEqual([[model.name], [model.name]])
+    wrapper.unmount()
+  })
+
   it.each([false, true])('shows independent 12h prices without a 1h label (intervals=%s)', (intervals) => {
     const model = tokenModel({ name: 'gpt-6-luna', platform: 'openai' })
     model.pricing!.cache_write_price = null

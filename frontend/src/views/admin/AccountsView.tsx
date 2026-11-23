@@ -108,7 +108,7 @@ import type {
 import { fetchAllAccountIds } from '@/utils/accountSelection'
 import { fetchAllAccountsByPriority } from '@/utils/accountPriorityFetch'
 import { computeDropPriority, planPriorityMove } from '@/utils/accountPriorityOrder'
-import { buildGrokUsageRefreshKey, buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
+import { buildAccountUsageRefreshKey, buildGrokUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 import { formatMultiplier } from '@/utils/formatters'
@@ -158,6 +158,7 @@ type AutoRefreshInterval = (typeof autoRefreshIntervals)[number]
 const AUTO_REFRESH_SILENT_WINDOW_MS = 15000
 
 const USAGE_BATCH_CACHE_TTL = 5 * 60 * 1000
+const MANUAL_REFRESH_WARN_INTERVAL_MS = 60_000
 const desktopViewportQuery = '(min-width: 768px)'
 
 const ACCOUNT_UNGROUPED_GROUP_QUERY_VALUE = 'ungrouped'
@@ -556,7 +557,7 @@ const shouldReplaceAutoRefreshRow = (current: Account, next: Account) => {
     current.rate_limit_reset_at !== next.rate_limit_reset_at ||
     current.overload_until !== next.overload_until ||
     current.temp_unschedulable_until !== next.temp_unschedulable_until ||
-    buildOpenAIUsageRefreshKey(current) !== buildOpenAIUsageRefreshKey(next) ||
+    buildAccountUsageRefreshKey(current) !== buildAccountUsageRefreshKey(next) ||
     buildGrokUsageRefreshKey(current) !== buildGrokUsageRefreshKey(next)
   )
 }
@@ -745,7 +746,8 @@ export default function AccountsView() {
   // 用量批量拉取
   const [usageBatch, setUsageBatch] = useState<UsageBatchState>({ usage: {}, errors: {}, loading: {} })
   const usageBatchRequestTokenByAccountId = useRef<Record<string, number>>({})
-  const usageBatchCache = useRef(new Map<number, { data: AccountUsageInfo; ts: number }>())
+  const lastManualRefreshAt = useRef(new Map<number, number>())
+  const usageBatchCache = useRef(new Map<number, { data: AccountUsageInfo; ts: number; refreshKey: string }>())
   const pendingUsageBatchIds = useRef(new Set<number>())
   const usageBatchFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const queuedUsageBatchForce = useRef(false)
@@ -1014,6 +1016,7 @@ export default function AccountsView() {
     usageBatchFlushTimer.current = null
     const accountIDs = Array.from(pendingUsageBatchIds.current)
     const force = queuedUsageBatchForce.current
+    const refreshKeys = new Map(accountsRef.current.map((account) => [account.id, buildAccountUsageRefreshKey(account)]))
     pendingUsageBatchIds.current.clear()
     queuedUsageBatchForce.current = false
 
@@ -1039,7 +1042,7 @@ export default function AccountsView() {
         const usage = usageMap[key] ?? null
         fresh.push([key, usage, errorMap[key] ?? null])
         if (usage) {
-          usageBatchCache.current.set(accountID, { data: usage, ts: now })
+          usageBatchCache.current.set(accountID, { data: usage, ts: now, refreshKey: refreshKeys.get(accountID) ?? '' })
         } else {
           usageBatchCache.current.delete(accountID)
         }
@@ -1084,7 +1087,7 @@ export default function AccountsView() {
       usageBatchCache.current.delete(cacheKey)
     } else {
       const cached = usageBatchCache.current.get(cacheKey)
-      if (cached && currentTime() - cached.ts < USAGE_BATCH_CACHE_TTL) {
+      if (cached && cached.refreshKey === buildAccountUsageRefreshKey(account) && currentTime() - cached.ts < USAGE_BATCH_CACHE_TTL) {
         setUsageBatch((prev) => ({
           usage: { ...prev.usage, [key]: cached.data },
           errors: { ...prev.errors, [key]: null },
@@ -2200,6 +2203,12 @@ export default function AccountsView() {
     }
   }
   const handleRefresh = async (a: Account) => {
+    // 只提醒不阻拦：短时间内反复手动刷新可能与后台自动刷新竞争同一份轮换令牌
+    const lastAt = lastManualRefreshAt.current.get(a.id) ?? 0
+    if (currentTime() - lastAt < MANUAL_REFRESH_WARN_INTERVAL_MS) {
+      useAppStore.getState().showWarning(t('admin.accounts.refreshTokenFrequentWarning'))
+    }
+    lastManualRefreshAt.current.set(a.id, currentTime())
     try {
       const result = await adminAPI.accounts.refreshCredentials(a.id)
       patchAccountInList(result.account)

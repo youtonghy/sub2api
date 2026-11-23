@@ -99,6 +99,7 @@ interface BulkEditState {
   enableStatus: boolean
   enableGroups: boolean
   enableOpenAIPassthrough: boolean
+  enableOpenAIPassthroughModelFilter: boolean
   enableOpenAIFlattenNamespaces: boolean
   enableOpenAILongContextBilling: boolean
   enableOpenAIImageSizeTiers: boolean
@@ -167,6 +168,7 @@ const createInitialState = (): BulkEditState => ({
   enableStatus: false,
   enableGroups: false,
   enableOpenAIPassthrough: false,
+  enableOpenAIPassthroughModelFilter: false,
   enableOpenAIFlattenNamespaces: false,
   enableOpenAILongContextBilling: false,
   enableOpenAIImageSizeTiers: false,
@@ -440,6 +442,7 @@ export default function BulkEditAccountModal({
     allOpenAIPassthroughCapable &&
     form.enableOpenAIPassthrough &&
     form.openaiPassthroughEnabled &&
+    form.enableOpenAIPassthroughModelFilter &&
     !form.openaiPassthroughModelFilterEnabled
 
   const openAIWSModeOptions = [
@@ -644,13 +647,17 @@ export default function BulkEditAccountModal({
     if (form.enableOpenAIPassthrough) {
       const extra = ensureExtra()
       extra.openai_passthrough = form.openaiPassthroughEnabled
-      extra.openai_passthrough_model_filter = form.openaiPassthroughEnabled && form.openaiPassthroughModelFilterEnabled
       if (!form.openaiPassthroughEnabled) {
         extra.openai_oauth_passthrough = false
       }
     }
 
     // 同时校验可见性：勾选后又改了目标筛选条件时，不应把该键写到非 OAuth 账号上
+    // extra 按键合并；未勾选修改时省略该键，保留各账号原有的筛选设置。
+    if (form.enableOpenAIPassthroughModelFilter && allOpenAIPassthroughCapable) {
+      ensureExtra().openai_passthrough_model_filter = form.openaiPassthroughModelFilterEnabled
+    }
+
     if (form.enableOpenAIFlattenNamespaces && allOpenAIOAuthOnly) {
       const extra = ensureExtra()
       extra.openai_responses_flatten_namespaces = form.openaiFlattenNamespacesEnabled
@@ -930,6 +937,7 @@ export default function BulkEditAccountModal({
     const hasAnyFieldEnabled =
       form.enableBaseUrl ||
       form.enableOpenAIPassthrough ||
+      (form.enableOpenAIPassthroughModelFilter && allOpenAIPassthroughCapable) ||
       form.enableOpenAIFlattenNamespaces ||
       (form.enableOpenAILongContextBilling && allOpenAIPassthroughCapable) ||
       (form.enableOpenAIImageSizeTiers && allOpenAIPassthroughCapable) ||
@@ -1089,16 +1097,34 @@ export default function BulkEditAccountModal({
                   onCheckedChange={(v) => update({ openaiPassthroughEnabled: v })}
                   aria-label={t('admin.accounts.openai.oauthPassthrough')}
                 />
-                {form.openaiPassthroughEnabled ? (
-                  <Checkbox
-                    label={t('admin.accounts.openai.passthroughModelFilter')}
-                    description={t('admin.accounts.openai.passthroughModelFilterDesc')}
-                    checked={form.openaiPassthroughModelFilterEnabled}
-                    disabled={!form.enableOpenAIPassthrough}
-                    onCheckedChange={(next) => update({ openaiPassthroughModelFilterEnabled: next === true })}
-                    data-testid="bulk-openai-passthrough-model-filter"
-                  />
-                ) : null}
+              </FieldBody>
+            </BulkField>
+          ) : null}
+
+          {/* OpenAI passthrough model filtering：独立勾选，未勾选时保留各账号原值 */}
+          {allOpenAIPassthroughCapable ? (
+            <BulkField
+              id="bulk-edit-openai-passthrough-model-filter"
+              label={t('admin.accounts.openai.passthroughModelFilter')}
+              ariaLabel={t('admin.accounts.openai.passthroughModelFilter')}
+              description={t('admin.accounts.openai.passthroughModelFilterDesc')}
+              enabled={form.enableOpenAIPassthroughModelFilter}
+              onEnabledChange={(v) => update({ enableOpenAIPassthroughModelFilter: v })}
+              controls="bulk-edit-openai-passthrough-model-filter-body"
+            >
+              <FieldBody
+                id="bulk-edit-openai-passthrough-model-filter-body"
+                enabled={form.enableOpenAIPassthroughModelFilter}
+                group
+                labelledBy="bulk-edit-openai-passthrough-model-filter-label"
+              >
+                <Checkbox
+                  label={t('common.enabled')}
+                  checked={form.openaiPassthroughModelFilterEnabled}
+                  disabled={!form.enableOpenAIPassthroughModelFilter}
+                  onCheckedChange={(next) => update({ openaiPassthroughModelFilterEnabled: next === true })}
+                  data-testid="bulk-openai-passthrough-model-filter"
+                />
               </FieldBody>
             </BulkField>
           ) : null}

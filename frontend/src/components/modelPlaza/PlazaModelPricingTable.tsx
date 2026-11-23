@@ -4,6 +4,7 @@
  * 测试钩子：阶梯档位行带 data-tier-row（对应 Vue 的 .leading-5），划线原倍率带 data-struck。
  */
 import { useMemo, type CSSProperties, type ReactNode } from 'react'
+import { Copy } from 'lucide-react'
 
 import type { UserPricingInterval } from '@/api/channels'
 import type { PlazaModel, PlazaTimePricingPeriod } from '@/api/modelPlaza'
@@ -14,6 +15,7 @@ import {
   REASONING_EFFORT_LEVELS,
   type BillingMode
 } from '@/constants/channel'
+import { useClipboard } from '@/composables/useClipboard'
 import { useI18n } from '@/i18n/useI18n'
 import { platformAccentColor, platformLabel } from '@/utils/platformColors'
 import { formatScaled, resolveIntervalPrices } from '@/utils/pricing'
@@ -158,6 +160,7 @@ export default function PlazaModelPricingTable({
   peakRateMultiplier
 }: PlazaModelPricingTableProps) {
   const { t } = useI18n()
+  const { copyToClipboard } = useClipboard()
 
   const effectiveRate = userRateMultiplier ?? rateMultiplier
   const hasCustomRate = userRateMultiplier != null && userRateMultiplier !== rateMultiplier
@@ -521,7 +524,18 @@ export default function PlazaModelPricingTable({
               {/* 模型名 + 非 token 计费模式徽章；分时时段行额外标注时段 */}
               <td className={styles.modelCell}>
                 <div className={styles.modelName}>
-                  <span className={styles.name}>{m.name}</span>
+                  <span className={styles.nameWrap}>
+                    <span className={styles.name}>{m.name}</span>
+                    <button
+                      type="button"
+                      className={styles.copyButton}
+                      title={t('modelPlaza.table.copyModelId', { model: m.name })}
+                      aria-label={t('modelPlaza.table.copyModelId', { model: m.name })}
+                      onClick={() => void copyToClipboard(m.name)}
+                    >
+                      <Copy size={14} aria-hidden="true" />
+                    </button>
+                  </span>
                   {/* 时段徽章紧跟模型名，其余徽章排在后面，空间不足时先换行的是它们 */}
                   {period && (
                     <span className={styles.periodBadge} title={timePricingRowHint(m)}>

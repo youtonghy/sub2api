@@ -153,13 +153,15 @@ export default function AccountActionMenu({
     label: string,
     icon: ReactNode,
     handler: ((account: Account) => void) | undefined,
-    tone: Tone = 'default'
+    tone: Tone = 'default',
+    title?: string
   ) => (
     <button
       type="button"
       role="menuitem"
       className={styles.item}
       data-tone={tone === 'default' ? undefined : tone}
+      title={title}
       onClick={() => {
         if (account) handler?.(account)
         onClose?.()
@@ -200,7 +202,7 @@ export default function AccountActionMenu({
             {(account.type === 'oauth' || account.type === 'setup-token') && !isShadow && (
               <>
                 {item(t('admin.accounts.reAuthorize'), <Link2 {...iconProps} />, onReauth, 'accent')}
-                {item(t('admin.accounts.refreshToken'), <RefreshCw {...iconProps} />, onRefreshToken, 'accent')}
+                {item(t('admin.accounts.refreshToken'), <RefreshCw {...iconProps} />, onRefreshToken, 'accent', t('admin.accounts.refreshTokenHint'))}
               </>
             )}
             {isOpenAIOAuthParent &&

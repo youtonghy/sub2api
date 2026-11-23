@@ -157,7 +157,8 @@ export default function WebSearchEmulationSection() {
                       value={provider.type}
                       options={[
                         { value: 'brave', label: 'Brave Search' },
-                        { value: 'tavily', label: 'Tavily' }
+                        { value: 'tavily', label: 'Tavily' },
+                        { value: 'exa', label: 'Exa' }
                       ]}
                       onChange={(value) => updateProvider(pIdx, { type: value as WebSearchProviderConfig['type'] })}
                     />

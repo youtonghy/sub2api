@@ -307,10 +307,10 @@ describe('BulkEditAccountModal', () => {
     })
   })
 
-  it('OpenAI 账号批量编辑可开启自动透传', async () => {
+  it.each(['oauth', 'apikey'])('OpenAI %s 仅开启自动透传时保留原有模型筛选设置', async (type) => {
     mountModal({
       selectedPlatforms: ['openai'],
-      selectedTypes: ['oauth']
+      selectedTypes: [type]
     })
 
     enable('bulk-edit-openai-passthrough-enabled')
@@ -320,8 +320,7 @@ describe('BulkEditAccountModal', () => {
     expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledTimes(1)
     expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], {
       extra: {
-        openai_passthrough: true,
-        openai_passthrough_model_filter: false
+        openai_passthrough: true
       }
     })
   })
@@ -902,10 +901,10 @@ describe('BulkEditAccountModal', () => {
     })
   })
 
-  it('OpenAI 账号批量编辑可关闭自动透传', async () => {
+  it.each(['oauth', 'apikey'])('OpenAI %s 仅关闭自动透传时保留原有模型筛选设置', async (type) => {
     mountModal({
       selectedPlatforms: ['openai'],
-      selectedTypes: ['apikey']
+      selectedTypes: [type]
     })
 
     enable('bulk-edit-openai-passthrough-enabled')
@@ -915,13 +914,12 @@ describe('BulkEditAccountModal', () => {
     expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], {
       extra: {
         openai_passthrough: false,
-        openai_passthrough_model_filter: false,
         openai_oauth_passthrough: false
       }
     })
   })
 
-  it('开启 OpenAI 自动透传时不再同时提交模型限制', async () => {
+  it('明确关闭模型筛选并开启 OpenAI 自动透传时不再同时提交模型限制', async () => {
     mountModal({
       selectedPlatforms: ['openai'],
       selectedTypes: ['oauth']
@@ -929,6 +927,7 @@ describe('BulkEditAccountModal', () => {
 
     enable('bulk-edit-openai-passthrough-enabled')
     fireEvent.click(byId('bulk-edit-openai-passthrough-toggle'))
+    enable('bulk-edit-openai-passthrough-model-filter-enabled')
     enable('bulk-edit-model-restriction-enabled')
     await submit()
 
@@ -950,6 +949,7 @@ describe('BulkEditAccountModal', () => {
 
     enable('bulk-edit-openai-passthrough-enabled')
     fireEvent.click(byId('bulk-edit-openai-passthrough-toggle'))
+    enable('bulk-edit-openai-passthrough-model-filter-enabled')
     setChecked(screen.getByTestId('bulk-openai-passthrough-model-filter'), true)
     enable('bulk-edit-model-restriction-enabled')
     await submit()
@@ -960,6 +960,56 @@ describe('BulkEditAccountModal', () => {
       credentials: { model_mapping: {} }
     })
     expect(document.body.textContent).not.toContain('admin.accounts.openai.modelRestrictionDisabledByPassthrough')
+  })
+
+  it.each([
+    ['oauth', true],
+    ['oauth', false],
+    ['apikey', true],
+    ['apikey', false]
+  ])('can set model filtering to %s/%s without changing passthrough', async (type, enabled) => {
+    mountModal({ selectedPlatforms: ['openai'], selectedTypes: [type] })
+    const filter = screen.getByTestId('bulk-openai-passthrough-model-filter')
+    expect(filter).toBeDisabled()
+    enable('bulk-edit-openai-passthrough-model-filter-enabled')
+    setChecked(screen.getByTestId('bulk-openai-passthrough-model-filter'), enabled)
+    await submit()
+
+    expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledTimes(1)
+    expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], {
+      extra: { openai_passthrough_model_filter: enabled }
+    })
+  })
+
+  it('can independently disable model filtering for filtered results', async () => {
+    mountModal({
+      accountIds: [],
+      target: {
+        mode: 'filtered',
+        filters: { platform: 'openai', status: 'active' },
+        previewCount: 12,
+        selectedPlatforms: ['openai'],
+        selectedTypes: ['oauth', 'apikey']
+      }
+    })
+    enable('bulk-edit-openai-passthrough-model-filter-enabled')
+    await submit()
+
+    expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith({
+      filters: { platform: 'openai', status: 'active' },
+      extra: { openai_passthrough_model_filter: false }
+    })
+  })
+
+  it('omits model filtering after its modification checkbox is cleared', async () => {
+    mountModal({ selectedPlatforms: ['openai'], selectedTypes: ['apikey'] })
+    enable('bulk-edit-openai-passthrough-model-filter-enabled')
+    setChecked(screen.getByTestId('bulk-openai-passthrough-model-filter'), true)
+    setChecked(byId('bulk-edit-openai-passthrough-model-filter-enabled'), false)
+    enable('bulk-edit-status-enabled')
+    await submit()
+
+    expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], { status: 'active' })
   })
 
   it('filtered-results 模式下应提交 filters 而不是 account_ids', async () => {

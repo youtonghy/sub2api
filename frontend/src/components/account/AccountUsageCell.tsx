@@ -13,7 +13,7 @@ import { adminAPI } from '@/api/admin'
 import { useI18n } from '@/i18n/useI18n'
 import type { Account, AccountUsageInfo, GeminiCredentials, WindowStats } from '@/types'
 import { supportsAccountQuota } from '@/utils/accountQuota'
-import { buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
+import { buildAccountUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { formatCompactNumber, formatDateTime } from '@/utils/format'
 import { isOfficialGeminiBaseUrl } from '@/utils/geminiExplicitCache'
 import { enqueueUsageRequest } from '@/utils/usageLoadQueue'
@@ -50,7 +50,27 @@ export interface AccountUsageCellProps {
 type UsageSource = 'passive' | 'active'
 
 // Module-level cache shared across all AccountUsageCell instances
-const _usageCache = new Map<number, { data: AccountUsageInfo; ts: number }>()
+const _usageCache = new Map<number, { data: AccountUsageInfo; ts: number; refreshKey: string }>()
+
+function estimateWindowTotalCost(window?: AccountUsageInfo['seven_day']) {
+  const utilization = window?.utilization
+  const currentCost = window?.window_stats?.cost
+  if (
+    window?.utilization_unknown ||
+    typeof utilization !== 'number' ||
+    typeof currentCost !== 'number' ||
+    !Number.isFinite(utilization) ||
+    !Number.isFinite(currentCost) ||
+    utilization <= 0 ||
+    currentCost <= 0
+  ) {
+    return null
+  }
+
+  const estimate = (currentCost * 100) / utilization
+  return Number.isFinite(estimate) && estimate > 0 ? estimate : null
+}
+
 const USAGE_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 const desktopViewportQuery = '(min-width: 768px)'
 
@@ -315,27 +335,9 @@ export default function AccountUsageCell({
     (window) => window && !window.utilization_unknown
   )
 
-  const openAISevenDayEstimatedTotalCost = (() => {
-    const sevenDay = usageInfo?.seven_day
-    const utilization = sevenDay?.utilization
-    const currentCost = sevenDay?.window_stats?.cost
-    if (
-      sevenDay?.utilization_unknown ||
-      typeof utilization !== 'number' ||
-      typeof currentCost !== 'number' ||
-      !Number.isFinite(utilization) ||
-      !Number.isFinite(currentCost) ||
-      utilization <= 0 ||
-      currentCost <= 0
-    ) {
-      return null
-    }
+  const openAISevenDayEstimatedTotalCost = estimateWindowTotalCost(usageInfo?.seven_day)
 
-    const estimate = (currentCost * 100) / utilization
-    return Number.isFinite(estimate) && estimate > 0 ? estimate : null
-  })()
-
-  const openAIUsageRefreshKey = buildOpenAIUsageRefreshKey(account)
+  const usageRefreshKey = buildAccountUsageRefreshKey(account)
   const shouldAutoLoadUsageOnMount = shouldFetchUsage
   const shouldLazyLoadOnMobile = shouldFetchUsage && !isDesktopViewport
 
@@ -796,7 +798,7 @@ export default function AccountUsageCell({
     // Check cache
     if (!options?.bypassCache) {
       const cached = _usageCache.get(accountID)
-      if (cached && Date.now() - cached.ts < USAGE_CACHE_TTL) {
+      if (cached && cached.refreshKey === usageRefreshKey && Date.now() - cached.ts < USAGE_CACHE_TTL) {
         setUsageInfo(cached.data)
         setLoading(false)
         return
@@ -805,6 +807,7 @@ export default function AccountUsageCell({
 
     setLoading(true)
     setError(null)
+    const refreshKey = usageRefreshKey
 
     try {
       const fetchFn = () =>
@@ -814,7 +817,7 @@ export default function AccountUsageCell({
       const result = await enqueueUsageRequest(account, fetchFn)
       if (!disposed.current) {
         setUsageInfo(result)
-        _usageCache.set(accountID, { data: result, ts: Date.now() })
+        _usageCache.set(accountID, { data: result, ts: Date.now(), refreshKey })
       }
     } catch (e: unknown) {
       if (!disposed.current) {
@@ -856,13 +859,14 @@ export default function AccountUsageCell({
 
   const loadActiveUsage = async () => {
     const accountID = account.id
+    const refreshKey = usageRefreshKey
     setActiveQueryLoading(true)
     setError(null)
     try {
       const result = await adminAPI.accounts.getUsage(accountID, 'active', true)
       if (!disposed.current && currentAccountID.current === accountID) {
         setUsageInfo(result)
-        _usageCache.set(accountID, { data: result, ts: Date.now() })
+        _usageCache.set(accountID, { data: result, ts: Date.now(), refreshKey })
       }
     } catch (e: unknown) {
       if (!disposed.current && currentAccountID.current === accountID) {
@@ -980,18 +984,18 @@ export default function AccountUsageCell({
     sameTuple
   )
 
-  // OpenAI 行数据刷新（重置、限流变化等）时重新拉取用量
-  useOnChange(openAIUsageRefreshKey, (nextKey, prevKey) => {
+  // 行数据刷新（重置、限流、会话窗口变化等）时重新拉取用量
+  useOnChange(usageRefreshKey, (nextKey, prevKey) => {
     if (!prevKey || nextKey === prevKey) return
-    if (account.platform !== 'openai' || account.type !== 'oauth') return
+    if (!shouldFetchUsage) return
 
     if (isBatchManaged) {
-      latest.current.requestParentBatchUsage({ force: true })
+      latest.current.requestParentBatchUsage(account.platform === 'openai' ? { force: true } : undefined)
       return
     }
 
     _usageCache.delete(account.id)
-    latest.current.requestAutoLoad()
+    latest.current.requestAutoLoad(isAnthropicOAuthOrSetupToken ? 'passive' : undefined)
   })
 
   // 列表手动刷新信号
@@ -1133,15 +1137,18 @@ export default function AccountUsageCell({
               utilization={usageInfo.five_hour.utilization}
               resetsAt={usageInfo.five_hour.resets_at}
               windowStats={usageInfo.five_hour.window_stats}
+              estimatedTotalCost={estimateWindowTotalCost(usageInfo.five_hour)}
               color="indigo"
             />
           ) : null}
-          {/* 7d Window (OAuth only) */}
+          {/* 7d Window (OAuth or Setup Token with passive samples) */}
           {usageInfo.seven_day ? (
             <UsageProgressBar
               label="7d"
               utilization={usageInfo.seven_day.utilization}
               resetsAt={usageInfo.seven_day.resets_at}
+              windowStats={usageInfo.seven_day.window_stats}
+              estimatedTotalCost={estimateWindowTotalCost(usageInfo.seven_day)}
               color="emerald"
             />
           ) : null}
