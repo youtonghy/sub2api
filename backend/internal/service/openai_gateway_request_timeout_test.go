@@ -43,7 +43,9 @@ func TestShouldFailoverOpenAIUpstreamResponse_RequestTimeout(t *testing.T) {
 	}
 }
 
-func TestOpenAIRequestTimeout_CustomErrorCodesStillTakePrecedence(t *testing.T) {
+// 本 fork 中可 failover 的上游状态码不受自定义错误码拦截（与上游相反）：
+// 换号由 Forward 在调用 handleErrorResponse 前完成，这里只确认 408 不会被当作“未启用的错误码”吞掉。
+func TestOpenAIRequestTimeout_CustomErrorCodesDoNotSwallowFailoverStatus(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -63,9 +65,7 @@ func TestOpenAIRequestTimeout_CustomErrorCodesStillTakePrecedence(t *testing.T) 
 	}
 	result, err := (&OpenAIGatewayService{}).handleErrorResponse(context.Background(), resp, c, account, nil)
 	require.Nil(t, result)
-	require.ErrorContains(t, err, "not in custom error codes")
-	var failoverErr *UpstreamFailoverError
-	require.NotErrorAs(t, err, &failoverErr)
-	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.Error(t, err)
+	require.NotContains(t, err.Error(), "not in custom error codes")
 	require.True(t, c.Writer.Written())
 }
