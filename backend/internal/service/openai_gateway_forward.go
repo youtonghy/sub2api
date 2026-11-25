@@ -1557,7 +1557,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 	applyOpenCodeUpstreamUserAgent(account, targetURL, req.Header)
 
 	// 账号级请求头覆写（仅 openai api_key 账号启用时生效；OAuth 路径 no-op）
-	account.ApplyHeaderOverrides(req.Header)
+	account.ApplyHeaderOverrides(req.Context(), req.Header)
 	// Header overrides are applied after the inbound-header normalization above.
 	// An account can therefore add the Responses Lite marker at this point;
 	// close the body/header pair here before the request leaves the gateway.
