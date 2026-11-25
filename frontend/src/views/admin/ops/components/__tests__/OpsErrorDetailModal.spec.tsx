@@ -7,7 +7,12 @@ import OpsErrorDetailsModal, { type OpsErrorDetailsModalProps } from '../OpsErro
 const mocks = vi.hoisted(() => ({
   getRequestErrorDetail: vi.fn(),
   listRequestErrorUpstreamErrors: vi.fn(),
-  listRequestErrors: vi.fn()
+  listRequestErrors: vi.fn(),
+  copyToClipboard: vi.fn()
+}))
+
+vi.mock('@/composables/useClipboard', () => ({
+  useClipboard: () => ({ copied: false, copyToClipboard: mocks.copyToClipboard })
 }))
 
 vi.mock('@/api/admin/ops', async (importOriginal) => {
@@ -76,6 +81,34 @@ describe('OpsErrorDetailModal', () => {
     expect(dialog.textContent).toContain('429')
     expect(dialog.querySelectorAll('pre')).toHaveLength(2)
     expect(dialog.textContent).not.toContain('admin.ops.errorDetail.payloads.upstream_detail')
+    expect(dialog.querySelector('[data-testid="error-detail-reported-headers"]')).toBeNull()
+  })
+
+  it('shows the identity headers that were reported upstream and copies them', async () => {
+    mocks.getRequestErrorDetail.mockResolvedValue({
+      id: 2,
+      created_at: '2026-11-24T00:00:00Z',
+      phase: 'upstream',
+      error_owner: 'provider',
+      status_code: 502,
+      platform: 'openai',
+      request_id: 'rid-2',
+      upstream_errors: JSON.stringify([
+        {
+          account_id: 5,
+          account_name: 'relay-a',
+          upstream_status_code: 400,
+          reported_headers: { 'x-gateway-user-id': '7' }
+        }
+      ])
+    })
+
+    const { findByTestId } = render(<OpsErrorDetailModal show errorId={2} errorType="request" />)
+    const section = await findByTestId('error-detail-reported-headers')
+    expect(section.textContent).toContain('relay-a')
+    expect(section.textContent).toContain('x-gateway-user-id')
+    act(() => section.querySelector('button')!.click())
+    expect(mocks.copyToClipboard).toHaveBeenCalledWith('x-gateway-user-id: 7', 'admin.ops.errorDetail.reportedHeaders.copied')
   })
 })
 

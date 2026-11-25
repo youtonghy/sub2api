@@ -16,6 +16,7 @@ import type {
   OpenAIResponsesMode,
   TempUnschedulableScope
 } from '@/types'
+import type { UpstreamGroupSource } from '@/api/admin/accounts'
 import { buildModelMappingObject, splitModelMappingObject } from '@/composables/useModelWhitelist'
 import { supportsAccountQuota } from '@/utils/accountQuota'
 import {
@@ -190,6 +191,9 @@ export interface EditState {
   autoResetCredit7dThreshold: NumInput
   upstreamBillingAutoProbeEnabled: boolean
   upstreamBillingRateSyncEnabled: boolean
+  upstreamGroupSyncEnabled: boolean
+  /** 打开表单时的上游地址：未改地址 / 代理 / 密钥时可直接用已保存账号探测分组 */
+  savedBillingBaseUrl: string
   mixedScheduling: boolean // For antigravity accounts: enable mixed scheduling
   // 上游ID：直接上游声明请求标识的响应头名，留空不记录。
   upstreamRequestIdHeader: string
@@ -323,6 +327,8 @@ export function createInitialEditState(): EditState {
     autoResetCredit7dThreshold: 100,
     upstreamBillingAutoProbeEnabled: false,
     upstreamBillingRateSyncEnabled: false,
+    upstreamGroupSyncEnabled: false,
+    savedBillingBaseUrl: '',
     mixedScheduling: false,
     upstreamRequestIdHeader: '',
     allowOverages: false,
@@ -903,6 +909,7 @@ export function syncEditStateFromAccount(prev: EditState, newAccount: Account): 
     typeof extra?.auto_reset_credit_7d_threshold === 'number' ? extra.auto_reset_credit_7d_threshold * 100 : 100
   s.upstreamBillingAutoProbeEnabled = extra?.upstream_billing_probe_enabled === true
   s.upstreamBillingRateSyncEnabled = s.upstreamBillingAutoProbeEnabled && extra?.upstream_billing_rate_sync_enabled === true
+  s.upstreamGroupSyncEnabled = s.upstreamBillingAutoProbeEnabled && extra?.upstream_billing_group_sync_enabled === true
 
   // Load OpenAI passthrough toggle (OpenAI OAuth/SetupToken/API Key)
   s.openaiPassthroughEnabled = false
@@ -1262,7 +1269,32 @@ export function syncEditStateFromAccount(prev: EditState, newAccount: Account): 
     s.selectedErrorCodes = []
   }
   s.editApiKey = ''
+  s.savedBillingBaseUrl = billingBaseUrlOf(s, newAccount)
   return s
+}
+
+/** 上游倍率 / 分组探测使用的地址：国产多协议自适应模式取 Chat 端点 */
+export function billingBaseUrlOf(s: EditState, account: Account | null): string {
+  return (
+    isCNApiKeyAccount(account) && s.editApiProtocol === 'adaptive' ? s.editAdaptiveBaseUrls.chat_completions : s.editBaseUrl
+  ).trim()
+}
+
+/**
+ * 同步上游分组名称与备注的探测来源：填写了新密钥时用表单凭据；
+ * 地址、代理与密钥都没改时用已保存账号；否则需要重新输入密钥。
+ */
+export function upstreamGroupSourceOf(s: EditState, account: Account | null): UpstreamGroupSource | null {
+  if (!account) return null
+  const baseUrl = billingBaseUrlOf(s, account)
+  const apiKey = s.editApiKey.trim()
+  if (apiKey && baseUrl) {
+    return { platform: account.platform, base_url: baseUrl, api_key: apiKey, proxy_id: s.form.proxy_id }
+  }
+  if (baseUrl === s.savedBillingBaseUrl && s.form.proxy_id === account.proxy_id && !apiKey) {
+    return { account_id: account.id }
+  }
+  return null
 }
 
 // ── 国产/多协议供应商的模式与协议联动（Vue 版 watch(editApiProtocol / editAccountMode / editOpenCodeAccountMode)） ──
@@ -1437,6 +1469,10 @@ export function buildEditUpdatePayload(s: EditState, account: Account, deps: Bui
   }
   updatePayload.auto_pause_on_expired = s.autoPauseOnExpired
   if (account.type === 'apikey') {
+    // 名称 / 备注未改时不提交，避免覆盖后台自动同步的上游分组文字
+    if (form.name === account.name) delete updatePayload.name
+    if (form.notes === (account.notes || '')) delete updatePayload.notes
+    updatePayload.upstream_billing_group_sync_enabled = s.upstreamGroupSyncEnabled
     updatePayload.upstream_billing_probe_enabled = s.upstreamBillingAutoProbeEnabled
     updatePayload.upstream_billing_rate_sync_enabled = s.upstreamBillingRateSyncEnabled
     if (s.upstreamBillingRateSyncEnabled) {
@@ -1605,7 +1641,8 @@ export function buildEditUpdatePayload(s: EditState, account: Account, deps: Bui
     // Add header override if enabled for this API-key platform
     if (isHeaderOverrideCapable(account.platform, 'apikey')) {
       if (s.headerOverrideEnabled) {
-        const headerError = validateHeaderOverrideRows(s.headerOverrideRows)
+        // 身份上报变量仅 api_key 账号可用：OAuth 订阅上游不能收到网关用户身份
+        const headerError = validateHeaderOverrideRows(s.headerOverrideRows, { allowVariables: account.type === 'apikey' })
         if (headerError) {
           return fail(t(`admin.accounts.headerOverride.${headerError}`))
         }
@@ -1800,7 +1837,7 @@ export function buildEditUpdatePayload(s: EditState, account: Account, deps: Bui
     }
 
     if (s.headerOverrideEnabled) {
-      const headerError = validateHeaderOverrideRows(s.headerOverrideRows)
+      const headerError = validateHeaderOverrideRows(s.headerOverrideRows, { allowVariables: false })
       if (headerError) {
         return fail(t(`admin.accounts.headerOverride.${headerError}`))
       }
@@ -2124,6 +2161,7 @@ export function buildEditUpdatePayload(s: EditState, account: Account, deps: Bui
     if (account.type === 'apikey') {
       delete newExtra.upstream_billing_probe_enabled
       delete newExtra.upstream_billing_rate_sync_enabled
+      delete newExtra.upstream_billing_group_sync_enabled
     }
     // Total quota
     if (s.editQuotaLimit != null && s.editQuotaLimit > 0) {

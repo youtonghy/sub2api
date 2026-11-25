@@ -12,7 +12,9 @@ const {
   getUpstreamBillingProbeSettings,
   getAllProxies,
   getAllGroups,
-  refreshCredentials
+  refreshCredentials,
+  previewUpstreamGroup,
+  updateAccount
 } = vi.hoisted(() => ({
   listAccounts: vi.fn(),
   listWithEtag: vi.fn(),
@@ -21,7 +23,9 @@ const {
   getUpstreamBillingProbeSettings: vi.fn(),
   getAllProxies: vi.fn(),
   getAllGroups: vi.fn(),
-  refreshCredentials: vi.fn()
+  refreshCredentials: vi.fn(),
+  previewUpstreamGroup: vi.fn(),
+  updateAccount: vi.fn()
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -36,7 +40,9 @@ vi.mock('@/api/admin', () => ({
       batchClearError: vi.fn(),
       batchRefresh: vi.fn(),
       toggleSchedulable: vi.fn(),
-      refreshCredentials
+      refreshCredentials,
+      previewUpstreamGroup,
+      update: updateAccount
     },
     proxies: { getAll: getAllProxies },
     groups: { getAll: getAllGroups }
@@ -94,7 +100,7 @@ vi.mock('@/components/common/PlatformTypeBadge', async () => (await import('./ac
 vi.mock('@/components/common/HelpTooltip', async () => (await import('./accountsViewHarness')).plainHelpTooltipModule())
 vi.mock('@/components/common/DataTable', async () => ({
   default: (await import('./accountsViewHarness')).makeDataTableStub({
-    cells: ['groups', 'actions'],
+    cells: ['name', 'groups', 'actions'],
     rowAttrs: (row) => ({ 'data-account-name': row.name })
   })
 }))
@@ -152,6 +158,24 @@ describe('admin AccountsView lite account list', () => {
     cleanup()
     vi.useRealTimers()
     vi.restoreAllMocks()
+  })
+
+  it('syncs the selected row without clearing notes missing from the upstream', async () => {
+    const account = { ...listRow, type: 'apikey', notes: 'local notes' }
+    listAccounts.mockResolvedValue({ items: [account], total: 1, page: 1, page_size: 20, pages: 1 })
+    previewUpstreamGroup.mockReset().mockResolvedValueOnce({}).mockResolvedValueOnce({ name: 'New group' })
+    updateAccount.mockReset().mockResolvedValue({ ...account, name: 'New group' })
+    const { container } = await mountView()
+    const sync = () => container.querySelector<HTMLButtonElement>('button[aria-label="admin.accounts.upstreamBilling.saveGroup"]')!
+    await act(async () => fireEvent.click(sync()))
+    await flushPromises()
+    expect(updateAccount).not.toHaveBeenCalled()
+    expect(app.showInfo).toHaveBeenCalledWith('admin.accounts.upstreamBilling.groupUnavailable')
+    await act(async () => fireEvent.click(sync()))
+    await flushPromises()
+    expect(previewUpstreamGroup).toHaveBeenLastCalledWith({ account_id: account.id })
+    expect(updateAccount).toHaveBeenCalledWith(account.id, { name: 'New group' })
+    expect(container.querySelector('[data-account-name="New group"]')).not.toBeNull()
   })
 
   it('keeps lite=1 on the initial list request', async () => {

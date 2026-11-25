@@ -85,6 +85,7 @@ import {
   openaiResponsesWebSocketV2Mode,
   routesByModel,
   syncPreviewCredentials,
+  upstreamGroupSource,
   vertexUsesApiKey,
   type AccountCategory,
   type CreateAccountController,
@@ -95,6 +96,7 @@ import styles from './CreateAccountModal.module.css'
 import { cnSupportsNativeResponses, defaultCNBaseUrl, isHeaderOverrideCapable, providerModeLabel } from './credentialsBuilder'
 import GrokBaseUrlPresets from './GrokBaseUrlPresets'
 import HeaderOverrideEditor from './HeaderOverrideEditor'
+import UpstreamGroupSyncButton from './UpstreamGroupSyncButton'
 import { allSelectedGroupsEnableLongContextPricing } from './longContextBilling'
 import ModelWhitelistSelector from './ModelWhitelistSelector'
 import OAuthAuthorizationFlow, { type OAuthFlowHandle } from './OAuthAuthorizationFlow'
@@ -731,7 +733,8 @@ export default function CreateAccountModal({ show, proxies, groups, onClose, onC
     </FormSection>
   )
 
-  const headerOverrideToggle = (
+  // 身份上报变量仅 api_key 账号可用（Grok OAuth 共用此区域时传 false）
+  const headerOverrideToggle = (allowVariables: boolean) => (
     <ToggleRow
       label={t('admin.accounts.headerOverride.title')}
       description={t('admin.accounts.headerOverride.hint')}
@@ -743,7 +746,11 @@ export default function CreateAccountModal({ show, proxies, groups, onClose, onC
           <FormNotice tone="info">
             <p>{t('admin.accounts.headerOverride.info')}</p>
           </FormNotice>
-          <HeaderOverrideEditor rows={s.headerOverrideRows} onChange={(rows) => set({ headerOverrideRows: rows })} />
+          <HeaderOverrideEditor
+            rows={s.headerOverrideRows}
+            allowVariables={allowVariables}
+            onChange={(rows) => set({ headerOverrideRows: rows })}
+          />
         </>
       ) : null}
     </ToggleRow>
@@ -807,14 +814,36 @@ export default function CreateAccountModal({ show, proxies, groups, onClose, onC
       }}
     >
       <FormSection>
-        <Input
+        <FormField
           label={t('admin.accounts.accountName')}
-          value={form.name}
-          onChange={(value) => setForm({ name: value })}
-          required={!isGrokSSOInputMethod(s)}
-          placeholder={t('admin.accounts.enterAccountName')}
-          data-tour="account-form-name"
-        />
+          htmlFor="create-account-name"
+          labelExtra={
+            form.type === 'apikey' ? (
+              <UpstreamGroupSyncButton
+                source={upstreamGroupSource(s)}
+                name={form.name}
+                notes={form.notes}
+                onNameChange={(name) => setForm({ name })}
+                onNotesChange={(notes) => setForm({ notes })}
+                allowAuto
+                auto={s.upstreamGroupSyncEnabled}
+                onAutoChange={ctl.setUpstreamGroupSync}
+              />
+            ) : null
+          }
+          hint={form.type === 'apikey' && s.upstreamGroupSyncEnabled ? t('admin.accounts.upstreamBilling.autoSyncGroupHint') : undefined}
+        >
+          <input
+            id="create-account-name"
+            type="text"
+            value={form.name}
+            onChange={(event) => setForm({ name: event.target.value })}
+            required={!isGrokSSOInputMethod(s)}
+            className={formStyles.input}
+            placeholder={t('admin.accounts.enterAccountName')}
+            data-tour="account-form-name"
+          />
+        </FormField>
         <FormField label={t('admin.accounts.notes')} htmlFor="create-account-notes" hint={t('admin.accounts.notesHint')}>
           <textarea
             id="create-account-notes"
@@ -1321,7 +1350,7 @@ export default function CreateAccountModal({ show, proxies, groups, onClose, onC
                 label={t('admin.accounts.upstreamBilling.autoProbe')}
                 description={t('admin.accounts.upstreamBilling.autoProbeHint')}
                 checked={s.upstreamBillingAutoProbeEnabled}
-                onChange={(value) => set({ upstreamBillingAutoProbeEnabled: value })}
+                onChange={ctl.setUpstreamBillingAutoProbe}
               />
             </>
           ) : null}
@@ -1561,7 +1590,7 @@ export default function CreateAccountModal({ show, proxies, groups, onClose, onC
               label={t('admin.accounts.upstreamBilling.autoProbe')}
               description={t('admin.accounts.upstreamBilling.autoProbeHint')}
               checked={s.upstreamBillingAutoProbeEnabled}
-              onChange={(value) => set({ upstreamBillingAutoProbeEnabled: value })}
+              onChange={ctl.setUpstreamBillingAutoProbe}
             />
 
             {/* Gemini API Key tier selection */}
@@ -1702,7 +1731,7 @@ export default function CreateAccountModal({ show, proxies, groups, onClose, onC
           </FormSection>
 
           {/* Header Override Section (eligible API-key platforms) */}
-          {isHeaderOverrideCapable(platform, 'apikey') ? <FormSection>{headerOverrideToggle}</FormSection> : null}
+          {isHeaderOverrideCapable(platform, 'apikey') ? <FormSection>{headerOverrideToggle(true)}</FormSection> : null}
         </>
       ) : null}
 
@@ -1865,7 +1894,7 @@ export default function CreateAccountModal({ show, proxies, groups, onClose, onC
       ) : null}
 
       {/* Grok OAuth Header Override (OAuth 类型没有 apikey 容器，需要独立区域) */}
-      {platform === 'grok' && oauthOAuthFlow ? <FormSection>{headerOverrideToggle}</FormSection> : null}
+      {platform === 'grok' && oauthOAuthFlow ? <FormSection>{headerOverrideToggle(false)}</FormSection> : null}
 
       {/* OpenAI OAuth Model Mapping (OAuth 类型没有 apikey 容器，需要独立的模型映射区域) */}
       {(platform === 'openai' || platform === 'grok') && oauthOAuthFlow ? modelRestrictionSection : null}

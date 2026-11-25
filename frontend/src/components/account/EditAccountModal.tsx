@@ -81,6 +81,7 @@ import {
   editAdaptiveProtocolOptions,
   isBedrockAPIKeyMode,
   isCNApiKeyAccount,
+  upstreamGroupSourceOf,
   isGenericMultiProtocolAccount,
   isGrokDiagnosticsDirty,
   isGrokOAuthAccount,
@@ -114,6 +115,7 @@ import CnBaseUrlPresets from './CnBaseUrlPresets'
 import GrokBaseUrlPresets from './GrokBaseUrlPresets'
 import GrokModelDiagnosticsPanel from './GrokModelDiagnosticsPanel'
 import HeaderOverrideEditor from './HeaderOverrideEditor'
+import UpstreamGroupSyncButton from './UpstreamGroupSyncButton'
 import { allSelectedGroupsEnableLongContextPricing } from './longContextBilling'
 import OllamaCloudUsageSettings from './OllamaCloudUsageSettings'
 import OpenCodeGoProtocolRulesEditor from './OpenCodeGoProtocolRulesEditor'
@@ -787,7 +789,15 @@ export default function EditAccountModal({ show, account, proxies, groups, onClo
   }
 
   const handleUpstreamBillingAutoProbeChange = (enabled: boolean) => {
-    update(enabled ? { upstreamBillingAutoProbeEnabled: true } : { upstreamBillingAutoProbeEnabled: false, upstreamBillingRateSyncEnabled: false })
+    update(
+      enabled
+        ? { upstreamBillingAutoProbeEnabled: true }
+        : { upstreamBillingAutoProbeEnabled: false, upstreamBillingRateSyncEnabled: false, upstreamGroupSyncEnabled: false }
+    )
+  }
+
+  const handleUpstreamGroupSyncChange = (enabled: boolean) => {
+    update(enabled ? { upstreamGroupSyncEnabled: true, upstreamBillingAutoProbeEnabled: true } : { upstreamGroupSyncEnabled: false })
   }
 
   // 点击预设端点：回填 base url 与对应模式/协议。
@@ -1121,7 +1131,29 @@ export default function EditAccountModal({ show, account, proxies, groups, onClo
             }}
           >
             <FormSection>
-              <FormField label={t('common.name')} htmlFor={fieldId('name')}>
+              <FormField
+                label={t('common.name')}
+                htmlFor={fieldId('name')}
+                labelExtra={
+                  account.type === 'apikey' || (account.platform === 'antigravity' && account.type === 'upstream') ? (
+                    <UpstreamGroupSyncButton
+                      source={upstreamGroupSourceOf(s, account)}
+                      name={s.form.name}
+                      notes={s.form.notes}
+                      onNameChange={(name) => updateForm({ name })}
+                      onNotesChange={(notes) => updateForm({ notes })}
+                      allowAuto={account.type === 'apikey'}
+                      auto={s.upstreamGroupSyncEnabled}
+                      onAutoChange={handleUpstreamGroupSyncChange}
+                    />
+                  ) : null
+                }
+                hint={
+                  account.type === 'apikey' && s.upstreamGroupSyncEnabled
+                    ? t('admin.accounts.upstreamBilling.autoSyncGroupHint')
+                    : undefined
+                }
+              >
                 <input
                   id={fieldId('name')}
                   type="text"
@@ -1590,7 +1622,11 @@ export default function EditAccountModal({ show, account, proxies, groups, onClo
                       <FormNotice tone="info">
                         <p>{t('admin.accounts.headerOverride.info')}</p>
                       </FormNotice>
-                      <HeaderOverrideEditor rows={s.headerOverrideRows} onChange={(rows) => update({ headerOverrideRows: rows })} />
+                      <HeaderOverrideEditor
+                        rows={s.headerOverrideRows}
+                        allowVariables={account.type === 'apikey'}
+                        onChange={(rows) => update({ headerOverrideRows: rows })}
+                      />
                     </>
                   ) : null}
                 </SwitchRow>

@@ -231,8 +231,38 @@ tr:hover .dragHandle,
   font-weight: 500;
 }
 
+.nameLine {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.groupSyncButton {
+  display: inline-flex;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: calc(var(--radius-control) - 2px);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.groupSyncButton:hover:not(:disabled) {
+  background: var(--accent-subtle);
+}
+
+.groupSyncButton:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
 .homepageTooltip {
-  align-self: flex-start;
   margin-left: -4px;
 }
 

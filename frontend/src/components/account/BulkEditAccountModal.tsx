@@ -356,6 +356,9 @@ export default function BulkEditAccountModal({
   const targetPreviewCount = target?.previewCount ?? accountIds.length
   const targetSelectedPlatforms = target?.selectedPlatforms ?? selectedPlatforms
   const targetSelectedTypes = target?.selectedTypes ?? selectedTypes
+  // 身份上报变量仅 api_key 账号可用：所选账号里只要混有其它类型就不开放
+  const headerOverrideAllowVariables =
+    targetSelectedTypes.length > 0 && targetSelectedTypes.every((ty) => ty === 'apikey')
   // Grok 快捷端点仅在所选账号全部为 grok 平台时展示（其他平台不显示）
   const allTargetsGrok = targetSelectedPlatforms.length > 0 && targetSelectedPlatforms.every((p) => p === 'grok')
   const isMixedPlatform = targetSelectedPlatforms.length > 1
@@ -986,7 +989,9 @@ export default function BulkEditAccountModal({
         appStore.showError(t('admin.accounts.headerOverride.bulkEmptyRows'))
         return
       }
-      const headerError = validateHeaderOverrideRows(form.headerOverrideRows)
+      const headerError = validateHeaderOverrideRows(form.headerOverrideRows, {
+        allowVariables: headerOverrideAllowVariables
+      })
       if (headerError) {
         appStore.showError(t(`admin.accounts.headerOverride.${headerError}`))
         return
@@ -1500,6 +1505,7 @@ export default function BulkEditAccountModal({
 
                       <HeaderOverrideEditor
                         rows={form.headerOverrideRows}
+                        allowVariables={headerOverrideAllowVariables}
                         onChange={(rows) => update({ headerOverrideRows: rows })}
                       />
                     </div>

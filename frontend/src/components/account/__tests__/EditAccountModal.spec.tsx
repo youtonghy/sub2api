@@ -8,8 +8,9 @@ import {
   setPlatformCatalog
 } from '@/constants/platformCatalog'
 
-const { updateAccountMock, checkMixedChannelRiskMock, authIsSimpleMode, harness } = vi.hoisted(() => ({
+const { updateAccountMock, checkMixedChannelRiskMock, previewUpstreamGroupMock, authIsSimpleMode, harness } = vi.hoisted(() => ({
   updateAccountMock: vi.fn(),
+  previewUpstreamGroupMock: vi.fn(),
   checkMixedChannelRiskMock: vi.fn(),
   authIsSimpleMode: { value: true },
   harness: {
@@ -37,6 +38,7 @@ vi.mock('@/api/admin', () => ({
   adminAPI: {
     accounts: {
       update: updateAccountMock,
+      previewUpstreamGroup: previewUpstreamGroupMock,
       checkMixedChannelRisk: checkMixedChannelRiskMock
     },
     settings: {
@@ -1349,6 +1351,50 @@ describe('EditAccountModal', () => {
     expect(payload?.upstream_billing_probe_enabled).toBe(true)
     expect(payload?.upstream_billing_rate_sync_enabled).toBe(true)
     expect(payload).not.toHaveProperty('rate_multiplier')
+  })
+
+  it('uses the saved connection until the administrator changes the upstream', async () => {
+    const account = buildAccount()
+    account.notes = 'local notes'
+    const wrapper = mountModal(account)
+    const sync = () => wrapper.get<HTMLButtonElement>('[data-testid="upstream-group-sync"]')
+    previewUpstreamGroupMock.mockReset().mockResolvedValue({ name: 'Updated group' })
+    await wrapper.click(sync())
+    await flushPromises()
+    expect(previewUpstreamGroupMock).toHaveBeenLastCalledWith({ account_id: account.id }, expect.anything())
+    expect(wrapper.get<HTMLInputElement>('[data-tour="edit-account-form-name"]').value).toBe('Updated group')
+    expect(wrapper.get<HTMLTextAreaElement>('textarea').value).toBe('local notes')
+
+    await wrapper.setValue('input[placeholder="https://api.openai.com"]', 'https://new-relay.example')
+    expect(sync().disabled).toBe(true)
+    await wrapper.setValue('input[type="password"]', 'replacement-key')
+    await wrapper.click(sync())
+    expect(previewUpstreamGroupMock).toHaveBeenLastCalledWith(
+      { platform: 'openai', base_url: 'https://new-relay.example', api_key: 'replacement-key', proxy_id: null },
+      expect.anything()
+    )
+  })
+
+  it('opts into group sync independently and clears it when probing stops', async () => {
+    const account = buildAccount()
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    const group = () => within(wrapper.get('[data-testid="upstream-billing-group-sync"]')).getByRole('switch')
+    const probe = () => wrapper.get('[data-testid="upstream-billing-auto-probe"]')
+    const rate = () => wrapper.get('[data-testid="upstream-billing-rate-sync"]')
+    expect(isChecked(group())).toBe(false)
+    await wrapper.click(group())
+    expect(isChecked(probe())).toBe(true)
+    expect(isChecked(rate())).toBe(false)
+    await wrapper.submit()
+    const payload = updateAccountMock.mock.lastCall?.[1]
+    expect(payload).toMatchObject({ upstream_billing_group_sync_enabled: true, upstream_billing_rate_sync_enabled: false })
+    // 名称 / 备注未改时不提交，避免覆盖自动同步的上游分组文字
+    expect(payload).not.toHaveProperty('name')
+    expect(payload).not.toHaveProperty('notes')
+    await wrapper.click(probe())
+    expect(isChecked(group())).toBe(false)
   })
 
   it('disabling probing also disables rate sync and restores manual rate editing', async () => {

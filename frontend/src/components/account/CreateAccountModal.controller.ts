@@ -150,6 +150,7 @@ const createInitialState = (show: boolean) => ({
   apiKeyBaseUrl: 'https://api.anthropic.com',
   apiKeyValue: '',
   upstreamBillingAutoProbeEnabled: true,
+  upstreamGroupSyncEnabled: false,
   // ── 国产供应商（Kimi / Zhipu / DeepSeek）账号类型、API 协议与端点 ──
   // 多协议供应商（国产厂商与走通用表单的供应商）的接入模式；OpenCode 用 openCodeAccountMode。
   accountMode: 'payg' as string,
@@ -321,12 +322,24 @@ export const cnProtocolOptions = (s: CreateAccountState): Array<{ value: CnApiPr
   ...cnAdaptiveProtocolOptions(s)
 ]
 
+const previewBaseUrl = (s: CreateAccountState) =>
+  isMultiProtocolPlatform(s) && s.apiProtocol === 'adaptive'
+    ? s.adaptiveBaseUrls.chat_completions.trim() || s.apiKeyBaseUrl.trim()
+    : s.apiKeyBaseUrl.trim()
+
+/** 同步上游分组名称与备注的探测来源：需要已填写上游地址与 API Key */
+export const upstreamGroupSource = (s: CreateAccountState) => {
+  const antigravity = s.form.platform === 'antigravity'
+  const baseURL = antigravity ? s.upstreamBaseUrl.trim() : previewBaseUrl(s)
+  const apiKey = (antigravity ? s.upstreamApiKey : s.apiKeyValue).trim()
+  return baseURL && apiKey
+    ? { platform: s.form.platform, base_url: baseURL, api_key: apiKey, proxy_id: s.form.proxy_id }
+    : null
+}
+
 export const syncPreviewCredentials = (s: CreateAccountState) => {
   if (!s.apiKeyValue) return undefined
-  const baseUrl =
-    isMultiProtocolPlatform(s) && s.apiProtocol === 'adaptive'
-      ? s.adaptiveBaseUrls.chat_completions.trim() || s.apiKeyBaseUrl.trim()
-      : s.apiKeyBaseUrl.trim()
+  const baseUrl = previewBaseUrl(s)
   const modelMapping = buildModelMappingObject(s.modelRestrictionMode, s.allowedModels, s.modelMappings)
   return {
     platform: s.form.platform,
@@ -407,6 +420,11 @@ export function createCreateAccountController(deps: CreateAccountControllerDeps)
   const set = store.set
   const setForm = (patch: Partial<CreateAccountForm>) => set({ form: { ...get().form, ...patch } })
   const appStore = () => useAppStore.getState()
+  // 自动同步上游分组依赖自动探测：开启同步时一并开启探测，关闭探测时一并关闭同步
+  const setUpstreamGroupSync = (enabled: boolean) =>
+    set(enabled ? { upstreamGroupSyncEnabled: true, upstreamBillingAutoProbeEnabled: true } : { upstreamGroupSyncEnabled: false })
+  const setUpstreamBillingAutoProbe = (enabled: boolean) =>
+    set(enabled ? { upstreamBillingAutoProbeEnabled: true } : { upstreamBillingAutoProbeEnabled: false, upstreamGroupSyncEnabled: false })
   // 最新的 onClose / onCreated 回调（组件每次提交后通过 setCallbacks 更新）
   let callbacks: { onClose: () => void; onCreated: () => void } = { onClose: () => {}, onCreated: () => {} }
   const setCallbacks = (next: typeof callbacks) => {
@@ -577,7 +595,8 @@ export function createCreateAccountController(deps: CreateAccountControllerDeps)
       }
     }
     if (s.headerOverrideEnabled) {
-      const headerError = validateHeaderOverrideRows(s.headerOverrideRows)
+      // Grok OAuth 账号不支持身份上报变量
+      const headerError = validateHeaderOverrideRows(s.headerOverrideRows, { allowVariables: false })
       if (headerError) {
         appStore().showError(t(`admin.accounts.headerOverride.${headerError}`))
         return false
@@ -1197,6 +1216,7 @@ export function createCreateAccountController(deps: CreateAccountControllerDeps)
       apiKeyValue: '',
       upstreamRequestIdHeader: '',
       upstreamBillingAutoProbeEnabled: true,
+      upstreamGroupSyncEnabled: false,
       editQuotaLimit: null,
       editQuotaDailyLimit: null,
       editQuotaWeeklyLimit: null,
@@ -1611,6 +1631,7 @@ export function createCreateAccountController(deps: CreateAccountControllerDeps)
       // 上游倍率探测对全部 API-key 平台开放（antigravity upstream 走本 helper）；
       // 非 apikey 类型（bedrock/oauth）不传，后端不动作。
       upstream_billing_probe_enabled: type === 'apikey' ? s.upstreamBillingAutoProbeEnabled : undefined,
+      upstream_billing_group_sync_enabled: type === 'apikey' ? s.upstreamGroupSyncEnabled : undefined,
       auto_pause_on_expired: s.autoPauseOnExpired
     })
   }
@@ -1884,6 +1905,7 @@ export function createCreateAccountController(deps: CreateAccountControllerDeps)
       group_ids: latest.form.group_ids,
       extra: withUpstreamRequestIdHeader(extra),
       upstream_billing_probe_enabled: latest.upstreamBillingAutoProbeEnabled,
+      upstream_billing_group_sync_enabled: latest.upstreamGroupSyncEnabled,
       auto_pause_on_expired: latest.autoPauseOnExpired
     })
   }
@@ -2964,6 +2986,8 @@ export function createCreateAccountController(deps: CreateAccountControllerDeps)
     get,
     set,
     setForm,
+    setUpstreamGroupSync,
+    setUpstreamBillingAutoProbe,
     attachFlowHandle,
     currentClient,
     loadGlobalStates,

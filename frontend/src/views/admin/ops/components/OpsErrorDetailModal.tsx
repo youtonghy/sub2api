@@ -7,10 +7,11 @@ import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 import { Skeleton } from '@/components/arc/skeleton/skeleton'
 import BaseDialog from '@/components/common/BaseDialog'
+import { useClipboard } from '@/composables/useClipboard'
 import { useI18n } from '@/i18n/useI18n'
 import { useAppStore } from '@/stores'
 import { formatDateTime } from '@/utils/format'
-import { resolveUpstreamPayload } from '../utils/errorDetailResponse'
+import { extractReportedHeaderGroups, resolveUpstreamPayload } from '../utils/errorDetailResponse'
 import { statusCodeTone } from './opsBadgeTones'
 import styles from './OpsErrorDetailModal.module.css'
 
@@ -71,6 +72,7 @@ function prettyJSON(raw?: string): string {
 
 export default function OpsErrorDetailModal({ show, errorId, errorType, backToList = false, onShowChange, onBack }: OpsErrorDetailModalProps) {
   const { t } = useI18n()
+  const { copyToClipboard } = useClipboard()
 
   const [loading, setLoading] = useState(false)
   // 记录详情所属的错误 ID；关闭或切换 ID 时不再展示旧详情（Vue 版在关闭时把 detail 置空）
@@ -104,6 +106,9 @@ export default function OpsErrorDetailModal({ show, errorId, errorType, backToLi
       }
     }
   }
+
+  // 身份上报请求头：账号请求头覆写变量实际发给上游的值
+  const reportedHeaderGroups = extractReportedHeaderGroups(detail?.upstream_errors)
 
   const diagnosticPayloadSections: Array<{ key: DiagnosticPayloadKey; value: string }> = detail
     ? ([
@@ -273,6 +278,47 @@ export default function OpsErrorDetailModal({ show, errorId, errorType, backToLi
           <Alert tone="warning" title={t('admin.ops.errorDetail.rootCause')}>
             <span className={styles.breakWords}>{rootCauseMessage}</span>
           </Alert>
+        )}
+
+        {reportedHeaderGroups.length > 0 && (
+          <section className={styles.section} data-testid="error-detail-reported-headers">
+            <div>
+              <h3 className={styles.sectionTitle}>{t('admin.ops.errorDetail.reportedHeaders.title')}</h3>
+              <p className={styles.sectionHint}>{t('admin.ops.errorDetail.reportedHeaders.hint')}</p>
+            </div>
+            <div className={styles.stack}>
+              {reportedHeaderGroups.map((group) => (
+                <div key={group.key} className={styles.reportedGroup}>
+                  {(group.accountName || group.accountId != null) && (
+                    <div className={styles.reportedAccount}>
+                      <span className={styles.muted}>{t('admin.ops.errorDetail.account')}</span>
+                      <span className={styles.reportedAccountName}>{group.accountName || '—'}</span>
+                      {group.accountId != null && <span className={styles.mono}>#{group.accountId}</span>}
+                    </div>
+                  )}
+                  {group.headers.map((header) => (
+                    <div key={header.name} className={styles.reportedHeader}>
+                      <span className={[styles.mono, styles.reportedHeaderName].join(' ')}>{header.name}</span>
+                      <span className={[styles.mono, styles.reportedHeaderValue].join(' ')}>{header.value}</span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          void copyToClipboard(
+                            `${header.name}: ${header.value}`,
+                            t('admin.ops.errorDetail.reportedHeaders.copied')
+                          )
+                        }
+                      >
+                        {t('admin.ops.errorDetail.reportedHeaders.copy')}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         <section className={styles.section}>

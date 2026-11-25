@@ -701,6 +701,8 @@ export default function AccountsView() {
   const exportingDataRef = useRef(false)
   const [probingUpstreamBilling, setProbingUpstreamBilling] = useState<Set<number>>(() => new Set())
   const probingRef = useRef(probingUpstreamBilling)
+  const [syncingUpstreamGroup, setSyncingUpstreamGroup] = useState<Set<number>>(() => new Set())
+  const syncingUpstreamGroupRef = useRef(syncingUpstreamGroup)
   const [upstreamBillingProbeGloballyEnabled, setUpstreamBillingProbeGloballyEnabled] = useState<boolean | undefined>(undefined)
   const [upstreamBillingNow, setUpstreamBillingNow] = useState(currentTime)
   const upstreamBillingRateETag = useRef<string | null>(null)
@@ -2094,6 +2096,36 @@ export default function AccountsView() {
     enterAutoRefreshSilentWindow()
   }
 
+  const setSyncingGroup = (update: (draft: Set<number>) => void) => {
+    const next = new Set(syncingUpstreamGroupRef.current)
+    update(next)
+    syncingUpstreamGroupRef.current = next
+    setSyncingUpstreamGroup(next)
+  }
+
+  // 从上游分组同步名称与备注并直接保存；上游缺失的字段保留本地值
+  const handleSyncUpstreamGroup = async (account: AccountListItem) => {
+    if (syncingUpstreamGroupRef.current.has(account.id)) return
+    setSyncingGroup((draft) => draft.add(account.id))
+    try {
+      const fields = await adminAPI.accounts.previewUpstreamGroup({ account_id: account.id })
+      if (!fields.name && !fields.notes) {
+        useAppStore.getState().showInfo(t('admin.accounts.upstreamBilling.groupUnavailable'))
+        return
+      }
+      if (fields.name === account.name) delete fields.name
+      if (fields.notes === account.notes) delete fields.notes
+      if (fields.name || fields.notes) {
+        handleAccountUpdated(await adminAPI.accounts.update(account.id, fields))
+      }
+      useAppStore.getState().showSuccess(t('admin.accounts.upstreamBilling.groupSynced'))
+    } catch (error) {
+      useAppStore.getState().showError(extractApiErrorMessage(error, t('admin.accounts.upstreamBilling.groupFailed')))
+    } finally {
+      setSyncingGroup((draft) => draft.delete(account.id))
+    }
+  }
+
   const accountExportStepUp = useStepUp()
 
   const handleExportData = async () => {
@@ -2575,20 +2607,41 @@ export default function AccountsView() {
             <GripVertical size={16} strokeWidth={1.75} aria-hidden="true" />
           </button>
           <div className={styles.nameStack}>
-            {homepage ? (
-              <HelpTooltip
-                content={homepage}
-                width="24rem"
-                className={styles.homepageTooltip}
-                triggerContent={
-                  <a href={homepage} target="_blank" rel="noopener noreferrer" className={styles.homepageLink}>
-                    {value}
-                  </a>
-                }
-              />
-            ) : (
-              <span className={styles.name}>{value}</span>
-            )}
+            <div className={styles.nameLine}>
+              {homepage ? (
+                <HelpTooltip
+                  content={homepage}
+                  width="24rem"
+                  className={styles.homepageTooltip}
+                  triggerContent={
+                    <a href={homepage} target="_blank" rel="noopener noreferrer" className={styles.homepageLink}>
+                      {value}
+                    </a>
+                  }
+                />
+              ) : (
+                <span className={styles.name}>{value}</span>
+              )}
+              {row.type === 'apikey' || (row.platform === 'antigravity' && row.type === 'upstream') ? (
+                <button
+                  type="button"
+                  className={styles.groupSyncButton}
+                  title={t('admin.accounts.upstreamBilling.saveGroup')}
+                  aria-label={t('admin.accounts.upstreamBilling.saveGroup')}
+                  disabled={syncingUpstreamGroup.has(row.id)}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    void handleSyncUpstreamGroup(row)
+                  }}
+                >
+                  <RefreshCw
+                    size={12}
+                    aria-hidden="true"
+                    className={syncingUpstreamGroup.has(row.id) ? styles.spinning : undefined}
+                  />
+                </button>
+              ) : null}
+            </div>
             {email && (
               <span
                 className={styles.email}
