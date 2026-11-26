@@ -343,6 +343,26 @@ describe('BulkEditAccountModal', () => {
     })
   })
 
+  it.each(['oauth', 'apikey'])('OpenAI %s 批量编辑可设置账号级强制 Fast/Ultrafast', async (type) => {
+    mountModal({
+      selectedPlatforms: ['openai'],
+      selectedTypes: [type]
+    })
+
+    enable('bulk-edit-openai-force-fast-enabled')
+    fireEvent.click(screen.getByTestId('bulk-openai-force-fast'))
+    enable('bulk-edit-openai-force-ultrafast-enabled')
+    await submit()
+
+    expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledTimes(1)
+    expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], {
+      extra: {
+        openai_force_fast: true,
+        openai_force_ultrafast: false
+      }
+    })
+  })
+
   it('namespace 摊平开关不对 setup-token 等非 OAuth 选择展示', () => {
     mountModal({
       selectedPlatforms: ['openai'],

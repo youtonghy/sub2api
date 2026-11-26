@@ -229,6 +229,8 @@ export interface EditState {
   openaiPassthroughModelFilterEnabled: boolean
   // OpenAI Codex namespace 工具摊平兼容开关（仅 OAuth），缺省关闭即原样保留
   openaiFlattenNamespacesEnabled: boolean
+  openaiForceFastEnabled: boolean
+  openaiForceUltrafastEnabled: boolean
   openAILongContextBillingEnabled: boolean
   // OpenAI 订阅档位（Plus / Pro 20x / Pro 5x / Business Standard / Business Premium / Free）手动覆盖值,
   // 存于 credentials.plan_type;'' 表示清空/自动识别
@@ -359,6 +361,8 @@ export function createInitialEditState(): EditState {
     openaiPassthroughEnabled: false,
     openaiPassthroughModelFilterEnabled: false,
     openaiFlattenNamespacesEnabled: false,
+    openaiForceFastEnabled: false,
+    openaiForceUltrafastEnabled: false,
     openAILongContextBillingEnabled: false,
     editPlanType: '',
     openAICompactMode: 'auto',
@@ -915,6 +919,8 @@ export function syncEditStateFromAccount(prev: EditState, newAccount: Account): 
   s.openaiPassthroughEnabled = false
   s.openaiPassthroughModelFilterEnabled = false
   s.openaiFlattenNamespacesEnabled = false
+  s.openaiForceFastEnabled = false
+  s.openaiForceUltrafastEnabled = false
   s.openAILongContextBillingEnabled = false
   s.editPlanType = ''
   s.openAICompactMode = 'auto'
@@ -937,6 +943,8 @@ export function syncEditStateFromAccount(prev: EditState, newAccount: Account): 
     s.openaiPassthroughEnabled = extra?.openai_passthrough === true || extra?.openai_oauth_passthrough === true
     s.openaiPassthroughModelFilterEnabled = extra?.openai_passthrough_model_filter === true
     s.openaiFlattenNamespacesEnabled = newAccount.type === 'oauth' && extra?.openai_responses_flatten_namespaces === true
+    s.openaiForceFastEnabled = extra?.openai_force_fast === true
+    s.openaiForceUltrafastEnabled = extra?.openai_force_ultrafast === true
     const longContextBillingValue = extra?.openai_long_context_billing_enabled
     s.openAILongContextBillingEnabled = longContextBillingValue === true
     // plan_type 手动覆盖仅 OAuth 有实际调度语义(IsOpenAIChatGPTSubscription 要求 oauth),故只对 oauth 回填
@@ -2047,6 +2055,16 @@ export function buildEditUpdatePayload(s: EditState, account: Account, deps: Bui
       newExtra.openai_responses_flatten_namespaces = true
     } else {
       delete newExtra.openai_responses_flatten_namespaces
+    }
+    if (s.openaiForceFastEnabled) {
+      newExtra.openai_force_fast = true
+    } else {
+      delete newExtra.openai_force_fast
+    }
+    if (s.openaiForceUltrafastEnabled) {
+      newExtra.openai_force_ultrafast = true
+    } else {
+      delete newExtra.openai_force_ultrafast
     }
     if (isSparkShadow) {
       delete newExtra.openai_long_context_billing_enabled

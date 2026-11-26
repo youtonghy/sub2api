@@ -917,6 +917,12 @@ export default {
         passthroughModelFilter: '透传时按账号模型筛选',
         passthroughModelFilterDesc:
           '使用账号模型白名单与映射的来源模型名筛选候选账号，映射目标不会改写透传请求的模型名。列表为空时允许所有模型。默认关闭。',
+        forceFast: '强制 Fast',
+        forceFastDesc:
+          '开启后，调度到该账号的请求一律以 service_tier=priority（Fast）发往上游，并按 Fast 价格计费。若请求所属分组已设置强制 Fast/Ultrafast，以分组为准。',
+        forceUltrafast: '强制 Ultrafast',
+        forceUltrafastDesc:
+          '开启后，对支持 Ultrafast 的模型强制 service_tier=ultrafast（OAuth 账号需具备 Ultrafast 资格），优先于强制 Fast，并按 Ultrafast 价格计费；不支持的模型在开启强制 Fast 时改用 Fast，否则保留客户端原值。若请求所属分组已设置强制，以分组为准。',
         flattenNamespaces: '摊平 Codex namespace 工具（兼容）',
         flattenNamespacesDesc:
           '默认关闭：/responses 上的 namespace 工具声明原样转发，这正是 ChatGPT Codex 后端期望的形态。仅当该 OAuth 账号指向不认识 namespace 的兼容上游时才开启——摊平会把工具改名为 namespace__tool，使按 functions.<命名空间>.<工具> 寻址的模型（如 gpt-5.6 多智能体）无法调用。压缩（compact）请求不受该开关影响，始终摊平。',

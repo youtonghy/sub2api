@@ -789,6 +789,12 @@ export default {
         passthroughModelFilter: 'Filter passthrough accounts by model',
         passthroughModelFilterDesc:
           'Use the account model whitelist and mapping source names to select this account. Mapping targets do not rename passthrough requests. An empty list allows all models. Disabled by default.',
+        forceFast: 'Force Fast',
+        forceFastDesc:
+          'When enabled, requests routed to this account are sent upstream with service_tier=priority (Fast) and billed at Fast rates. If the request group already forces Fast/Ultrafast, the group setting wins.',
+        forceUltrafast: 'Force Ultrafast',
+        forceUltrafastDesc:
+          'When enabled, models that support Ultrafast are forced to service_tier=ultrafast (OAuth accounts must be entitled to Ultrafast), taking precedence over Force Fast and billed at Ultrafast rates. Other models use Fast if Force Fast is on, otherwise the client value is kept. If the request group already forces a tier, the group setting wins.',
         flattenNamespaces: 'Flatten Codex namespace tools (compatibility)',
         flattenNamespacesDesc:
           'Disabled by default: Codex namespace tool declarations are forwarded as-is on /responses, which is what the ChatGPT Codex backend expects. Enable only when this OAuth account is routed to a relay that rejects namespace tools — flattening renames them to namespace__tool, which breaks models that address collaboration tools as functions.<namespace>.<tool>. Compaction requests always flatten regardless of this switch.',

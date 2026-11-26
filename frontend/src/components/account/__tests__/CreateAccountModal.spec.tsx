@@ -335,6 +335,23 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     })
   })
 
+  it('forces Fast by default for new OpenAI accounts and lets Ultrafast be enabled', async () => {
+    createAccountMock.mockReset().mockResolvedValue({ id: 45, platform: 'openai', type: 'apikey' })
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'OpenAI')
+    await selectButtonByText(wrapper, 'API Key')
+    await setValue(textInput(wrapper), 'forced tier')
+    await setValue(passwordInput(wrapper), 'synthetic-key')
+    await clickToggle('create-openai-force-ultrafast-toggle')
+    await click(screen.getByTestId('model-whitelist-selector'))
+    await submit(wrapper)
+    await flushPromises()
+
+    const payload = createAccountMock.mock.calls[0]?.[0]
+    expect(payload.extra.openai_force_fast).toBe(true)
+    expect(payload.extra.openai_force_ultrafast).toBe(true)
+  })
+
   it('can create a passthrough account with model filtering enabled', async () => {
     createAccountMock.mockReset().mockResolvedValue({ id: 43, platform: 'openai', type: 'apikey' })
     const wrapper = mountModal()

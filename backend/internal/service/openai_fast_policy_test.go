@@ -725,6 +725,60 @@ func TestOpenAIGroupForcedServiceTier(t *testing.T) {
 	}
 }
 
+func TestOpenAIForcedServiceTier_AccountFallback(t *testing.T) {
+	const sol, unsupported = "gpt-6.1-sol", "gpt-5.6-sol"
+	account := func(platform string, fast, ultrafast bool) *Account {
+		return &Account{Platform: platform, Type: AccountTypeAPIKey, Extra: map[string]any{
+			"openai_force_fast": fast, "openai_force_ultrafast": ultrafast,
+		}}
+	}
+	group := func(fast, ultrafast bool) context.Context {
+		return context.WithValue(context.Background(), ctxkey.Group, &Group{
+			ID: 7, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true,
+			ForceOpenAIFast: fast, ForceOpenAIUltrafast: ultrafast,
+		})
+	}
+	for _, tt := range []struct {
+		name    string
+		ctx     context.Context
+		account *Account
+		model   string
+		want    string
+	}{
+		{name: "nil account", ctx: context.Background(), account: nil, model: sol, want: ""},
+		{name: "account off, no group", ctx: context.Background(), account: account(PlatformOpenAI, false, false), model: sol, want: ""},
+		{name: "account without extra", ctx: context.Background(), account: &Account{Platform: PlatformOpenAI}, model: sol, want: ""},
+		{name: "account fast, no group", ctx: context.Background(), account: account(PlatformOpenAI, true, false), model: sol, want: OpenAIFastTierPriority},
+		{name: "account fast, nil ctx", ctx: nil, account: account(PlatformOpenAI, true, false), model: sol, want: OpenAIFastTierPriority},
+		{name: "account ultrafast, supported", ctx: context.Background(), account: account(PlatformOpenAI, false, true), model: sol, want: OpenAIFastTierUltrafast},
+		{name: "account ultrafast, unsupported follows client", ctx: context.Background(), account: account(PlatformOpenAI, false, true), model: unsupported, want: ""},
+		{name: "account both, unsupported falls back to fast", ctx: context.Background(), account: account(PlatformOpenAI, true, true), model: unsupported, want: OpenAIFastTierPriority},
+		{name: "grok account ignores flags", ctx: context.Background(), account: account(PlatformGrok, true, true), model: sol, want: ""},
+		{name: "group not forcing uses account", ctx: group(false, false), account: account(PlatformOpenAI, true, false), model: sol, want: OpenAIFastTierPriority},
+		{name: "group fast overrides account ultrafast", ctx: group(true, false), account: account(PlatformOpenAI, false, true), model: sol, want: OpenAIFastTierPriority},
+		{name: "group ultrafast overrides account fast", ctx: group(false, true), account: account(PlatformOpenAI, true, false), model: sol, want: OpenAIFastTierUltrafast},
+		{name: "group fast applies to account with flags off", ctx: group(true, false), account: account(PlatformOpenAI, false, false), model: sol, want: OpenAIFastTierPriority},
+		{name: "group ultrafast-only on unsupported model falls to account", ctx: group(false, true), account: account(PlatformOpenAI, true, false), model: unsupported, want: OpenAIFastTierPriority},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, openAIForcedServiceTier(tt.ctx, tt.account, tt.model))
+		})
+	}
+}
+
+func TestApplyOpenAIFastPolicyToBody_AccountForceFast(t *testing.T) {
+	svc := newOpenAIGatewayServiceWithSettings(t, DefaultOpenAIFastPolicySettings())
+	account := &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Extra: map[string]any{"openai_force_fast": true}}
+	updated, err := svc.applyOpenAIFastPolicyToBody(context.Background(), account, "gpt-5.5", []byte(`{"model":"gpt-5.5"}`))
+	require.NoError(t, err)
+	require.Equal(t, OpenAIFastTierPriority, gjson.GetBytes(updated, "service_tier").String())
+
+	frame, blocked, err := svc.applyOpenAIFastPolicyToWSResponseCreate(context.Background(), account, "gpt-5.5", []byte(`{"type":"response.create","model":"gpt-5.5","service_tier":"flex"}`))
+	require.NoError(t, err)
+	require.Nil(t, blocked)
+	require.Equal(t, OpenAIFastTierPriority, gjson.GetBytes(frame, "service_tier").String())
+}
+
 // 仅强制 Ultra Fast 的分组：不支持的模型保留客户端传入的档位（含省略）。
 func TestApplyOpenAIFastPolicyToBody_GroupForceUltrafastSkipsUnsupportedModels(t *testing.T) {
 	svc := newOpenAIGatewayServiceWithSettings(t, DefaultOpenAIFastPolicySettings())

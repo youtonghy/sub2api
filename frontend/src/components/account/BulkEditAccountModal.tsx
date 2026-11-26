@@ -101,6 +101,8 @@ interface BulkEditState {
   enableOpenAIPassthrough: boolean
   enableOpenAIPassthroughModelFilter: boolean
   enableOpenAIFlattenNamespaces: boolean
+  enableOpenAIForceFast: boolean
+  enableOpenAIForceUltrafast: boolean
   enableOpenAILongContextBilling: boolean
   enableOpenAIImageSizeTiers: boolean
   enableOpenAIEndpointCapabilities: boolean
@@ -136,6 +138,8 @@ interface BulkEditState {
   openaiPassthroughModelFilterEnabled: boolean
   // Codex namespace 工具摊平兼容开关（仅 OAuth），缺省关闭即原样保留
   openaiFlattenNamespacesEnabled: boolean
+  openaiForceFastEnabled: boolean
+  openaiForceUltrafastEnabled: boolean
   openAILongContextBillingEnabled: boolean
   openAIImageSizeTiers: OpenAIImageSizeTier[]
   openAIEndpointCapabilities: OpenAIEndpointCapability[]
@@ -170,6 +174,8 @@ const createInitialState = (): BulkEditState => ({
   enableOpenAIPassthrough: false,
   enableOpenAIPassthroughModelFilter: false,
   enableOpenAIFlattenNamespaces: false,
+  enableOpenAIForceFast: false,
+  enableOpenAIForceUltrafast: false,
   enableOpenAILongContextBilling: false,
   enableOpenAIImageSizeTiers: false,
   enableOpenAIEndpointCapabilities: false,
@@ -201,6 +207,8 @@ const createInitialState = (): BulkEditState => ({
   openaiPassthroughEnabled: false,
   openaiPassthroughModelFilterEnabled: false,
   openaiFlattenNamespacesEnabled: false,
+  openaiForceFastEnabled: false,
+  openaiForceUltrafastEnabled: false,
   openAILongContextBillingEnabled: false,
   openAIImageSizeTiers: [...OPENAI_IMAGE_SIZE_TIERS],
   openAIEndpointCapabilities: ['chat_completions', 'embeddings'],
@@ -666,6 +674,14 @@ export default function BulkEditAccountModal({
       extra.openai_responses_flatten_namespaces = form.openaiFlattenNamespacesEnabled
     }
 
+    // 账号级强制 service_tier：未勾选修改时省略该键，保留各账号原值
+    if (form.enableOpenAIForceFast && allOpenAIPassthroughCapable) {
+      ensureExtra().openai_force_fast = form.openaiForceFastEnabled
+    }
+    if (form.enableOpenAIForceUltrafast && allOpenAIPassthroughCapable) {
+      ensureExtra().openai_force_ultrafast = form.openaiForceUltrafastEnabled
+    }
+
     if (applyOpenAILongContextBilling) {
       const extra = ensureExtra()
       extra.openai_long_context_billing_enabled = form.openAILongContextBillingEnabled
@@ -942,6 +958,8 @@ export default function BulkEditAccountModal({
       form.enableOpenAIPassthrough ||
       (form.enableOpenAIPassthroughModelFilter && allOpenAIPassthroughCapable) ||
       form.enableOpenAIFlattenNamespaces ||
+      (form.enableOpenAIForceFast && allOpenAIPassthroughCapable) ||
+      (form.enableOpenAIForceUltrafast && allOpenAIPassthroughCapable) ||
       (form.enableOpenAILongContextBilling && allOpenAIPassthroughCapable) ||
       (form.enableOpenAIImageSizeTiers && allOpenAIPassthroughCapable) ||
       (form.enableOpenAIEndpointCapabilities && allOpenAIAPIKey) ||
@@ -1129,6 +1147,61 @@ export default function BulkEditAccountModal({
                   disabled={!form.enableOpenAIPassthroughModelFilter}
                   onCheckedChange={(next) => update({ openaiPassthroughModelFilterEnabled: next === true })}
                   data-testid="bulk-openai-passthrough-model-filter"
+                />
+              </FieldBody>
+            </BulkField>
+          ) : null}
+
+          {/* OpenAI 账号级强制 service_tier（分组未强制时生效） */}
+          {allOpenAIPassthroughCapable ? (
+            <BulkField
+              id="bulk-edit-openai-force-fast"
+              label={t('admin.accounts.openai.forceFast')}
+              ariaLabel={t('admin.accounts.openai.forceFast')}
+              description={t('admin.accounts.openai.forceFastDesc')}
+              enabled={form.enableOpenAIForceFast}
+              onEnabledChange={(v) => update({ enableOpenAIForceFast: v })}
+              controls="bulk-edit-openai-force-fast-body"
+            >
+              <FieldBody
+                id="bulk-edit-openai-force-fast-body"
+                enabled={form.enableOpenAIForceFast}
+                group
+                labelledBy="bulk-edit-openai-force-fast-label"
+              >
+                <Checkbox
+                  label={t('common.enabled')}
+                  checked={form.openaiForceFastEnabled}
+                  disabled={!form.enableOpenAIForceFast}
+                  onCheckedChange={(next) => update({ openaiForceFastEnabled: next === true })}
+                  data-testid="bulk-openai-force-fast"
+                />
+              </FieldBody>
+            </BulkField>
+          ) : null}
+
+          {allOpenAIPassthroughCapable ? (
+            <BulkField
+              id="bulk-edit-openai-force-ultrafast"
+              label={t('admin.accounts.openai.forceUltrafast')}
+              ariaLabel={t('admin.accounts.openai.forceUltrafast')}
+              description={t('admin.accounts.openai.forceUltrafastDesc')}
+              enabled={form.enableOpenAIForceUltrafast}
+              onEnabledChange={(v) => update({ enableOpenAIForceUltrafast: v })}
+              controls="bulk-edit-openai-force-ultrafast-body"
+            >
+              <FieldBody
+                id="bulk-edit-openai-force-ultrafast-body"
+                enabled={form.enableOpenAIForceUltrafast}
+                group
+                labelledBy="bulk-edit-openai-force-ultrafast-label"
+              >
+                <Checkbox
+                  label={t('common.enabled')}
+                  checked={form.openaiForceUltrafastEnabled}
+                  disabled={!form.enableOpenAIForceUltrafast}
+                  onCheckedChange={(next) => update({ openaiForceUltrafastEnabled: next === true })}
+                  data-testid="bulk-openai-force-ultrafast"
                 />
               </FieldBody>
             </BulkField>

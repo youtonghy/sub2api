@@ -2397,6 +2397,28 @@ func (a *Account) IsOpenAIResponsesFlattenNamespacesEnabled() bool {
 	return ok && enabled
 }
 
+// IsOpenAIForceFastEnabled 返回账号级"强制 Fast"开关。
+// 字段：accounts.extra.openai_force_fast，缺省 false。
+// 仅当请求所属分组未强制任何 service_tier 时生效（见 openAIForcedServiceTier）。
+func (a *Account) IsOpenAIForceFastEnabled() bool {
+	if a == nil || a.Platform != PlatformOpenAI || a.Extra == nil {
+		return false
+	}
+	enabled, ok := a.Extra["openai_force_fast"].(bool)
+	return ok && enabled
+}
+
+// IsOpenAIForceUltrafastEnabled 返回账号级"强制 Ultrafast"开关。
+// 字段：accounts.extra.openai_force_ultrafast，缺省 false。
+// 仅对支持 Ultrafast 的模型生效，优先于 IsOpenAIForceFastEnabled。
+func (a *Account) IsOpenAIForceUltrafastEnabled() bool {
+	if a == nil || a.Platform != PlatformOpenAI || a.Extra == nil {
+		return false
+	}
+	enabled, ok := a.Extra["openai_force_ultrafast"].(bool)
+	return ok && enabled
+}
+
 // IsOpenAIWSAllowStoreRecoveryEnabled 返回账号级 store 恢复开关。
 // 字段：accounts.extra.openai_ws_allow_store_recovery。
 func (a *Account) IsOpenAIWSAllowStoreRecoveryEnabled() bool {

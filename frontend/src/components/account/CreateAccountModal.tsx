@@ -2346,6 +2346,26 @@ export default function CreateAccountModal({ show, proxies, groups, onClose, onC
         </FormSection>
       ) : null}
 
+      {/* OpenAI 账号级强制 service_tier（分组未强制时生效） */}
+      {platform === 'openai' ? (
+        <FormSection>
+          <ToggleRow
+            data-testid="create-openai-force-fast-toggle"
+            label={t('admin.accounts.openai.forceFast')}
+            description={t('admin.accounts.openai.forceFastDesc')}
+            checked={s.openaiForceFastEnabled}
+            onChange={(value) => set({ openaiForceFastEnabled: value })}
+          />
+          <ToggleRow
+            data-testid="create-openai-force-ultrafast-toggle"
+            label={t('admin.accounts.openai.forceUltrafast')}
+            description={t('admin.accounts.openai.forceUltrafastDesc')}
+            checked={s.openaiForceUltrafastEnabled}
+            onChange={(value) => set({ openaiForceUltrafastEnabled: value })}
+          />
+        </FormSection>
+      ) : null}
+
       {/* OpenAI Codex namespace 工具摊平（兼容开关，仅 OAuth） */}
       {platform === 'openai' && form.type === 'oauth' ? (
         <FormSection>

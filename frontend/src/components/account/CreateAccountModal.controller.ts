@@ -199,6 +199,9 @@ const createInitialState = (show: boolean) => ({
   openaiPassthroughModelFilterEnabled: false,
   // OpenAI Codex namespace 工具摊平兼容开关（仅 OAuth），缺省关闭即原样保留
   openaiFlattenNamespacesEnabled: false,
+  // 账号级强制 service_tier（分组未强制时生效）；新建 OpenAI 账号默认强制 Fast
+  openaiForceFastEnabled: true,
+  openaiForceUltrafastEnabled: false,
   openAILongContextBillingEnabled: false,
   openAILongContextBillingTouched: false,
   openAICompactMode: 'auto' as OpenAICompactMode,
@@ -1256,6 +1259,8 @@ export function createCreateAccountController(deps: CreateAccountControllerDeps)
       openaiPassthroughEnabled: false,
       openaiPassthroughModelFilterEnabled: false,
       openaiFlattenNamespacesEnabled: false,
+      openaiForceFastEnabled: true,
+      openaiForceUltrafastEnabled: false,
       openAILongContextBillingEnabled: false,
       openAILongContextBillingTouched: false,
       openAICompactMode: 'auto',
@@ -1355,6 +1360,16 @@ export function createCreateAccountController(deps: CreateAccountControllerDeps)
       extra.openai_responses_flatten_namespaces = true
     } else {
       delete extra.openai_responses_flatten_namespaces
+    }
+    if (s.openaiForceFastEnabled) {
+      extra.openai_force_fast = true
+    } else {
+      delete extra.openai_force_fast
+    }
+    if (s.openaiForceUltrafastEnabled) {
+      extra.openai_force_ultrafast = true
+    } else {
+      delete extra.openai_force_ultrafast
     }
     extra.openai_long_context_billing_enabled = s.openAILongContextBillingEnabled
 

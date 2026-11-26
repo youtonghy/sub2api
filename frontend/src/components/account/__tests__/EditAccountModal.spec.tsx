@@ -1027,6 +1027,25 @@ describe('EditAccountModal', () => {
     expect(updateAccountMock.mock.calls[0]?.[1]?.extra?.openai_responses_flatten_namespaces).toBe(true)
   })
 
+  it('loads account force Fast/Ultrafast toggles and clears them when switched off', async () => {
+    const account = buildAccount()
+    account.extra = { openai_force_fast: true }
+    updateAccountMock.mockReset()
+    checkMixedChannelRiskMock.mockReset()
+    checkMixedChannelRiskMock.mockResolvedValue({ has_risk: false })
+    updateAccountMock.mockResolvedValue(account)
+
+    const wrapper = mountModal(account)
+    await wrapper.click('[data-testid="edit-openai-force-fast-toggle"]')
+    await wrapper.click('[data-testid="edit-openai-force-ultrafast-toggle"]')
+    await wrapper.submit()
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    const extra = updateAccountMock.mock.calls[0]?.[1]?.extra
+    expect(extra).not.toHaveProperty('openai_force_fast')
+    expect(extra?.openai_force_ultrafast).toBe(true)
+  })
+
   it('writes the upstream request id header into extra only when it changes', async () => {
     const account = buildAccount()
     account.extra = { openai_compact_mode: 'force_on' }
